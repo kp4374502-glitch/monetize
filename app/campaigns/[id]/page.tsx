@@ -3,9 +3,10 @@ import { notFound } from "next/navigation";
 import { requireUserId } from "@/lib/auth/ensure-user";
 import { getCampaignForUser, getRoleForCampaign } from "@/lib/auth/roles";
 import { listInviteLinks } from "@/lib/campaigns/service";
-import { getCreatorClips, getReviewQueue } from "@/lib/clips/service";
+import { getClipHistory, getCreatorClips, getReviewQueue } from "@/lib/clips/service";
 import { CreatorClips } from "@/components/clips/creator-clips";
 import { ReviewQueue } from "@/components/clips/review-queue";
+import { ClipHistory } from "@/components/clips/clip-history";
 import {
   deleteCampaignAction,
   generateInviteLinkAction,
@@ -28,6 +29,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
   const isAdmin = role === "owner" || role === "admin";
   const myClips = role === "creator" ? await getCreatorClips(userId, id) : [];
   const queue = canInvite ? await getReviewQueue(userId, id) : null;
+  const history = canInvite ? await getClipHistory(userId, id) : null;
 
   return (
     <main className="mx-auto max-w-3xl p-8">
@@ -39,6 +41,8 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
 
       {role === "creator" && <CreatorClips campaignId={id} clips={myClips} viewMinimum={campaign.viewMinimum} />}
       {queue && <ReviewQueue campaignId={id} pending={queue.pending} awaitingPayment={queue.awaitingPayment} />}
+
+      {history && <ClipHistory history={history} />}
 
       {isAdmin && (
         <section className="mt-8 flex flex-wrap gap-2">

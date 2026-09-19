@@ -24,7 +24,13 @@ export async function CampaignSwitcher() {
         {list.map((c) => (
           <li key={c.id}>
             <Link href={`/campaigns/${c.id}`} className="flex justify-between gap-4 rounded px-3 py-2 hover:bg-bg-primary">
-              <span>{c.name}</span>
+              <span>
+                {c.name}
+                <span className="block text-xs text-text-secondary">
+                  {c.brandName}
+                  {c.status !== "active" && <span className="ml-2 rounded-full border border-gold-border px-1.5 text-gold-light">{c.status}</span>}
+                </span>
+              </span>
               <span className="text-text-secondary">{c.role}</span>
             </Link>
           </li>

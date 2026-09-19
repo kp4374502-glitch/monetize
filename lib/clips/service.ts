@@ -1,4 +1,5 @@
-import { and, asc, desc, eq, like, sql, gte, count, ne } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, like, sql, gte, count, ne } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { db } from "../db/client";
 import { campaigns, campaignCreators, clipReviewEvents, clips, users } from "../../drizzle/schema";
@@ -369,4 +370,64 @@ export async function getReviewQueue(actorId: string, campaignId: string) {
       )
       .orderBy(asc(clips.submittedAt));
   return { pending: await rows("pending"), awaitingPayment: await rows("approved") };
+}
+
+const HISTORY_LIMIT = 50;
+
+/**
+ * Paid and Rejected history plus the money totals, for Mods/Admins/Owner of THIS campaign.
+ * Totals are exact (summed in SQL over numeric columns): paid = payout of paid clips,
+ * owed = payout of approved-but-unpaid clips. Lists are newest first, capped at 50 each.
+ */
+export async function getClipHistory(actorId: string, campaignId: string) {
+  await requireRole(actorId, campaignId, "mod");
+
+  const payer = alias(users, "payer");
+  const paid = await db
+    .select({ clip: clips, creatorUsername: users.username, paidByUsername: payer.username })
+    .from(clips)
+    .innerJoin(users, eq(users.id, clips.creatorUserId))
+    .leftJoin(payer, eq(payer.id, clips.paidBy))
+    .where(and(eq(clips.campaignId, campaignId), eq(clips.paidStatus, "paid")))
+    .orderBy(desc(clips.paidAt))
+    .limit(HISTORY_LIMIT);
+
+  const rejectedRows = await db
+    .select({ clip: clips, creatorUsername: users.username })
+    .from(clips)
+    .innerJoin(users, eq(users.id, clips.creatorUserId))
+    .where(and(eq(clips.campaignId, campaignId), eq(clips.status, "rejected")))
+    .orderBy(desc(clips.submittedAt))
+    .limit(HISTORY_LIMIT);
+
+  // Who made the latest reject call on each clip (from the audit log).
+  const rejecters = new Map<string, string>();
+  if (rejectedRows.length) {
+    const events = await db
+      .select({ clipId: clipReviewEvents.clipId, username: users.username })
+      .from(clipReviewEvents)
+      .innerJoin(users, eq(users.id, clipReviewEvents.actorUserId))
+      .where(
+        and(
+          inArray(clipReviewEvents.clipId, rejectedRows.map((r) => r.clip.id)),
+          eq(clipReviewEvents.action, "reject"),
+        ),
+      )
+      .orderBy(desc(clipReviewEvents.createdAt));
+    for (const e of events) if (!rejecters.has(e.clipId)) rejecters.set(e.clipId, e.username);
+  }
+
+  const [totals] = await db
+    .select({
+      paid: sql<string>`coalesce(sum(${clips.payout}) filter (where ${clips.paidStatus} = 'paid'), 0)`,
+      owed: sql<string>`coalesce(sum(${clips.payout}) filter (where ${clips.status} = 'approved' and ${clips.paidStatus} = 'unpaid'), 0)`,
+    })
+    .from(clips)
+    .where(eq(clips.campaignId, campaignId));
+
+  return {
+    paid,
+    rejected: rejectedRows.map((r) => ({ ...r, rejectedBy: rejecters.get(r.clip.id) ?? null })),
+    totals: { paid: Number(totals.paid).toFixed(2), owed: Number(totals.owed).toFixed(2) },
+  };
 }

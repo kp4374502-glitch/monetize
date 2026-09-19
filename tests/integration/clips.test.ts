@@ -445,3 +445,44 @@ describe("tenant isolation for clip reads", () => {
     await expect(svc.getReviewQueue("c1", camp)).rejects.toThrow(/Access denied/);
   });
 });
+
+describe("getClipHistory (Paid / Rejected lists + totals)", () => {
+  it("lists paid and rejected clips with who/why, and totals paid vs owed exactly", async () => {
+    const h = (await campaignSvc.createCampaign("owner", { ...validCampaign, name: "History" })).id;
+    await db.insert(campaignCreators).values([
+      { campaignId: h, userId: "c1" },
+      { campaignId: h, userId: "c2" },
+    ]);
+    const approve = async (creator: string, views: number) => {
+      const clip = await makeClip(creator, h, views);
+      await svc.attachVideoProof(creator, h, clip.id, "https://youtu.be/aaaaaaaaaaa");
+      await svc.setQualifyingAudiencePct("admin", h, clip.id, 50); // payout = views/1000 dollars
+      await svc.reviewClip("admin", h, clip.id, { action: "approve" });
+      return clip;
+    };
+    const paidClip = await approve("c1", 10_000); // $10.00
+    await svc.markPaid("admin", h, paidClip.id);
+    await approve("c2", 20_000); // $20.00 owed
+    const rejected = await makeClip("c2", h);
+    await svc.reviewClip("admin", h, rejected.id, { action: "reject", reason: "stolen link" });
+    await makeClip("c1", h); // pending: counts toward neither total
+
+    const hist = await svc.getClipHistory("admin", h);
+    expect(hist.totals).toEqual({ paid: "10.00", owed: "20.00" });
+    expect(hist.paid).toHaveLength(1);
+    expect(hist.paid[0]).toMatchObject({ creatorUsername: "c1", paidByUsername: "admin" });
+    expect(hist.paid[0].clip.id).toBe(paidClip.id);
+    expect(hist.rejected).toHaveLength(1);
+    expect(hist.rejected[0]).toMatchObject({ creatorUsername: "c2", rejectedBy: "admin" });
+    expect(hist.rejected[0].clip.rejectionReason).toBe("stolen link");
+  });
+
+  it("is scoped to one campaign and gated to that campaign's reviewers", async () => {
+    // camp/campB/small hold plenty of other data; none of it may leak into a fresh campaign
+    const empty = (await campaignSvc.createCampaign("owner", { ...validCampaign, name: "Empty" })).id;
+    expect(await svc.getClipHistory("owner", empty)).toEqual({ paid: [], rejected: [], totals: { paid: "0.00", owed: "0.00" } });
+    await expect(svc.getClipHistory("modOther", camp)).rejects.toThrow(/Access denied/);
+    await expect(svc.getClipHistory("c1", camp)).rejects.toThrow(/Access denied/);
+    expect((await svc.getClipHistory("modA", camp)).paid.every((r) => r.clip.campaignId === camp)).toBe(true);
+  });
+});
