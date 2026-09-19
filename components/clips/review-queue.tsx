@@ -60,12 +60,23 @@ export function ReviewQueue({
       <h2 className="mb-2 mt-8 font-semibold">Approved — awaiting payment ({awaitingPayment.length})</h2>
       <ul className="grid gap-3">
         {awaitingPayment.map(({ clip: c, creatorUsername }) => (
-          <li key={c.id} className="flex items-center justify-between gap-3 rounded-md border border-subtle p-3" data-testid="payment-row">
-            <div className="text-sm">
-              <span className="font-medium">{creatorUsername}</span> · {c.views.toLocaleString()} views · <span data-testid="payment-amount">{money(c.payout)}</span>
+          <li key={c.id} className="rounded-md border border-subtle p-3" data-testid="payment-row">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm">
+                <span className="font-medium">{creatorUsername}</span> · {c.views.toLocaleString()} views · <span data-testid="payment-amount">{money(c.payout)}</span>
+              </div>
+              <ActionForm action={markPaidAction.bind(null, campaignId, c.id)}>
+                <Button type="submit" disabled={c.payout === null}>Mark paid</Button>
+              </ActionForm>
             </div>
-            <ActionForm action={markPaidAction.bind(null, campaignId, c.id)}>
-              <Button type="submit">Mark paid</Button>
+            {c.videoProofUrl ? (
+              <p className="mt-1 text-sm">Proof: <a href={c.videoProofUrl} target="_blank" rel="noreferrer" className="underline">{c.videoProofUrl}</a></p>
+            ) : (
+              <p className="mt-1 text-sm text-gold-light">⚠ Video proof missing — waiting on the creator. Earns $0 until it's attached.</p>
+            )}
+            <ActionForm action={setPctAction.bind(null, campaignId, c.id)} className="mt-2 flex flex-wrap items-center gap-2">
+              <Input name="pct" type="number" step="0.01" min="0" max="100" placeholder="Qualifying audience %" defaultValue={c.qualifyingAudiencePct ?? ""} disabled={!c.videoProofUrl} className="w-56" required />
+              <Button type="submit" variant="outline" disabled={!c.videoProofUrl}>Save %</Button>
             </ActionForm>
           </li>
         ))}
