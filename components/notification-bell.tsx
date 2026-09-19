@@ -4,7 +4,13 @@ import { dismissNotificationAction } from "@/app/notifications/actions";
 
 /** Basic in-app bell: unread notifications persist until dismissed. */
 export async function NotificationBell() {
-  const { userId } = await auth();
+  // Paths the Clerk middleware skips (e.g. /index.html) still render this layout; auth() throws there.
+  let userId: string | null = null;
+  try {
+    ({ userId } = await auth());
+  } catch {
+    return null;
+  }
   if (!userId) return null;
 
   let items: Awaited<ReturnType<typeof listNotifications>> = [];

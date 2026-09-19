@@ -4,7 +4,13 @@ import { getCampaignsForUser } from "@/lib/auth/roles";
 
 /** Uses the same role layer as everything else — no parallel lookup. Navigation is plain links. */
 export async function CampaignSwitcher() {
-  const { userId } = await auth();
+  // Paths the Clerk middleware skips (e.g. /index.html) still render this layout; auth() throws there.
+  let userId: string | null = null;
+  try {
+    ({ userId } = await auth());
+  } catch {
+    return null;
+  }
   if (!userId) return null;
 
   let list: Awaited<ReturnType<typeof getCampaignsForUser>> = [];
