@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ClerkProvider } from "@clerk/nextjs";
+import { NotificationBell } from "@/components/notification-bell";
 import { CampaignSwitcher } from "@/components/campaign-switcher";
 import "./globals.css";
 
@@ -18,7 +19,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="font-bold">
               Monetize
             </Link>
-            <CampaignSwitcher />
+            <div className="flex items-center gap-2">
+              <NotificationBell />
+              <CampaignSwitcher />
+            </div>
           </header>
           {children}
         </body>

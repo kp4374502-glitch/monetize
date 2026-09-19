@@ -238,11 +238,21 @@ export const notifications = pgTable(
 // ---------------------------------------------------------------------------
 // scrapecreators_cache — optional cost-saving cache
 // ---------------------------------------------------------------------------
-export const scrapeCreatorsCache = pgTable("scrapecreators_cache", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  platform: platformEnum("platform").notNull(),
-  url: text("url").notNull(),
-  views: integer("views").notNull(),
-  likes: integer("likes").notNull(),
-  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const scrapeCreatorsCache = pgTable(
+  "scrapecreators_cache",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    platform: platformEnum("platform").notNull(),
+    url: text("url").notNull(),
+    views: integer("views").notNull(),
+    likes: integer("likes").notNull(),
+    // Task 3: added so a cache hit can fully populate a clip (thumbnail/caption) without an API call.
+    thumbnailUrl: text("thumbnail_url"),
+    caption: text("caption"),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    // Public post data, deliberately not tenant-scoped; one row per (platform, url) for upserts.
+    onePerUrl: unique("scrapecreators_cache_platform_url_unique").on(t.platform, t.url),
+  }),
+);

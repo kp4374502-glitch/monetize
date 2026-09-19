@@ -1,10 +1,10 @@
-# Monetize Clips — Product & Technical Spec
+# Monetize — Product & Technical Spec
 
 2026-09-18 · Compiled with @Someone
 
 ## Overview
 
-Monetize Clips is a multi-tenant platform for running paid TikTok/Instagram/YouTube clipping campaigns: creators submit links to clips they've posted, a reviewer verifies view counts and audience quality, and the platform tracks what each creator has earned. The platform itself is free — no fee is taken from any campaign.
+Monetize is a multi-tenant platform for running paid TikTok/Instagram/YouTube clipping campaigns: creators submit links to clips they've posted, a reviewer verifies view counts and audience quality, and the platform tracks what each creator has earned. The platform itself is free — no fee is taken from any campaign.
 
 Each brand runs its own **campaign** with its own payout formula, review team, and creator roster. Payouts are calculated and tracked in-app, but the actual money changes hands manually on Discord — the app is a ledger and review tool, not a payment processor.
 
@@ -262,6 +262,97 @@ The app calculates what's owed but **never moves money**. Actual payment happens
 - **Database:** Postgres, provisioned directly through Vercel's Storage/Marketplace tab (Neon-backed) — no separate Neon or Supabase account.
 - **Auth:** turnkey provider (e.g. Clerk), chosen and fully implemented end-to-end — handles multi-role (Owner/Admin/Mod/Creator), platform-wide and per-campaign scoping. **Login is username + password** (no email required, matching the current Liftly UI), with a forgot-password/reset flow.
 - **Creator onboarding:** an Owner or Mod generates a reusable invite link per campaign — the same link can onboard many creators and stays active until the Owner/Mod revokes it. No public self-signup.
+
+## Technical operations
+
+The sections below fill gaps between the business spec and an actually-buildable system — defaults chosen where no explicit decision was made; flag if any should change.
+
+### API / route design
+
+No public REST API is needed — this isn't consumed by external clients. Use **Next.js Server Actions**, colocated by domain, validated with `zod` schemas on every input:
+
+- **Campaigns:** `createCampaign`, `updateCampaignSettings`, `pauseCampaign`, `closeCampaign`, `reopenCampaign`, `transferCampaignOwnership`
+- **People:** `generateInviteLink`, `revokeInviteLink`, `addAdmin`, `addMod`, `removeMod`, `removeCreator`, `changeRole`
+- **Clips:** `submitClip`, `deleteClip` (delete-and-resubmit pattern), `refreshViews` (manual + a scheduled version for Vercel Cron)
+- **Review:** `reviewClip` (approve/reject with reason), `setQualifyingAudiencePct`, `attachVideoProof`, `markPaid`
+- **Notifications:** `listNotifications`, `markNotificationRead`
+
+### Security
+
+- **Password hashing & sessions:** handled natively by Clerk — no custom crypto code needed.
+- **API-level rate limiting** (distinct from the business-level 100/day submission cap): throttle login attempts and invite-link redemption attempts, e.g. via Upstash Redis or Vercel Edge Middleware.
+- **Input validation:** `zod` on every Server Action; submitted clip URLs are validated against expected TikTok/Instagram/YouTube URL patterns before a ScrapeCreators call is made, rejecting anything malformed up front.
+
+### Bootstrap process
+
+There's no self-signup path for the platform Owner (by design — exactly one exists). The first Owner row is created by a one-time seed script run during initial deployment, setting `is_platform_owner = true` — never exposed through any UI route.
+
+### ScrapeCreators failure handling
+
+Wrap every call in try/catch with retry-with-backoff (e.g. 3 attempts). On failure, keep showing the last-known-good `views`/`likes` values rather than zeroing them out, and surface a small "stats may be outdated" indicator using `last_refreshed_at` rather than blocking the page.
+
+### Error monitoring & logging
+
+Sentry (or Vercel's built-in observability) for exception tracking. `clip_review_events` already doubles as a structured audit log for review actions; no separate logging system is required for that specific need.
+
+### Environments & secrets
+
+`DATABASE_URL`, Clerk keys, and `SCRAPECREATORS_API_KEY` live in Vercel's environment variables (scoped to Production/Preview/Development), never committed to the repo. Vercel's preview deployments (one per PR) serve as staging before promoting to production.
+
+### Indexes
+
+Beyond the uniqueness constraints already in the schema: `clips(campaign_id, status)` for the review queue, `clips(campaign_id, creator_user_id, submitted_at)` for the daily-limit check and a creator's own clip list, and `notifications(user_id, read)` for the bell dropdown. Full detail lives in the Database Schema tab.
+
+### Timezone handling
+
+All timestamps stored in UTC. The 7-day video-proof window and the daily submission-limit reset are both computed in UTC uniformly, not per-campaign local time — flag if a campaign needs its own timezone instead.
+
+### Legal basics
+
+A lightweight privacy policy should exist at launch, covering stored usernames/passwords (via Clerk), stored video-proof links, and campaign/creator data — standard financial-services compliance doesn't apply since payouts happen outside the app on Discord. This still needs a human (ideally legal) review, not something Claude Code should draft as binding legal text.
+
+
+## Design system
+
+Brand reference: [usemonetize.co](https://usemonetize.co/) — the real Monetize marketing site. Dark theme, gold accent, matching that brand rather than the old Liftly visual style.
+
+### Colors (visual estimate from a screenshot — spot-check against the live site's dev tools if pixel-perfect matching matters)
+
+```css
+--bg-primary: #0A0A0A;      /* near-black page background */
+--bg-secondary: #000000;    /* pure black panels/cards */
+--text-primary: #FFFFFF;
+--text-secondary: #A3A3A3;  /* muted/secondary text */
+--accent-gold-light: #F0C572;
+--accent-gold-dark: #9C7A2E;
+--accent-gradient: linear-gradient(135deg, #F0C572, #9C7A2E);
+--border-gold: #C9A227;      /* metallic gold card/button borders */
+--border-subtle: #2A2A2A;    /* low-contrast dividers */
+```
+
+### Shape & component language
+
+- Fully rounded pill-shaped buttons and badges, filled with the gold gradient on primary actions.
+- Cards on a black fill with a thin gold-gradient border (visible on the hero's stacked mockup cards).
+- Toggle switches: dark track, white knob.
+
+### Typography
+
+Bold sans-serif for most UI text; an italic serif face used selectively for emphasized words in headlines (a stylistic accent, not the body font) — keep this contrast for marketing-adjacent pages (landing/auth) but a plain bold sans is fine for dense data screens (the review queue, clip feed) where legibility matters more than flourish.
+
+### Implementation
+
+Tailwind CSS + shadcn/ui, with the tokens above wired into Tailwind's theme config (`tailwind.config.ts`) rather than hardcoded per component, so the palette stays a single source of truth. shadcn components get restyled to the gold/black palette and pill shape rather than left at their default look.
+
+## Testing strategy
+
+Full coverage: unit + integration + e2e.
+
+- **Unit:** Vitest, covering business logic in isolation — the payout formula (CPM/Earnings/Payout math, including the Max Pay Per Post cap and Mod Mark-Paid Threshold), role/permission resolution, and the daily submission-limit calculation.
+- **Integration:** Server Actions tested end-to-end against a real test database (a disposable Postgres schema or a tool like Testcontainers) — this is where the cross-tenant isolation tests from Task 1 belong, plus things like "a Mod above the pay threshold gets rejected."
+- **E2E:** Playwright, simulating real flows in a browser — at minimum: a creator signs up via invite link and submits a clip; an Admin/Mod reviews, sets Qualifying Audience %, and approves it; a payout appears and gets marked paid.
+- **CI:** tests run automatically on every pull request via GitHub Actions before merge — flag if a different CI setup is preferred.
+
 
 ## Open questions & next steps
 

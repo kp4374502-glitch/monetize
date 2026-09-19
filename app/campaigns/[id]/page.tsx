@@ -3,6 +3,9 @@ import { notFound } from "next/navigation";
 import { requireUserId } from "@/lib/auth/ensure-user";
 import { getCampaignForUser, getRoleForCampaign } from "@/lib/auth/roles";
 import { listInviteLinks } from "@/lib/campaigns/service";
+import { getCreatorClips, getReviewQueue } from "@/lib/clips/service";
+import { CreatorClips } from "@/components/clips/creator-clips";
+import { ReviewQueue } from "@/components/clips/review-queue";
 import {
   deleteCampaignAction,
   generateInviteLinkAction,
@@ -11,7 +14,7 @@ import {
 } from "../actions";
 import { Button } from "@/components/ui/button";
 
-/** Placeholder dashboard — Task 3 builds the real one. */
+/** Campaign dashboard: creators see their own clips; Mods/Admins/Owner see the review queue. */
 export default async function CampaignPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const userId = await requireUserId();
@@ -23,15 +26,19 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
   const links = canInvite ? await listInviteLinks(userId, id) : [];
   const origin = `${(await headers()).get("x-forwarded-proto") ?? "http"}://${(await headers()).get("host")}`;
   const isAdmin = role === "owner" || role === "admin";
+  const myClips = role === "creator" ? await getCreatorClips(userId, id) : [];
+  const queue = canInvite ? await getReviewQueue(userId, id) : null;
 
   return (
-    <main className="mx-auto max-w-2xl p-8">
+    <main className="mx-auto max-w-3xl p-8">
       <p className="text-sm text-text-secondary">{campaign.brandName}</p>
       <h1 className="text-3xl font-bold" data-testid="campaign-name">{campaign.name}</h1>
       <p className="mt-1 text-text-secondary">
         Your role: <span data-testid="role">{role}</span> · Status: {campaign.status}
       </p>
-      <p className="mt-4 text-sm text-text-secondary">Placeholder dashboard — clips and review arrive in Task 3.</p>
+
+      {role === "creator" && <CreatorClips campaignId={id} clips={myClips} viewMinimum={campaign.viewMinimum} />}
+      {queue && <ReviewQueue campaignId={id} pending={queue.pending} awaitingPayment={queue.awaitingPayment} />}
 
       {isAdmin && (
         <section className="mt-8 flex flex-wrap gap-2">

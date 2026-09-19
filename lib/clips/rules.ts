@@ -1,0 +1,87 @@
+import { calculatePayout } from "../payout";
+
+/** Pure business rules — no DB, so they are unit-tested directly. Money math is in integer cents. */
+
+export const toCents = (v: number | string): number => Math.round(Number(v) * 100);
+export const fromCents = (c: number): string => (c / 100).toFixed(2);
+
+export interface EconomicsInput {
+  views: number;
+  qualifyingAudiencePct: number | null;
+  videoProofUrl: string | null;
+  campaign: { baseRate: number; divisor: number; maxPayPerPost: number; viewMinimum: number };
+}
+
+export type Economics =
+  | { eligible: false; reason: "no_proof" | "no_pct" | "below_view_minimum" }
+  | { eligible: true; cpm: string; earnings: string; payout: string };
+
+/**
+ * Gating per docs/PRODUCT_SPEC.md ("Tier 1 audience verification" + "Payout formula"): no payout
+ * until video proof is attached, a Qualifying Audience % is entered, and views clear the campaign's
+ * View Minimum. (Approval is checked separately — it gates owing/paying, not the calculation.)
+ * cpm keeps 4 decimals; earnings and payout are rounded to cents.
+ */
+export function computeEconomics(i: EconomicsInput): Economics {
+  if (!i.videoProofUrl) return { eligible: false, reason: "no_proof" };
+  if (i.qualifyingAudiencePct === null) return { eligible: false, reason: "no_pct" };
+  if (i.views < i.campaign.viewMinimum) return { eligible: false, reason: "below_view_minimum" };
+
+  const r = calculatePayout({
+    qualifyingAudiencePct: i.qualifyingAudiencePct,
+    divisor: i.campaign.divisor,
+    baseRate: i.campaign.baseRate,
+    views: i.views,
+    maxPayPerPost: i.campaign.maxPayPerPost,
+  });
+  const earningsCents = toCents(r.earnings);
+  const payoutCents = Math.min(earningsCents, toCents(i.campaign.maxPayPerPost));
+  return { eligible: true, cpm: r.cpm.toFixed(4), earnings: fromCents(earningsCents), payout: fromCents(payoutCents) };
+}
+
+/** budget_spent + payout <= total_budget, compared in cents. */
+export function wouldExceedBudget(budgetSpent: number | string, payout: number | string, totalBudget: number | string) {
+  return toCents(budgetSpent) + toCents(payout) > toCents(totalBudget);
+}
+
+/** A Mod may mark paid only up to the threshold; Admin/Owner are unlimited. */
+export function roleCanMarkPaid(role: "owner" | "admin" | "mod" | "creator", payout: number | string, threshold: number | string) {
+  if (role === "owner" || role === "admin") return true;
+  if (role === "mod") return toCents(payout) <= toCents(threshold);
+  return false;
+}
+
+/**
+ * A Mod may act on a clip's review/audience-% only if nobody else has (or they did it themselves).
+ * Admin/Owner may always override anyone.
+ */
+export function roleCanOverride(
+  role: "owner" | "admin" | "mod" | "creator",
+  actorId: string,
+  lastDecisionBy: string | null,
+): boolean {
+  if (role === "owner" || role === "admin") return true;
+  if (role === "mod") return lastDecisionBy === null || lastDecisionBy === actorId;
+  return false;
+}
+
+/**
+ * Soft duplicate/stolen-link flag: the same underlying post already submitted by a DIFFERENT
+ * creator in the same campaign. Returns a reason string (never names the other creator) or null.
+ */
+export function duplicateFlag(
+  creatorId: string,
+  matches: Array<{ creatorUserId: string }>,
+): { sameCreator: boolean; reason: string | null } {
+  const sameCreator = matches.some((m) => m.creatorUserId === creatorId);
+  const other = matches.some((m) => m.creatorUserId !== creatorId);
+  return {
+    sameCreator,
+    reason: other ? "This post was already submitted by another creator in this campaign." : null,
+  };
+}
+
+/** Rolling-window start for the daily submission limit: midnight UTC (spec: UTC uniformly). */
+export function startOfUtcDay(now: Date): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+}

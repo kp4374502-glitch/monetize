@@ -6,6 +6,7 @@ const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/invite/(.*)",
+  "/api/cron/(.*)", // authenticated by CRON_SECRET inside the route, not by a Clerk session
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
