@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
+import { requireUserId } from "@/lib/auth/ensure-user";
 import { isPlatformOwner, isPlatformAdmin } from "@/lib/auth/roles";
 
 /**
@@ -11,6 +13,7 @@ export default async function Home() {
 
   let statusLine = "Not signed in.";
   if (userId) {
+    await requireUserId(); // mirror the Clerk user into `users` on first visit
     const owner = await isPlatformOwner(userId);
     const admin = await isPlatformAdmin(userId);
     statusLine = `Signed in as ${userId}. Platform Owner: ${owner}. Platform Admin: ${admin}.`;
@@ -22,6 +25,9 @@ export default async function Home() {
         Monetize <span className="italic text-gold-light">foundation</span>
       </h1>
       <p className="text-text-secondary">{statusLine}</p>
+      {statusLine.includes("Platform Owner: true") && (
+        <Link href="/campaigns/new" className="text-gold-light underline">Create a campaign</Link>
+      )}
       <p className="text-text-secondary text-sm">
         This is a Task 1 placeholder page — campaign creation, invite links, and clip submission
         are later tasks.

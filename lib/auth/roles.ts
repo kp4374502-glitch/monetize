@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "../db/client";
 import { campaigns, campaignCreators, campaignMods, platformAdmins, users } from "../../drizzle/schema";
 
@@ -7,6 +7,9 @@ import { campaigns, campaignCreators, campaignMods, platformAdmins, users } from
  * campaign?" per docs/PRODUCT_SPEC.md -> "Roles & permissions". No Server Action or query touching
  * campaign-scoped data should bypass this layer — see CLAUDE.md's non-negotiable architectural rule.
  */
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const isUuid = (v: string) => UUID_RE.test(v);
 
 export type Role = "owner" | "admin" | "mod" | "creator" | null;
 
@@ -30,13 +33,15 @@ export async function isPlatformAdmin(userId: string): Promise<boolean> {
 
 /**
  * Resolves a user's role WITHIN a specific campaign.
- *   - Platform Owner / campaign Owner  -> "owner"
+ *   - Platform Owner (users.is_platform_owner) -> "owner" on every campaign
+ *   - campaign Owner (campaigns.owner_user_id) -> "owner"
  *   - platform_admins membership       -> "admin"  (implicit on every campaign, no row needed)
  *   - campaign_mods row for this campaign -> "mod"
  *   - campaign_creators row for this campaign -> "creator"
  *   - none of the above                -> null (no access)
  */
 export async function getRoleForCampaign(userId: string, campaignId: string): Promise<Role> {
+  if (!isUuid(campaignId)) return null;
   const [campaign] = await db
     .select({ ownerUserId: campaigns.ownerUserId })
     .from(campaigns)
@@ -45,7 +50,7 @@ export async function getRoleForCampaign(userId: string, campaignId: string): Pr
 
   if (!campaign) return null;
 
-  if (campaign.ownerUserId === userId) return "owner";
+  if (campaign.ownerUserId === userId || (await isPlatformOwner(userId))) return "owner";
   if (await isPlatformAdmin(userId)) return "admin";
 
   const [modRow] = await db
@@ -104,4 +109,41 @@ export async function getCampaignForUser(userId: string, campaignId: string) {
 
   const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, campaignId)).limit(1);
   return campaign ?? null;
+}
+
+/**
+ * Every campaign the user holds a role on, with that role — powers the campaign switcher.
+ * Platform Owner and platform Admins see all campaigns (roles apply implicitly everywhere); a Mod
+ * sees the campaign they are assigned to; a Creator sees campaigns they have joined. A user can
+ * hold different roles in different campaigns (e.g. Mod on one, Creator on another).
+ */
+export async function getCampaignsForUser(userId: string) {
+  const cols = { id: campaigns.id, name: campaigns.name, brandName: campaigns.brandName, status: campaigns.status };
+
+  if ((await isPlatformOwner(userId)) || (await isPlatformAdmin(userId))) {
+    const role: Role = (await isPlatformOwner(userId)) ? "owner" : "admin";
+    const rows = await db.select(cols).from(campaigns).orderBy(asc(campaigns.name));
+    return rows.map((c) => ({ ...c, role }));
+  }
+
+  const found = new Map<string, { id: string; name: string; brandName: string; status: string; role: Role }>();
+
+  const owned = await db.select(cols).from(campaigns).where(eq(campaigns.ownerUserId, userId));
+  for (const c of owned) found.set(c.id, { ...c, role: "owner" });
+
+  const modded = await db
+    .select(cols)
+    .from(campaignMods)
+    .innerJoin(campaigns, eq(campaigns.id, campaignMods.campaignId))
+    .where(eq(campaignMods.userId, userId));
+  for (const c of modded) if (!found.has(c.id)) found.set(c.id, { ...c, role: "mod" });
+
+  const joined = await db
+    .select(cols)
+    .from(campaignCreators)
+    .innerJoin(campaigns, eq(campaigns.id, campaignCreators.campaignId))
+    .where(eq(campaignCreators.userId, userId));
+  for (const c of joined) if (!found.has(c.id)) found.set(c.id, { ...c, role: "creator" });
+
+  return [...found.values()].sort((a, b) => a.name.localeCompare(b.name));
 }

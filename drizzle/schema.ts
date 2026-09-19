@@ -41,9 +41,9 @@ export const notificationTypeEnum = pgEnum("notification_type", [
 // users
 // ---------------------------------------------------------------------------
 export const users = pgTable("users", {
-  id: uuid("id").primaryKey().defaultRandom(),
+  id: text("id").primaryKey(), // Clerk user ID (e.g. user_2abc...) — single source of identity
   username: text("username").notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
+  passwordHash: text("password_hash"), // unused: Clerk owns credentials
   isPlatformOwner: boolean("is_platform_owner").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -56,7 +56,7 @@ export const campaigns = pgTable("campaigns", {
   brandName: text("brand_name").notNull(),
   name: text("name").notNull(),
   status: campaignStatusEnum("status").notNull().default("active"),
-  ownerUserId: uuid("owner_user_id")
+  ownerUserId: text("owner_user_id")
     .notNull()
     .references(() => users.id),
   baseRate: numeric("base_rate", { precision: 10, scale: 4 }).notNull(),
@@ -78,7 +78,7 @@ export const campaigns = pgTable("campaigns", {
 // platform_admins — presence here = Admin, active on every campaign implicitly
 // ---------------------------------------------------------------------------
 export const platformAdmins = pgTable("platform_admins", {
-  userId: uuid("user_id")
+  userId: text("user_id")
     .primaryKey()
     .references(() => users.id),
 });
@@ -93,10 +93,10 @@ export const campaignMods = pgTable(
     campaignId: uuid("campaign_id")
       .notNull()
       .references(() => campaigns.id),
-    userId: uuid("user_id")
+    userId: text("user_id")
       .notNull()
       .references(() => users.id),
-    addedBy: uuid("added_by")
+    addedBy: text("added_by")
       .notNull()
       .references(() => users.id),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -117,7 +117,7 @@ export const campaignCreators = pgTable(
     campaignId: uuid("campaign_id")
       .notNull()
       .references(() => campaigns.id),
-    userId: uuid("user_id")
+    userId: text("user_id")
       .notNull()
       .references(() => users.id),
     inviteLinkId: uuid("invite_link_id").references(() => inviteLinks.id),
@@ -142,7 +142,7 @@ export const inviteLinks = pgTable("invite_links", {
     .notNull()
     .references(() => campaigns.id),
   code: text("code").notNull().unique(),
-  createdBy: uuid("created_by")
+  createdBy: text("created_by")
     .notNull()
     .references(() => users.id),
   revoked: boolean("revoked").notNull().default(false),
@@ -159,7 +159,7 @@ export const clips = pgTable(
     campaignId: uuid("campaign_id")
       .notNull()
       .references(() => campaigns.id),
-    creatorUserId: uuid("creator_user_id")
+    creatorUserId: text("creator_user_id")
       .notNull()
       .references(() => users.id),
     platform: platformEnum("platform").notNull(),
@@ -172,7 +172,7 @@ export const clips = pgTable(
     status: clipStatusEnum("status").notNull().default("pending"),
     rejectionReason: text("rejection_reason"),
     qualifyingAudiencePct: numeric("qualifying_audience_pct", { precision: 5, scale: 2 }),
-    qualifyingPctSetBy: uuid("qualifying_pct_set_by").references(() => users.id),
+    qualifyingPctSetBy: text("qualifying_pct_set_by").references(() => users.id),
     videoProofUrl: text("video_proof_url"),
     videoProofSubmittedAt: timestamp("video_proof_submitted_at", { withTimezone: true }),
     videoProofReminderSentAt: timestamp("video_proof_reminder_sent_at", { withTimezone: true }),
@@ -180,7 +180,7 @@ export const clips = pgTable(
     earnings: numeric("earnings", { precision: 12, scale: 2 }),
     payout: numeric("payout", { precision: 12, scale: 2 }),
     paidStatus: paidStatusEnum("paid_status").notNull().default("unpaid"),
-    paidBy: uuid("paid_by").references(() => users.id),
+    paidBy: text("paid_by").references(() => users.id),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     flaggedDuplicate: boolean("flagged_duplicate").notNull().default(false),
     flaggedReason: text("flagged_reason"),
@@ -205,7 +205,7 @@ export const clipReviewEvents = pgTable("clip_review_events", {
   clipId: uuid("clip_id")
     .notNull()
     .references(() => clips.id),
-  actorUserId: uuid("actor_user_id")
+  actorUserId: text("actor_user_id")
     .notNull()
     .references(() => users.id),
   action: reviewActionEnum("action").notNull(),
@@ -220,7 +220,7 @@ export const notifications = pgTable(
   "notifications",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id")
+    userId: text("user_id")
       .notNull()
       .references(() => users.id),
     campaignId: uuid("campaign_id").references(() => campaigns.id),

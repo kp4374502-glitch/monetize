@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { ClerkProvider } from "@clerk/nextjs";
+import { CampaignSwitcher } from "@/components/campaign-switcher";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -11,7 +13,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <ClerkProvider>
       <html lang="en" className="dark">
-        <body className="bg-bg-primary text-text-primary min-h-screen">{children}</body>
+        <body className="bg-bg-primary text-text-primary min-h-screen">
+          <header className="flex items-center justify-between border-b border-subtle px-6 py-3">
+            <Link href="/" className="font-bold">
+              Monetize
+            </Link>
+            <CampaignSwitcher />
+          </header>
+          {children}
+        </body>
       </html>
     </ClerkProvider>
   );
