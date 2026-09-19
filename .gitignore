@@ -1,0 +1,14 @@
+node_modules/
+.next/
+.env
+.env.local
+.env*.local
+drizzle/migrations/
+playwright-report/
+test-results/
+*.tsbuildinfo
+next-env.d.ts
+.vercel
+
+# clerk configuration (can include secrets)
+/.clerk/
