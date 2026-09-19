@@ -1,9 +1,107 @@
-// STUB: the real role layer needs drizzle/schema.ts and docs/DATABASE_SCHEMA.md, which are not in
-// the export. Until then no one resolves as Owner/Admin. Replace with tenant-scoped queries.
-export async function isPlatformOwner(_userId: string): Promise<boolean> {
-  return false;
+import { and, eq } from "drizzle-orm";
+import { db } from "../db/client";
+import { campaigns, campaignCreators, campaignMods, platformAdmins, users } from "../../drizzle/schema";
+
+/**
+ * Every function in this file is the single choke point for "can this user see/do this in this
+ * campaign?" per docs/PRODUCT_SPEC.md -> "Roles & permissions". No Server Action or query touching
+ * campaign-scoped data should bypass this layer — see CLAUDE.md's non-negotiable architectural rule.
+ */
+
+export type Role = "owner" | "admin" | "mod" | "creator" | null;
+
+export async function isPlatformOwner(userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ isPlatformOwner: users.isPlatformOwner })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  return row?.isPlatformOwner ?? false;
 }
 
-export async function isPlatformAdmin(_userId: string): Promise<boolean> {
-  return false;
+export async function isPlatformAdmin(userId: string): Promise<boolean> {
+  const [row] = await db
+    .select()
+    .from(platformAdmins)
+    .where(eq(platformAdmins.userId, userId))
+    .limit(1);
+  return !!row;
+}
+
+/**
+ * Resolves a user's role WITHIN a specific campaign.
+ *   - Platform Owner / campaign Owner  -> "owner"
+ *   - platform_admins membership       -> "admin"  (implicit on every campaign, no row needed)
+ *   - campaign_mods row for this campaign -> "mod"
+ *   - campaign_creators row for this campaign -> "creator"
+ *   - none of the above                -> null (no access)
+ */
+export async function getRoleForCampaign(userId: string, campaignId: string): Promise<Role> {
+  const [campaign] = await db
+    .select({ ownerUserId: campaigns.ownerUserId })
+    .from(campaigns)
+    .where(eq(campaigns.id, campaignId))
+    .limit(1);
+
+  if (!campaign) return null;
+
+  if (campaign.ownerUserId === userId) return "owner";
+  if (await isPlatformAdmin(userId)) return "admin";
+
+  const [modRow] = await db
+    .select()
+    .from(campaignMods)
+    .where(and(eq(campaignMods.campaignId, campaignId), eq(campaignMods.userId, userId)))
+    .limit(1);
+  if (modRow) return "mod";
+
+  const [creatorRow] = await db
+    .select()
+    .from(campaignCreators)
+    .where(and(eq(campaignCreators.campaignId, campaignId), eq(campaignCreators.userId, userId)))
+    .limit(1);
+  if (creatorRow) return "creator";
+
+  return null;
+}
+
+/**
+ * Throws if `userId` does not hold at least `minimumRole` on `campaignId`.
+ * Role ranking: owner > admin > mod > creator. Use this at the top of every Server Action.
+ */
+const ROLE_RANK: Record<Exclude<Role, null>, number> = {
+  owner: 3,
+  admin: 3, // Admin is a strict superset of Mod but ranks alongside Owner for most checks;
+  // actions that are literally Owner-only (create campaign, approve new brand) must check
+  // `role === "owner"` explicitly rather than relying on rank alone.
+  mod: 1,
+  creator: 0,
+};
+
+export async function requireRole(
+  userId: string,
+  campaignId: string,
+  minimumRole: Exclude<Role, null>,
+): Promise<Exclude<Role, null>> {
+  const role = await getRoleForCampaign(userId, campaignId);
+  if (!role || ROLE_RANK[role] < ROLE_RANK[minimumRole]) {
+    throw new Error(
+      `Access denied: user ${userId} does not have ${minimumRole}+ access to campaign ${campaignId}.`,
+    );
+  }
+  return role;
+}
+
+/**
+ * Fetches a campaign row, but ONLY if `userId` has some role on it. Never fetch a campaign by id
+ * alone in a Server Action — always go through this so Campaign A can't leak into a Campaign B
+ * view. Returns null rather than throwing, since "not found" and "not yours" should look the same
+ * to the caller (don't leak existence of campaigns the user can't access).
+ */
+export async function getCampaignForUser(userId: string, campaignId: string) {
+  const role = await getRoleForCampaign(userId, campaignId);
+  if (!role) return null;
+
+  const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, campaignId)).limit(1);
+  return campaign ?? null;
 }
