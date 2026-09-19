@@ -15,3 +15,6 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# scratch files that may hold secrets
+temp.txt
