@@ -25,6 +25,7 @@ test.describe("core flow", () => {
     await owner.getByLabel("Max pay per post ($)").fill("500");
     await owner.getByLabel("Total budget ($)").fill("10000");
     await owner.getByLabel("Mod mark-paid threshold ($)").fill("50");
+    await owner.getByLabel("youtube").check(); // E2E_CLIP_URL may be a YouTube link; the form only ticks tiktok by default
     await owner.getByRole("button", { name: "Create campaign" }).click();
     await expect(owner.getByTestId("campaign-name")).toHaveText(name);
 
