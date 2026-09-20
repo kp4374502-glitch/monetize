@@ -37,22 +37,18 @@ function Landing() {
           Monetize is where brands run clipping campaigns: creators submit, reviewers verify, and what everyone is owed
           is always one page away.
         </p>
-        {/* Two plain buttons, ONE sign-in page: the app resolves the right view from each person's role after
-            they log in with their own username + password. Account creation is deliberately low-key. */}
+        {/* "Sign in" is for anyone with an existing account (creators, Owners, Admins, Mods: the app resolves
+            the right view from each person's role after login). The outlined button leads to the
+            access-code-gated brand request flow at /brand-signup, NOT to the sign-in page. */}
         <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
           <Link href="/sign-in" className={buttonVariants({ variant: "primary", size: "lg" })}>
             Sign in <ArrowRight className="h-4 w-4" />
           </Link>
-          <Link href="/sign-in" className={buttonVariants({ variant: "outline", size: "lg" })}>
+          <Link href="/brand-signup" className={buttonVariants({ variant: "outline", size: "lg" })}>
             Owner / Agency sign in
           </Link>
         </div>
         <p className="mt-4 text-sm text-text-secondary">New creator? Use the invite link your campaign team sent you.</p>
-        <p className="mt-2 text-xs text-text-secondary/80">
-          <Link href="/brand-signup" className="underline-offset-2 hover:text-gold-light hover:underline">
-            Brand sign-up
-          </Link>
-        </p>
       </section>
 
       <section className="mx-auto grid max-w-5xl gap-4 px-4 pb-24 sm:grid-cols-3">
