@@ -12,11 +12,23 @@
   --text-secondary: #a3a3a3;
   --accent-gold-light: #f0c572;
   --accent-gold-dark: #9c7a2e;
+  --accent-gradient: linear-gradient(135deg, #f0c572, #9c7a2e);
   --border-gold: #c9a227;
   --border-subtle: #2a2a2a;
+  color-scheme: dark;
 }
 
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: rgba(240, 197, 114, 0.35);
+}
+
+/* Native number spinners and date pickers follow the dark scheme; keep focus rings on-brand. */
+input[type="number"]::-webkit-inner-spin-button {
+  opacity: 0.4;
 }

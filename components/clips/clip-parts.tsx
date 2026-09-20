@@ -1,32 +1,24 @@
 import { clips } from "@/drizzle/schema";
+import { Badge } from "@/components/ui/badge";
 
 export type ClipRow = typeof clips.$inferSelect;
 
 const STALE_AFTER_MS = 36 * 60 * 60 * 1000; // cron runs daily; anything older missed a refresh
 
-export const money = (v: string | number | null) => (v === null ? "—" : `$${Number(v).toFixed(2)}`);
+export const money = (v: string | number | null) =>
+  v === null ? "—" : `$${Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export function StatusBadge({ clip }: { clip: ClipRow }) {
   const label = clip.paidStatus === "paid" ? "paid" : clip.status;
-  const tone =
-    label === "paid" || label === "approved"
-      ? "border-green-500 text-green-400"
-      : label === "rejected"
-        ? "border-red-500 text-red-400"
-        : "border-gold-border text-gold-light";
-  return (
-    <span className={`rounded-full border px-2 py-0.5 text-xs ${tone}`} data-testid="clip-status">
-      {label}
-    </span>
-  );
+  return <Badge status={label} data-testid="clip-status" />;
 }
 
 export function Thumb({ clip }: { clip: ClipRow }) {
   return clip.thumbnailUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={clip.thumbnailUrl} alt="" className="h-16 w-12 rounded object-cover" referrerPolicy="no-referrer" />
+    <img src={clip.thumbnailUrl} alt="" className="h-20 w-14 shrink-0 rounded-lg object-cover ring-1 ring-subtle" referrerPolicy="no-referrer" />
   ) : (
-    <div className="flex h-16 w-12 items-center justify-center rounded bg-bg-secondary text-xs text-text-secondary">
+    <div className="flex h-20 w-14 shrink-0 items-center justify-center rounded-lg bg-white/5 text-xs font-semibold uppercase text-text-secondary ring-1 ring-subtle">
       {clip.platform.slice(0, 2)}
     </div>
   );
@@ -40,8 +32,9 @@ export function Stats({ clip }: { clip: ClipRow }) {
       : null;
   return (
     <span className="text-sm text-text-secondary">
-      {clip.views.toLocaleString()} views · {clip.likes.toLocaleString()} likes
-      {stale && <span className="ml-2 text-xs text-gold-light">({stale})</span>}
+      <span className="font-semibold text-text-primary">{clip.views.toLocaleString()}</span> views ·{" "}
+      <span className="font-semibold text-text-primary">{clip.likes.toLocaleString()}</span> likes
+      {stale && <span className="ml-2 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-300">{stale}</span>}
     </span>
   );
 }

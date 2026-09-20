@@ -1,5 +1,7 @@
+import { CheckCircle2, TriangleAlert } from "lucide-react";
 import { ActionForm } from "@/components/action-form";
 import { Button } from "@/components/ui/button";
+import { Callout, Card, SectionHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { attachProofAction, refreshViewsAction, submitClipAction } from "@/app/campaigns/clip-actions";
 import { StatusBadge, Stats, Thumb, money, type ClipRow } from "./clip-parts";
@@ -7,46 +9,90 @@ import { StatusBadge, Stats, Thumb, money, type ClipRow } from "./clip-parts";
 /** Creator view: add a clip, and see ONLY their own clips. No payout formula or budget shown. */
 export function CreatorClips({ campaignId, clips, viewMinimum }: { campaignId: string; clips: ClipRow[]; viewMinimum: number }) {
   return (
-    <section className="mt-8">
-      <h2 className="mb-2 font-semibold">Add a clip</h2>
-      <ActionForm action={submitClipAction.bind(null, campaignId)} className="flex flex-wrap items-start gap-2">
-        <Input name="url" placeholder="Paste a TikTok, Instagram or YouTube link" required className="min-w-72 flex-1" />
-        <Button type="submit">Submit</Button>
-      </ActionForm>
-      <p className="mt-1 text-xs text-text-secondary">Clips earn once they pass {viewMinimum.toLocaleString()} views and are approved with video proof.</p>
+    <>
+      <Card>
+        <SectionHeader
+          title="Add a clip"
+          description={`Clips earn once they pass ${viewMinimum.toLocaleString()} views and are approved with video proof.`}
+        />
+        <ActionForm action={submitClipAction.bind(null, campaignId)} className="flex flex-wrap items-start gap-2">
+          <Input name="url" placeholder="Paste a TikTok, Instagram or YouTube link" required className="min-w-72 flex-1" />
+          <Button type="submit">Submit</Button>
+        </ActionForm>
+      </Card>
 
-      <h2 className="mb-2 mt-8 font-semibold">Your clips</h2>
-      {clips.length === 0 && <p className="text-sm text-text-secondary">No clips yet.</p>}
-      <ul className="grid gap-3">
-        {clips.map((c) => (
-          <li key={c.id} className="rounded-md border border-subtle p-3" data-testid="my-clip">
-            <div className="flex gap-3">
-              <Thumb clip={c} />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <StatusBadge clip={c} />
-                  <a href={c.url} target="_blank" rel="noreferrer" className="truncate text-sm underline">{c.url}</a>
+      <section>
+        <SectionHeader title="Your clips" count={clips.length} />
+        {clips.length === 0 && (
+          <Card innerClassName="py-10 text-center text-sm text-text-secondary">
+            No clips yet — paste a link above to submit your first one.
+          </Card>
+        )}
+        <ul className="grid gap-3">
+          {clips.map((c) => (
+            <li key={c.id} data-testid="my-clip">
+              <Card innerClassName="p-4">
+                <div className="flex gap-4">
+                  <Thumb clip={c} />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusBadge clip={c} />
+                      <a href={c.url} target="_blank" rel="noreferrer" className="truncate text-sm text-text-secondary underline-offset-2 hover:text-gold-light hover:underline">
+                        {c.url}
+                      </a>
+                    </div>
+                    <Stats clip={c} />
+                    <p className="text-sm text-text-secondary">
+                      Earnings:{" "}
+                      <span className="font-bold text-gold-light" data-testid="my-earnings">
+                        {c.status === "approved" ? money(c.payout) : "—"}
+                      </span>
+                    </p>
+
+                    {c.status === "rejected" && c.rejectionReason && (
+                      <Callout tone="danger" data-testid="rejection-reason">
+                        <span>
+                          <span className="font-semibold">Rejected:</span> {c.rejectionReason}
+                        </span>
+                      </Callout>
+                    )}
+
+                    {c.videoProofUrl ? (
+                      <p className="flex items-center gap-1.5 text-xs text-green-400">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Proof submitted
+                      </p>
+                    ) : (
+                      c.status !== "rejected" && (
+                        <Callout tone="warning">
+                          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                          <span>Video proof needed — this clip earns $0 until you attach it.</span>
+                        </Callout>
+                      )
+                    )}
+
+                    <div className="flex flex-wrap items-start gap-2 pt-1">
+                      {c.paidStatus === "unpaid" && (
+                        <ActionForm action={attachProofAction.bind(null, campaignId, c.id)} className="flex min-w-64 flex-1 flex-wrap items-center gap-2">
+                          <Input
+                            name="proofUrl"
+                            placeholder={c.videoProofUrl ? "Replace video proof link" : "Video proof link (YouTube unlisted / Drive)"}
+                            required
+                            className="min-w-56 flex-1"
+                          />
+                          <Button type="submit" variant="outline" size="sm">{c.videoProofUrl ? "Replace proof" : "Submit proof"}</Button>
+                        </ActionForm>
+                      )}
+                      <ActionForm action={refreshViewsAction.bind(null, campaignId, c.id)}>
+                        <Button type="submit" variant="ghost" size="sm">Refresh views now</Button>
+                      </ActionForm>
+                    </div>
+                  </div>
                 </div>
-                <Stats clip={c} />
-                <p className="text-sm">Earnings: <span data-testid="my-earnings">{c.status === "approved" ? money(c.payout) : "—"}</span></p>
-                {c.status === "rejected" && c.rejectionReason && (
-                  <p className="mt-1 text-sm text-red-400" data-testid="rejection-reason">Rejected: {c.rejectionReason}</p>
-                )}
-                {c.paidStatus === "unpaid" && (
-                  <ActionForm action={attachProofAction.bind(null, campaignId, c.id)} className="mt-2 flex flex-wrap items-center gap-2">
-                    <Input name="proofUrl" placeholder={c.videoProofUrl ? "Replace video proof link" : "Video proof link (YouTube unlisted / Drive)"} required className="min-w-64 flex-1" />
-                    <Button type="submit" variant="outline">{c.videoProofUrl ? "Replace proof" : "Submit proof"}</Button>
-                  </ActionForm>
-                )}
-                {c.videoProofUrl && <p className="mt-1 text-xs text-text-secondary">Proof submitted ✓</p>}
-                <ActionForm action={refreshViewsAction.bind(null, campaignId, c.id)} className="mt-2">
-                  <Button type="submit" variant="outline">Refresh views now</Button>
-                </ActionForm>
-              </div>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </section>
+              </Card>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </>
   );
 }

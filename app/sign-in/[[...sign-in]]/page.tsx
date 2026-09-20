@@ -1,9 +1,10 @@
 import { SignIn } from "@clerk/nextjs";
+import { AuthShell } from "@/components/auth-shell";
 
 export default function Page() {
   return (
-    <main className="flex justify-center p-8">
+    <AuthShell title="Welcome" accent="back" subtitle="Sign in to your Monetize account.">
       <SignIn />
-    </main>
+    </AuthShell>
   );
 }

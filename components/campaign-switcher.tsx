@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import { getCampaignsForUser } from "@/lib/auth/roles";
+import { Dropdown } from "@/components/dropdown";
+import { Badge } from "@/components/ui/badge";
 
 /** Uses the same role layer as everything else — no parallel lookup. Navigation is plain links. */
 export async function CampaignSwitcher() {
@@ -21,27 +23,37 @@ export async function CampaignSwitcher() {
   }
 
   return (
-    <details className="relative" data-testid="campaign-switcher">
-      <summary className="cursor-pointer rounded-md border border-subtle px-3 py-1.5 text-sm">
-        Campaigns ({list.length})
-      </summary>
-      <ul className="absolute right-0 z-10 mt-2 min-w-56 rounded-md border border-subtle bg-bg-secondary p-1 text-sm">
-        {list.length === 0 && <li className="px-3 py-2 text-text-secondary">No campaigns yet</li>}
+    <Dropdown
+      testId="campaign-switcher"
+      label="Switch campaign"
+      trigger={
+        <>
+          <span>Campaigns</span>
+          <span className="rounded-full bg-white/10 px-1.5 text-xs text-text-secondary">{list.length}</span>
+        </>
+      }
+    >
+      {list.length === 0 && <p className="px-3 py-3 text-sm text-text-secondary">No campaigns yet</p>}
+      <ul className="max-h-80 overflow-y-auto">
         {list.map((c) => (
           <li key={c.id}>
-            <Link href={`/campaigns/${c.id}`} className="flex justify-between gap-4 rounded px-3 py-2 hover:bg-bg-primary">
-              <span>
-                {c.name}
-                <span className="block text-xs text-text-secondary">
-                  {c.brandName}
-                  {c.status !== "active" && <span className="ml-2 rounded-full border border-gold-border px-1.5 text-gold-light">{c.status}</span>}
-                </span>
+            <Link
+              href={`/campaigns/${c.id}`}
+              role="menuitem"
+              className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 transition hover:bg-white/5"
+            >
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold">{c.name}</span>
+                <span className="block truncate text-xs text-text-secondary">{c.brandName}</span>
               </span>
-              <span className="text-text-secondary">{c.role}</span>
+              <span className="flex shrink-0 items-center gap-1.5">
+                {c.status !== "active" && <Badge status={c.status} />}
+                <Badge status={c.role ?? "creator"} />
+              </span>
             </Link>
           </li>
         ))}
       </ul>
-    </details>
+    </Dropdown>
   );
 }
