@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
-import { ArrowRight, BadgeCheck, Building2, Film, Wallet } from "lucide-react";
+import { ArrowRight, BadgeCheck, Film, Wallet } from "lucide-react";
+import { OwnerBrandMenu } from "@/components/owner-brand-menu";
 import { requireUserId } from "@/lib/auth/ensure-user";
 import { getCampaignsForUser, isPlatformOwner } from "@/lib/auth/roles";
 import { getBrandRequestForUser } from "@/lib/brand/service";
@@ -37,15 +38,13 @@ function Landing() {
           Monetize is where brands run clipping campaigns: creators submit, reviewers verify, and what everyone is owed
           is always one page away.
         </p>
-        {/* "Sign in" stays the creator-facing sign-in. "Owner / Brand sign in" opens a small chooser:
-            existing Owners/Admins/Mods sign in, while new brands can go through the gated Brand sign-up. */}
+        {/* "Sign in" stays the creator-facing sign-in. "Owner / Brand sign in" is ONE button that opens a
+            small menu: existing Owners/Admins/Mods sign in, new brands go to the gated Brand sign-up. */}
         <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
           <Link href="/sign-in" className={buttonVariants({ variant: "primary", size: "lg" })}>
             Sign in <ArrowRight className="h-4 w-4" />
           </Link>
-          <Link href="/owner-brand" className={buttonVariants({ variant: "outline", size: "lg" })}>
-            <Building2 className="h-4 w-4" /> Owner / Brand sign in
-          </Link>
+          <OwnerBrandMenu />
         </div>
         <p className="mt-4 text-sm text-text-secondary">New creator? Use the invite link your campaign team sent you.</p>
       </section>

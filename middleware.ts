@@ -6,7 +6,6 @@ const isPublicRoute = createRouteMatcher([
   "/", // landing page for signed-out visitors (signed-in users are sent to their campaigns)
   "/sign-in(.*)",
   "/sign-up(.*)",
-  "/owner-brand", // chooser: sign in vs. Brand sign-up
   "/brand-signup(.*)", // access-code gate + Clerk sign-up; /brand-request (the request form) requires a session
   "/invite/(.*)",
   "/api/cron/(.*)", // authenticated by CRON_SECRET inside the route, not by a Clerk session

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { Button, type ButtonSize, type ButtonVariant } from "@/components/ui/button";
 
 /** Header dropdown: click to toggle, closes on outside click / Escape. `testId` goes on the wrapper. */
 export function Dropdown({
@@ -11,12 +11,19 @@ export function Dropdown({
   testId,
   label,
   panelClassName,
+  variant,
+  size = "sm",
+  triggerClassName,
 }: {
   trigger: React.ReactNode;
   children: React.ReactNode;
   testId?: string;
   label: string;
   panelClassName?: string;
+  /** Trigger look when closed (default: the neutral header pill). It always turns "outline" while open. */
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  triggerClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -39,9 +46,9 @@ export function Dropdown({
     <div ref={ref} className="relative" data-testid={testId}>
       <Button
         type="button"
-        variant={open ? "outline" : "subtle"}
-        size="sm"
-        className="text-sm font-medium"
+        variant={open ? "outline" : (variant ?? "subtle")}
+        size={size}
+        className={cn("text-sm font-medium", triggerClassName)}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={label}
