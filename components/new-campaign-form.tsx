@@ -2,11 +2,12 @@ import { createCampaignAction } from "@/app/campaigns/actions";
 import { Button } from "@/components/ui/button";
 import { Card, SectionHeader } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 
 const platforms = ["tiktok", "instagram", "youtube"];
 
 /** The new-campaign form (rendered by /campaigns/new after its Owner-only check). */
-export function NewCampaignForm() {
+export function NewCampaignForm({ brands = [] }: { brands?: { userId: string; brandName: string; username: string }[] }) {
   return (
     <main className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
       <SectionHeader title="New campaign" description="Set the brand, the payout formula and the rules creators follow." />
@@ -16,6 +17,22 @@ export function NewCampaignForm() {
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Brand name"><Input name="brandName" required /></Field>
             <Field label="Campaign name"><Input name="name" required /></Field>
+            {brands.length > 0 && (
+              <Field
+                label="Campaign owner"
+                hint="Approved brands can own their campaign. You keep full authority over it either way."
+                className="sm:col-span-2"
+              >
+                <Select name="brandOwnerUserId" defaultValue="">
+                  <option value="">Me (platform Owner)</option>
+                  {brands.map((b) => (
+                    <option key={b.userId} value={b.userId}>
+                      {b.brandName} — {b.username}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            )}
           </div>
         </Card>
 

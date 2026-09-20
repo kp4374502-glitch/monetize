@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { Logo } from "@/components/logo";
+import { BrandRequestsLink } from "@/components/brand-requests-link";
 import { CampaignSwitcher } from "@/components/campaign-switcher";
 import { NotificationBell } from "@/components/notification-bell";
 import { buttonVariants } from "@/components/ui/button";
@@ -13,6 +14,7 @@ export function AppHeader() {
         <Logo />
         <nav className="flex items-center gap-2.5" aria-label="Main">
           <SignedIn>
+            <BrandRequestsLink />
             <CampaignSwitcher />
             <NotificationBell />
             {/* UserButton's menu carries "Sign out" */}

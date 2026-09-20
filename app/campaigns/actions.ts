@@ -22,7 +22,8 @@ function parseCampaignForm(fd: FormData) {
 
 export async function createCampaignAction(fd: FormData) {
   const userId = await requireUserId();
-  const campaign = await svc.createCampaign(userId, parseCampaignForm(fd));
+  const brandOwner = String(fd.get("brandOwnerUserId") ?? "").trim() || null; // approved brand, or the Owner
+  const campaign = await svc.createCampaign(userId, parseCampaignForm(fd), brandOwner);
   redirect(`/campaigns/${campaign.id}`);
 }
 

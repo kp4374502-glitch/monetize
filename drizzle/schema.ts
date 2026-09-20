@@ -256,3 +256,46 @@ export const scrapeCreatorsCache = pgTable(
     onePerUrl: unique("scrapecreators_cache_platform_url_unique").on(t.platform, t.url),
   }),
 );
+
+// ---------------------------------------------------------------------------
+// brand_requests — a signed-up user asking to become a brand. NOT tenant/campaign data: it is a
+// platform-level queue the platform Owner reviews by hand. Approval grants no power by itself; it
+// only makes the user assignable as a campaign's owner (campaigns.owner_user_id, transferable).
+// ---------------------------------------------------------------------------
+export const brandRequestStatusEnum = pgEnum("brand_request_status", ["pending", "approved", "rejected"]);
+
+export const brandRequests = pgTable(
+  "brand_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id)
+      .unique(),
+    brandName: text("brand_name").notNull(),
+    discord: text("discord").notNull(),
+    note: text("note"),
+    status: brandRequestStatusEnum("status").notNull().default("pending"),
+    reviewedBy: text("reviewed_by").references(() => users.id),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    statusIdx: index("brand_requests_status_idx").on(t.status),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// brand_signup_attempts — failed guesses at the shared BRAND_SIGNUP_CODE, for per-IP lockout
+// ---------------------------------------------------------------------------
+export const brandSignupAttempts = pgTable(
+  "brand_signup_attempts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ip: text("ip").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    ipTimeIdx: index("brand_signup_attempts_ip_created_idx").on(t.ip, t.createdAt),
+  }),
+);

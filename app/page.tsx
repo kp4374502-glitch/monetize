@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
-import { ArrowRight, BadgeCheck, Film, ShieldCheck, Wallet } from "lucide-react";
+import { ArrowRight, BadgeCheck, Building2, Film, Wallet } from "lucide-react";
 import { requireUserId } from "@/lib/auth/ensure-user";
 import { getCampaignsForUser, isPlatformOwner } from "@/lib/auth/roles";
+import { getBrandRequestForUser } from "@/lib/brand/service";
+import { BrandRequestStatus } from "@/components/brand-request-status";
 import { LogoMark } from "@/components/logo";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -35,13 +37,14 @@ function Landing() {
           Monetize is where brands run clipping campaigns: creators submit, reviewers verify, and what everyone is owed
           is always one page away.
         </p>
-        {/* Two entry points, one sign-in page: the app resolves the right view from the user's role after login. */}
+        {/* "Sign in" stays the creator-facing sign-in. "Owner / Brand sign in" opens a small chooser:
+            existing Owners/Admins/Mods sign in, while new brands can go through the gated Brand sign-up. */}
         <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
           <Link href="/sign-in" className={buttonVariants({ variant: "primary", size: "lg" })}>
             Sign in <ArrowRight className="h-4 w-4" />
           </Link>
-          <Link href="/sign-in" className={buttonVariants({ variant: "outline", size: "lg" })}>
-            <ShieldCheck className="h-4 w-4" /> Owner or Admin sign-in
+          <Link href="/owner-brand" className={buttonVariants({ variant: "outline", size: "lg" })}>
+            <Building2 className="h-4 w-4" /> Owner / Brand sign in
           </Link>
         </div>
         <p className="mt-4 text-sm text-text-secondary">New creator? Use the invite link your campaign team sent you.</p>
@@ -67,13 +70,18 @@ export default async function Home() {
   if (!userId) return <Landing />;
 
   await requireUserId(); // mirror the Clerk user into `users` on first visit
-  const [list, owner] = await Promise.all([getCampaignsForUser(userId), isPlatformOwner(userId)]);
+  const [list, owner, brandRequest] = await Promise.all([
+    getCampaignsForUser(userId),
+    isPlatformOwner(userId),
+    getBrandRequestForUser(userId),
+  ]);
 
   // One campaign: go straight there. Otherwise show a simple list so nobody has to hunt.
   if (list.length === 1) redirect(`/campaigns/${list[0].id}`);
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
+    <main className="mx-auto max-w-4xl space-y-6 px-4 py-10 sm:px-6">
+      {brandRequest && <BrandRequestStatus request={brandRequest} />}
       <SectionHeader
         title="Your campaigns"
         count={list.length}

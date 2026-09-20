@@ -11,6 +11,7 @@ import {
   notifications,
 } from "../../drizzle/schema";
 import { getRoleForCampaign, isPlatformOwner, requireRole } from "../auth/roles";
+import { isApprovedBrand } from "../brand/service";
 import { createCampaignSchema, updateCampaignSchema } from "./schemas";
 
 /**
@@ -31,15 +32,22 @@ const toDb = (i: ReturnType<typeof createCampaignSchema.parse>) => ({
   eligiblePlatforms: i.eligiblePlatforms,
 });
 
-/** Strictly platform-Owner-only — not even Admin. */
-export async function createCampaign(actorId: string, input: unknown) {
+/**
+ * Strictly platform-Owner-only — not even Admin. By default the caller owns the campaign; pass an
+ * APPROVED brand's user id to assign them as the campaign's owner instead (ownership is transferable
+ * per the spec). The platform Owner keeps owner authority on every campaign either way.
+ */
+export async function createCampaign(actorId: string, input: unknown, brandOwnerUserId?: string | null) {
   if (!(await isPlatformOwner(actorId))) {
     throw new Error("Access denied: only the platform Owner can create campaigns.");
   }
   const data = createCampaignSchema.parse(input);
+  if (brandOwnerUserId && !(await isApprovedBrand(brandOwnerUserId))) {
+    throw new Error("That brand hasn't been approved, so it can't be assigned as a campaign owner.");
+  }
   const [row] = await db
     .insert(campaigns)
-    .values({ ...toDb(data), ownerUserId: actorId })
+    .values({ ...toDb(data), ownerUserId: brandOwnerUserId || actorId })
     .returning();
   return row;
 }
