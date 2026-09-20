@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { requireUserId } from "@/lib/auth/ensure-user";
 import { getCampaignForUser, getRoleForCampaign } from "@/lib/auth/roles";
 import { listInviteLinks } from "@/lib/campaigns/service";
-import { getClipHistory, getCreatorClips, getReviewQueue } from "@/lib/clips/service";
+import { CREATOR_ROSTER_LIMIT, getClipHistory, getCreatorClips, getCreatorRoster, getReviewQueue } from "@/lib/clips/service";
+import { CreatorRoster } from "@/components/clips/creator-roster";
 import { CreatorClips } from "@/components/clips/creator-clips";
 import { ReviewQueue } from "@/components/clips/review-queue";
 import { ClipHistory } from "@/components/clips/clip-history";
@@ -34,6 +35,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
   const myClips = role === "creator" ? await getCreatorClips(userId, id) : [];
   const queue = canInvite ? await getReviewQueue(userId, id) : null;
   const history = canInvite ? await getClipHistory(userId, id) : null;
+  const roster = canInvite ? await getCreatorRoster(userId, id) : null;
 
   // Creator stat cards come from their own clip list (no extra query).
   const myViews = myClips.reduce((n, c) => n + c.views, 0);
@@ -87,6 +89,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
       )}
 
       {role === "creator" && <CreatorClips campaignId={id} clips={myClips} viewMinimum={campaign.viewMinimum} />}
+      {roster && <CreatorRoster roster={roster} limit={CREATOR_ROSTER_LIMIT} />}
       {queue && <ReviewQueue campaignId={id} pending={queue.pending} awaitingPayment={queue.awaitingPayment} />}
       {history && <ClipHistory history={history} />}
 

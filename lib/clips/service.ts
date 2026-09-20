@@ -431,3 +431,48 @@ export async function getClipHistory(actorId: string, campaignId: string) {
     totals: { paid: Number(totals.paid).toFixed(2), owed: Number(totals.owed).toFixed(2) },
   };
 }
+
+const ROSTER_LIMIT = 500;
+
+/**
+ * Creators on THIS campaign with per-creator clip aggregates, for Mods/Admins/Owner.
+ *   clips  = every clip they submitted (any status)      views = total views across those clips
+ *   earned = payout on APPROVED clips (paid + unpaid)     owed  = approved-but-unpaid payout
+ * Creators who have joined but not submitted anything still appear (zeros). The clips join carries
+ * the campaign_id, so nothing from another campaign can leak into a row. Sorted by earned, then name.
+ */
+export async function getCreatorRoster(actorId: string, campaignId: string) {
+  await requireRole(actorId, campaignId, "mod");
+
+  const rows = await db
+    .select({
+      userId: campaignCreators.userId,
+      username: users.username,
+      suspended: campaignCreators.suspended,
+      joinedAt: campaignCreators.joinedAt,
+      clips: sql<number>`count(${clips.id})::int`,
+      views: sql<string>`coalesce(sum(${clips.views}), 0)`,
+      earned: sql<string>`coalesce(sum(${clips.payout}) filter (where ${clips.status} = 'approved'), 0)`,
+      owed: sql<string>`coalesce(sum(${clips.payout}) filter (where ${clips.status} = 'approved' and ${clips.paidStatus} = 'unpaid'), 0)`,
+    })
+    .from(campaignCreators)
+    .innerJoin(users, eq(users.id, campaignCreators.userId))
+    .leftJoin(clips, and(eq(clips.campaignId, campaignCreators.campaignId), eq(clips.creatorUserId, campaignCreators.userId)))
+    .where(eq(campaignCreators.campaignId, campaignId))
+    .groupBy(campaignCreators.id, users.username)
+    .orderBy(sql`coalesce(sum(${clips.payout}) filter (where ${clips.status} = 'approved'), 0) desc`, asc(users.username))
+    .limit(ROSTER_LIMIT);
+
+  return rows.map((r) => ({
+    userId: r.userId,
+    username: r.username,
+    suspended: r.suspended,
+    joinedAt: r.joinedAt,
+    clips: r.clips,
+    views: Number(r.views),
+    earned: Number(r.earned).toFixed(2),
+    owed: Number(r.owed).toFixed(2),
+  }));
+}
+
+export const CREATOR_ROSTER_LIMIT = ROSTER_LIMIT;

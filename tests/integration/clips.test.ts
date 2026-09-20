@@ -486,3 +486,53 @@ describe("getClipHistory (Paid / Rejected lists + totals)", () => {
     expect((await svc.getClipHistory("modA", camp)).paid.every((r) => r.clip.campaignId === camp)).toBe(true);
   });
 });
+
+describe("getCreatorRoster (Creators list)", () => {
+  it("aggregates per creator: clips, views, earned (approved) and owed (approved-unpaid), scoped to the campaign", async () => {
+    const r = (await campaignSvc.createCampaign("owner", { ...validCampaign, name: "Roster" })).id;
+    await db.insert(campaignCreators).values([
+      { campaignId: r, userId: "c1" },
+      { campaignId: r, userId: "c2", suspended: true },
+    ]);
+    const approve = async (creator: string, views: number) => {
+      const clip = await makeClip(creator, r, views);
+      await svc.attachVideoProof(creator, r, clip.id, "https://youtu.be/aaaaaaaaaaa");
+      await svc.setQualifyingAudiencePct("admin", r, clip.id, 50); // payout = views / 1000 dollars
+      await svc.reviewClip("admin", r, clip.id, { action: "approve" });
+      return clip;
+    };
+    const paid = await approve("c1", 10_000); // $10.00, paid below
+    await svc.markPaid("admin", r, paid.id);
+    await approve("c1", 20_000); // $20.00 owed
+    await makeClip("c1", r, 5_000); // pending: counts as a clip and views, earns nothing yet
+
+    // Same creator, big numbers in ANOTHER campaign: must not leak into this roster
+    await makeClip("c1", camp, 400_000);
+
+    const roster = await svc.getCreatorRoster("admin", r);
+    expect(roster.map((x) => x.username)).toEqual(["c1", "c2"]); // sorted by earned desc
+    // 3 clips here (10k + 20k + 5k views); the 400k-view clip lives in another campaign
+    expect(roster[0]).toMatchObject({ clips: 3, views: 35_000, earned: "30.00", owed: "20.00", suspended: false });
+    expect(roster[1]).toMatchObject({ clips: 0, views: 0, earned: "0.00", owed: "0.00", suspended: true });
+  });
+
+  it("includes joined creators with no clips as zero rows and flags suspended ones", async () => {
+    const r = (await campaignSvc.createCampaign("owner", { ...validCampaign, name: "Roster2" })).id;
+    await db.insert(campaignCreators).values([
+      { campaignId: r, userId: "c2", suspended: true },
+      { campaignId: r, userId: "c1" },
+    ]);
+    const roster = await svc.getCreatorRoster("owner", r);
+    expect(roster).toHaveLength(2);
+    expect(roster.every((x) => x.clips === 0 && x.views === 0 && x.earned === "0.00" && x.owed === "0.00")).toBe(true);
+    expect(roster.find((x) => x.username === "c2")?.suspended).toBe(true);
+  });
+
+  it("is gated to that campaign's reviewers and never shows another campaign's creators", async () => {
+    const empty = (await campaignSvc.createCampaign("owner", { ...validCampaign, name: "Roster3" })).id;
+    expect(await svc.getCreatorRoster("owner", empty)).toEqual([]);
+    await expect(svc.getCreatorRoster("c1", camp)).rejects.toThrow(/Access denied/);
+    await expect(svc.getCreatorRoster("modOther", camp)).rejects.toThrow(/Access denied/);
+    expect((await svc.getCreatorRoster("modA", camp)).length).toBeGreaterThan(0);
+  });
+});
