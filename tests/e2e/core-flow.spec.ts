@@ -1,21 +1,30 @@
 import { test, expect } from "@playwright/test";
+import { setupClerkTestingToken } from "@clerk/testing/playwright";
+import { signInAs } from "./clerk";
 
 /**
- * NOT YET RUN. Task 3 half additionally needs SCRAPECREATORS_API_KEY and E2E_CLIP_URL (a public
- * TikTok/YouTube link with >= the campaign view minimum, 1000 by default). Needs: DATABASE_URL (migrated), real Clerk dev keys, the dev server, and an Owner
- * whose users row has is_platform_owner = true. Provide credentials via env:
- *   E2E_OWNER_USER / E2E_OWNER_PASS  (Clerk sign-in for the seeded platform Owner)
- * The new creator signs up through the UI; adjust the sign-up steps to match your Clerk
- * instance's configured identifiers (username+password per spec).
+ * NOT YET PASSING-VERIFIED. Needs: DATABASE_URL (migrated), SCRAPECREATORS_API_KEY, the Clerk keys
+ * (CLERK_SECRET_KEY etc. in .env.local, DEVELOPMENT instance only), and env vars:
+ *   E2E_OWNER_USER  Clerk username of a dedicated TEST Owner (no password needed — see ./clerk.ts)
+ *   E2E_CLIP_URL    a public TikTok/YouTube link with >= the campaign view minimum (1000 by default)
+ * USE A DEDICATED TEST OWNER, never a real account. The spec says there is exactly ONE platform
+ * Owner (nothing in the DB enforces it), and an extra Owner has full authority over every campaign
+ * in the real database — so set users.is_platform_owner = true on the test account only for the
+ * duration of a run, then clear it. Each run leaves one campaign, one Clerk user and one users row
+ * behind (accepted cost for now).
+ * The Owner is signed in via a Clerk sign-in ticket (skips password + Client Trust email code). The
+ * creator signs up through the REAL invite-link UI using a Clerk test email (+clerk_test), whose
+ * verification code is always 424242 on dev instances.
  */
 test.describe("core flow", () => {
   test("Owner creates campaign -> invite link -> new user joins and lands inside it", async ({ browser }) => {
+    // Cold dev-server page compiles, two Clerk flows and a real ScrapeCreators call. The full flow
+    // measured ~150s in dev; 180s ran out mid-way (right after the approval), so allow 6 minutes.
+    test.setTimeout(360_000);
     const owner = await (await browser.newContext()).newPage();
-    await owner.goto("/sign-in");
-    await owner.getByLabel(/username|email/i).fill(process.env.E2E_OWNER_USER!);
-    await owner.getByRole("button", { name: /continue/i }).click();
-    await owner.getByLabel(/password/i).fill(process.env.E2E_OWNER_PASS!);
-    await owner.getByRole("button", { name: /continue/i }).click();
+    await signInAs(owner, process.env.E2E_OWNER_USER!);
+    await owner.goto("/");
+    await expect(owner.getByTestId("campaign-switcher")).toBeVisible();
 
     await owner.goto("/campaigns/new");
     const name = `E2E ${Date.now()}`;
@@ -33,13 +42,28 @@ test.describe("core flow", () => {
     const link = await owner.getByTestId("invite-row").first().locator("code").innerText();
 
     const creator = await (await browser.newContext()).newPage();
+    await setupClerkTestingToken({ page: creator }); // bypass bot protection on the sign-up form
     await creator.goto(link);
     await expect(creator.getByRole("heading", { name: `Join ${name}` })).toBeVisible();
     await creator.getByRole("link", { name: /sign up to join/i }).click();
-    const username = `e2e_${Date.now()}`;
+    const stamp = Date.now();
+    const username = `e2e_${stamp}`;
     await creator.getByLabel(/username/i).fill(username);
-    await creator.getByLabel(/password/i).first().fill(`Pw-${Date.now()}-xZ!`);
+    // Spec: username+password only. If the Clerk instance still asks for an email (its config
+    // has required one before), use a +clerk_test address: dev instances accept the fixed code 424242.
+    const emailField = creator.getByLabel(/email address/i);
+    const needsEmail = await emailField.isVisible();
+    if (needsEmail) await emailField.fill(`${username}+clerk_test@example.com`);
+    const creatorPass = creator.locator('input[name="password"]');
+    await expect(creatorPass).toBeEnabled();
+    await creatorPass.fill(`Pw-${stamp}-xZ!`);
     await creator.getByRole("button", { name: /continue/i }).click();
+    if (needsEmail) {
+      // Verification code screen. UNVERIFIED selector: Clerk renders the OTP as a single/segmented input.
+      const code = creator.locator('input[autocomplete="one-time-code"], input[name="codeInput"]').first();
+      await code.waitFor({ state: "visible" });
+      await code.pressSequentially("424242");
+    }
     await creator.waitForURL(/\/invite\//);
     await creator.getByRole("button", { name: "Join campaign" }).click();
 

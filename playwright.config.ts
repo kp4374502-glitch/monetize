@@ -1,7 +1,14 @@
 import { defineConfig } from "@playwright/test";
+import { loadEnvConfig } from "@next/env";
+
+// Playwright doesn't read .env.local; global setup and the sign-in helper need the Clerk keys.
+loadEnvConfig(process.cwd(), true);
 
 export default defineConfig({
   testDir: "./tests/e2e",
+  globalSetup: "./tests/e2e/global.setup.ts",
+  // The dev server compiles each route on first visit (several seconds); the 5s default is too tight.
+  expect: { timeout: 30_000 },
   use: { baseURL: "http://localhost:3000" },
   webServer: {
     command: "npm run dev",

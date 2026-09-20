@@ -23,6 +23,8 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@clerk/backend": "^2.33.7",
+    "@clerk/testing": "^2.2.36",
     "@electric-sql/pglite": "^0.5.8",
     "@playwright/test": "^1.63.0",
     "@types/node": "^22",
