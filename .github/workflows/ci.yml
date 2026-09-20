@@ -1,0 +1,39 @@
+name: CI
+
+# Typecheck + unit/integration tests on every push to main and every pull request.
+# The integration tests run against an in-process Postgres (PGlite), so this needs no database,
+# no Clerk keys and no ScrapeCreators key. The Playwright e2e test is NOT run here: it needs real
+# Clerk/Neon/ScrapeCreators credentials and creates real accounts.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Typecheck & tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Tests
+        run: npm test
