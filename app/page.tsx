@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
-import { ArrowRight, BadgeCheck, Film, Wallet } from "lucide-react";
+import { ArrowRight, BadgeCheck, Film, ShieldCheck, Wallet } from "lucide-react";
 import { requireUserId } from "@/lib/auth/ensure-user";
 import { getCampaignsForUser, isPlatformOwner } from "@/lib/auth/roles";
 import { LogoMark } from "@/components/logo";
@@ -35,9 +35,13 @@ function Landing() {
           Monetize is where brands run clipping campaigns: creators submit, reviewers verify, and what everyone is owed
           is always one page away.
         </p>
-        <div className="mt-10 flex justify-center">
+        {/* Two entry points, one sign-in page: the app resolves the right view from the user's role after login. */}
+        <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
           <Link href="/sign-in" className={buttonVariants({ variant: "primary", size: "lg" })}>
             Sign in <ArrowRight className="h-4 w-4" />
+          </Link>
+          <Link href="/sign-in" className={buttonVariants({ variant: "outline", size: "lg" })}>
+            <ShieldCheck className="h-4 w-4" /> Owner or Admin sign-in
           </Link>
         </div>
         <p className="mt-4 text-sm text-text-secondary">New creator? Use the invite link your campaign team sent you.</p>
