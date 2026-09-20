@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { ArrowRight, BadgeCheck, Film, Wallet } from "lucide-react";
 import { requireUserId } from "@/lib/auth/ensure-user";
 import { getCampaignsForUser, isPlatformOwner } from "@/lib/auth/roles";
+import { LogoMark } from "@/components/logo";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, SectionHeader } from "@/components/ui/card";
@@ -22,6 +23,7 @@ function Landing() {
         className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[32rem] bg-[radial-gradient(ellipse_at_top,rgba(240,197,114,0.16),transparent_70%)]"
       />
       <section className="mx-auto max-w-4xl px-4 pb-16 pt-20 text-center sm:pt-28">
+        <LogoMark size={96} priority className="mx-auto mb-6 drop-shadow-[0_0_28px_rgba(240,197,114,0.3)]" />
         <p className="mx-auto mb-6 w-fit rounded-full border border-gold-border/40 bg-gold-light/10 px-4 py-1 text-xs font-semibold uppercase tracking-widest text-gold-light">
           Paid clipping campaigns
         </p>

@@ -18,3 +18,6 @@ next-env.d.ts
 
 # scratch files that may hold secrets
 temp.txt
+
+# Windows folder metadata
+desktop.ini
