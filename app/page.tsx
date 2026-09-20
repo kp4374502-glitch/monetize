@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 import { ArrowRight, BadgeCheck, Film, Wallet } from "lucide-react";
-import { OwnerBrandMenu } from "@/components/owner-brand-menu";
 import { requireUserId } from "@/lib/auth/ensure-user";
 import { getCampaignsForUser, isPlatformOwner } from "@/lib/auth/roles";
 import { getBrandRequestForUser } from "@/lib/brand/service";
@@ -38,15 +37,22 @@ function Landing() {
           Monetize is where brands run clipping campaigns: creators submit, reviewers verify, and what everyone is owed
           is always one page away.
         </p>
-        {/* "Sign in" stays the creator-facing sign-in. "Owner / Brand sign in" is ONE button that opens a
-            small menu: existing Owners/Admins/Mods sign in, new brands go to the gated Brand sign-up. */}
+        {/* Two plain buttons, ONE sign-in page: the app resolves the right view from each person's role after
+            they log in with their own username + password. Account creation is deliberately low-key. */}
         <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
           <Link href="/sign-in" className={buttonVariants({ variant: "primary", size: "lg" })}>
             Sign in <ArrowRight className="h-4 w-4" />
           </Link>
-          <OwnerBrandMenu />
+          <Link href="/sign-in" className={buttonVariants({ variant: "outline", size: "lg" })}>
+            Owner / Agency sign in
+          </Link>
         </div>
         <p className="mt-4 text-sm text-text-secondary">New creator? Use the invite link your campaign team sent you.</p>
+        <p className="mt-2 text-xs text-text-secondary/80">
+          <Link href="/brand-signup" className="underline-offset-2 hover:text-gold-light hover:underline">
+            Brand sign-up
+          </Link>
+        </p>
       </section>
 
       <section className="mx-auto grid max-w-5xl gap-4 px-4 pb-24 sm:grid-cols-3">
