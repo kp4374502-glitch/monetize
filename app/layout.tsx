@@ -47,7 +47,7 @@ const clerkAppearance = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider appearance={clerkAppearance}>
+    <ClerkProvider appearance={clerkAppearance} signInUrl="/sign-in">
       <html lang="en" className="dark">
         <body className={`${sans.variable} ${serif.variable} min-h-screen bg-bg-primary font-sans text-text-primary`}>
           <AppHeader />

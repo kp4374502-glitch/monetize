@@ -11,11 +11,16 @@ const isPublicRoute = createRouteMatcher([
   "/api/cron/(.*)", // authenticated by CRON_SECRET inside the route, not by a Clerk session
 ]);
 
-export default clerkMiddleware(async (auth, req) => {
-  if (!isPublicRoute(req)) {
-    await auth.protect();
-  }
-});
+export default clerkMiddleware(
+  async (auth, req) => {
+    if (!isPublicRoute(req)) {
+      await auth.protect();
+    }
+  },
+  // Send signed-out visitors of protected pages to OUR themed /sign-in, not Clerk's hosted page
+  // (which shows an ungated "Don't have an account? Sign up" link we can't restyle or hide).
+  { signInUrl: "/sign-in" },
+);
 
 export const config = {
   matcher: ["/((?!_next|.*\\..*).*)", "/(api|trpc)(.*)"],
