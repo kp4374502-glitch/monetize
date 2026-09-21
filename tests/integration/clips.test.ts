@@ -132,8 +132,10 @@ describe("submitClip", () => {
   it("rejects a duplicate URL — same creator, and a different creator", async () => {
     const url = tiktok();
     await svc.submitClip("c1", camp, url, opts());
-    await expect(svc.submitClip("c1", camp, url, opts())).rejects.toThrow(/already been submitted/);
-    await expect(svc.submitClip("c2", camp, url, opts())).rejects.toThrow(/already been submitted/);
+    await expect(svc.submitClip("c1", camp, url, opts())).rejects.toThrow("You've already submitted this link to this campaign.");
+    const other = await svc.submitClip("c2", camp, url, opts()).catch((e: Error) => e.message);
+    expect(other).toBe("This link has already been submitted to this campaign by another creator and can't be added again.");
+    expect(other).not.toMatch(/c1/); // never names the first submitter
   });
 
   it("rejects a platform not in eligible_platforms", async () => {

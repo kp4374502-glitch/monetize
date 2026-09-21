@@ -22,6 +22,10 @@ import {
   wouldExceedBudget,
 } from "./rules";
 
+const OWN_DUPLICATE_MESSAGE = "You've already submitted this link to this campaign.";
+// Deliberately never says WHICH creator: creators must not see each other's activity.
+const OTHER_DUPLICATE_MESSAGE = "This link has already been submitted to this campaign by another creator and can't be added again.";
+
 /**
  * Every query here filters by campaign_id (CLAUDE.md's non-negotiable rule). The one exception is
  * refreshAllClips, a system job for the cron route: it selects across campaigns on purpose, and
@@ -115,9 +119,8 @@ export async function submitClip(actorId: string, campaignId: string, rawUrl: st
     .from(clips)
     .where(and(eq(clips.campaignId, campaignId), eq(clips.platform, parsed.platform), like(clips.url, likePattern)));
   const flag = duplicateFlag(actorId, matches);
-  if (flag.sameCreator || matches.some((m) => m.url === parsed.url)) {
-    throw new Error("This link has already been submitted to this campaign.");
-  }
+  if (flag.sameCreator) throw new Error(OWN_DUPLICATE_MESSAGE);
+  if (matches.some((m) => m.url === parsed.url)) throw new Error(OTHER_DUPLICATE_MESSAGE);
 
   const meta = await fetchClipMetadata(parsed.url, parsed.platform, fetchOpts);
 
@@ -142,7 +145,13 @@ export async function submitClip(actorId: string, campaignId: string, rawUrl: st
     return { clip: row, statsAvailable: meta.ok };
   } catch (e) {
     if (String((e as { cause?: { code?: string }; code?: string })?.cause?.code ?? (e as { code?: string })?.code) === "23505") {
-      throw new Error("This link has already been submitted to this campaign.");
+      // Lost a race with another insert of the same URL: work out whose it was so the wording is accurate.
+      const [existing] = await db
+        .select({ creatorUserId: clips.creatorUserId })
+        .from(clips)
+        .where(and(eq(clips.campaignId, campaignId), eq(clips.url, parsed.url)))
+        .limit(1);
+      throw new Error(existing?.creatorUserId === actorId ? OWN_DUPLICATE_MESSAGE : OTHER_DUPLICATE_MESSAGE);
     }
     throw e;
   }
