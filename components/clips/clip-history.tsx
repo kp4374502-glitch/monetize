@@ -16,7 +16,7 @@ export function ClipHistory({ history }: { history: History }) {
         {history.paid.length === 0 && (
           <Card innerClassName="py-8 text-center text-sm text-text-secondary">Nothing paid yet.</Card>
         )}
-        <ul className="grid gap-2.5">
+        <ul className="grid grid-cols-1 gap-2.5">
           {history.paid.map(({ clip: c, creatorUsername, paidByUsername }) => (
             <li key={c.id} data-testid="paid-row">
               <Card innerClassName="flex items-center gap-4 p-4">
@@ -43,7 +43,7 @@ export function ClipHistory({ history }: { history: History }) {
         {history.rejected.length === 0 && (
           <Card innerClassName="py-8 text-center text-sm text-text-secondary">No rejected clips.</Card>
         )}
-        <ul className="grid gap-2.5">
+        <ul className="grid grid-cols-1 gap-2.5">
           {history.rejected.map(({ clip: c, creatorUsername, rejectedBy }) => (
             <li key={c.id} data-testid="rejected-row">
               <Card innerClassName="flex items-center gap-4 p-4">

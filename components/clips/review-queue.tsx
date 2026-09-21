@@ -68,7 +68,7 @@ export function ReviewQueue({
         {pending.length === 0 && (
           <Card innerClassName="py-10 text-center text-sm text-text-secondary">Nothing waiting on you. 🎉</Card>
         )}
-        <ul className="grid gap-3">
+        <ul className="grid grid-cols-1 gap-3">
           {pending.map(({ clip: c, creatorUsername }) => (
             <li key={c.id} data-testid="queue-row">
               <Card innerClassName="p-4">
@@ -109,12 +109,12 @@ export function ReviewQueue({
         {awaitingPayment.length === 0 && (
           <Card innerClassName="py-8 text-center text-sm text-text-secondary">No approved clips waiting to be paid.</Card>
         )}
-        <ul className="grid gap-3">
+        <ul className="grid grid-cols-1 gap-3">
           {awaitingPayment.map(({ clip: c, creatorUsername }) => (
             <li key={c.id} data-testid="payment-row">
               <Card innerClassName="p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 text-sm">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                     <StatusBadge clip={c} />
                     <span className="font-bold">{creatorUsername}</span>
                     <span className="text-text-secondary">{c.views.toLocaleString()} views</span>
