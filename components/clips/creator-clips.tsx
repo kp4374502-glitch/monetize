@@ -28,7 +28,8 @@ export function CreatorClips({ campaignId, clips, viewMinimum }: { campaignId: s
             No clips yet — paste a link above to submit your first one.
           </Card>
         )}
-        <ul className="grid gap-3">
+        {/* grid-cols-1 = minmax(0,1fr): without it a long unbreakable URL widens the whole column on phones */}
+        <ul className="grid grid-cols-1 gap-3">
           {clips.map((c) => (
             <li key={c.id} data-testid="my-clip">
               <Card innerClassName="p-4">
@@ -65,7 +66,21 @@ export function CreatorClips({ campaignId, clips, viewMinimum }: { campaignId: s
                       c.status !== "rejected" && (
                         <Callout tone="warning">
                           <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                          <span>Analytics proof needed — this clip earns $0 until you attach it.</span>
+                          <div className="min-w-0 space-y-2">
+                            <p>Analytics proof needed — this clip earns $0 until you attach it.</p>
+                            <div data-testid="proof-instructions" className="space-y-1.5 text-sm text-amber-100/90">
+                              <p className="font-semibold">To fix this:</p>
+                              <ol className="list-decimal space-y-1 pl-5">
+                                <li>Start recording your screen from the home screen of your phone or computer.</li>
+                                <li>Play this post for 2–3 seconds, then open its analytics.</li>
+                                <li>Show your full audience breakdown before you stop recording.</li>
+                                <li>Upload the video to YouTube (unlisted) or Google Drive, then paste the link below.</li>
+                              </ol>
+                              <p className="break-all pt-1 text-xs text-text-secondary">
+                                Example of a valid proof link: https://youtube.com/shorts/jxGG6URvhZQ?si=KbmrzYhnU9LV-Nh8
+                              </p>
+                            </div>
+                          </div>
                         </Callout>
                       )
                     )}
