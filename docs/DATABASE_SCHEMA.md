@@ -70,6 +70,7 @@ Every table holding campaign-specific data carries a `campaign_id` — this is t
 - `qualifying_pct_set_by` (fk users)
 - `video_proof_url`, `video_proof_submitted_at` (nullable, can be submitted early or replaced)
 - `video_proof_reminder_sent_at` (nullable)
+- `analytics_screenshot_pathname` (nullable, Vercel Blob pathname of the uploaded proof screenshot; mutually exclusive with `video_proof_url` — a clip holds one proof at a time), `analytics_screenshot_submitted_at` (nullable), `analytics_screenshot_views_at_submit` (nullable int, the views that made it eligible — evidence that it was valid when submitted; a screenshot stays valid if views later reach 10,000+)
 - `cpm`, `earnings`, `payout` (computed and cached)
 - `paid_status` (unpaid | paid)
 - `paid_by` (fk users, nullable), `paid_at` (nullable)

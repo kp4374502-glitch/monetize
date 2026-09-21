@@ -176,6 +176,14 @@ export const clips = pgTable(
     videoProofUrl: text("video_proof_url"),
     videoProofSubmittedAt: timestamp("video_proof_submitted_at", { withTimezone: true }),
     videoProofReminderSentAt: timestamp("video_proof_reminder_sent_at", { withTimezone: true }),
+    // Analytics-proof SCREENSHOT (alternative to the video link, only accepted while the clip has < 10,000
+    // views). Stored as a PRIVATE Vercel Blob; we keep its pathname, never a public URL. A clip has one
+    // proof at a time: setting a screenshot clears the video link and vice versa.
+    analyticsScreenshotPathname: text("analytics_screenshot_pathname"),
+    analyticsScreenshotSubmittedAt: timestamp("analytics_screenshot_submitted_at", { withTimezone: true }),
+    // The clip's view count when the screenshot was accepted — the evidence that it was valid at the time.
+    // Never re-checked: later view growth does not invalidate accepted proof.
+    analyticsScreenshotViewsAtSubmit: integer("analytics_screenshot_views_at_submit"),
     cpm: numeric("cpm", { precision: 10, scale: 4 }),
     earnings: numeric("earnings", { precision: 12, scale: 2 }),
     payout: numeric("payout", { precision: 12, scale: 2 }),

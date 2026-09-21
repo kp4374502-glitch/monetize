@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, inArray, like, sql, gte, count, ne } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { db } from "../db/client";
 import { campaigns, campaignCreators, clipReviewEvents, clips, users } from "../../drizzle/schema";
@@ -7,7 +8,12 @@ import { getRoleForCampaign, requireRole } from "../auth/roles";
 import { fetchClipMetadata, type FetchOptions } from "../scrapecreators";
 import { notify } from "../notifications";
 import { isValidProofUrl, parseClipUrl } from "./url";
+import { validateScreenshot } from "./image";
+import { vercelBlobStore, type ProofImageStore } from "./proof-store";
 import {
+  SCREENSHOT_VIEWS_LIMIT,
+  canSubmitScreenshot,
+  hasAnalyticsProof,
   computeEconomics,
   duplicateFlag,
   roleCanMarkPaid,
@@ -42,11 +48,15 @@ async function loadClip(campaignId: string, clipId: string): Promise<Clip> {
 }
 
 /** cpm/earnings/payout columns for a clip's current state; nulls when not (yet) earning. */
-function economicsColumns(clip: Pick<Clip, "views" | "qualifyingAudiencePct" | "videoProofUrl">, campaign: Campaign) {
+function economicsColumns(
+  clip: Pick<Clip, "views" | "qualifyingAudiencePct" | "videoProofUrl" | "analyticsScreenshotPathname">,
+  campaign: Campaign,
+) {
   const e = computeEconomics({
     views: clip.views,
     qualifyingAudiencePct: clip.qualifyingAudiencePct === null ? null : Number(clip.qualifyingAudiencePct),
     videoProofUrl: clip.videoProofUrl,
+    analyticsScreenshotPathname: clip.analyticsScreenshotPathname,
     campaign: {
       baseRate: Number(campaign.baseRate),
       divisor: Number(campaign.divisor),
@@ -140,8 +150,18 @@ export async function submitClip(actorId: string, campaignId: string, rawUrl: st
 
 const proofSchema = z.string().trim().refine(isValidProofUrl, "Analytics proof must be a YouTube (unlisted) or Google Drive link.");
 
-/** Creator-only, own clips. Early submission and replacement are both allowed (no date checks). */
-export async function attachVideoProof(actorId: string, campaignId: string, clipId: string, rawUrl: string) {
+/**
+ * Creator-only, own clips. Early submission and replacement are both allowed (no date checks), and a video
+ * link is accepted at ANY view count. A clip has one proof at a time, so this also replaces (and deletes)
+ * an earlier screenshot.
+ */
+export async function attachVideoProof(
+  actorId: string,
+  campaignId: string,
+  clipId: string,
+  rawUrl: string,
+  store: ProofImageStore = vercelBlobStore,
+) {
   const url = proofSchema.parse(rawUrl);
   const [clip] = await db
     .select()
@@ -152,13 +172,99 @@ export async function attachVideoProof(actorId: string, campaignId: string, clip
   if (clip.paidStatus === "paid") throw new Error("This clip has already been paid.");
 
   const campaign = await loadCampaign(campaignId);
-  const next = { ...clip, videoProofUrl: url };
+  const next = { ...clip, videoProofUrl: url, analyticsScreenshotPathname: null };
   const [row] = await db
     .update(clips)
-    .set({ videoProofUrl: url, videoProofSubmittedAt: new Date(), ...economicsColumns(next, campaign) })
+    .set({
+      videoProofUrl: url,
+      videoProofSubmittedAt: new Date(),
+      analyticsScreenshotPathname: null,
+      analyticsScreenshotSubmittedAt: null,
+      analyticsScreenshotViewsAtSubmit: null,
+      ...economicsColumns(next, campaign),
+    })
     .where(and(eq(clips.id, clipId), eq(clips.campaignId, campaignId)))
     .returning();
+  if (clip.analyticsScreenshotPathname) await store.del(clip.analyticsScreenshotPathname).catch(() => {});
   return row;
+}
+
+/**
+ * Creator-only, own clips: submit an analytics SCREENSHOT as proof instead of a video link.
+ *
+ * The rule (docs/PRODUCT_SPEC.md -> "Tier 1 audience verification"): only while the clip has FEWER than
+ * 10,000 views. At 10,000 or more the creator must use a video link. This is checked here, at submission
+ * time, against the clip's stored view count — and it is the ONLY place the limit is enforced. An accepted
+ * screenshot is never re-checked, so it stays valid when the clip's views later pass 10,000. The view count
+ * at submission is recorded as evidence.
+ */
+export async function attachAnalyticsScreenshot(
+  actorId: string,
+  campaignId: string,
+  clipId: string,
+  file: { bytes: Uint8Array },
+  store: ProofImageStore = vercelBlobStore,
+) {
+  const [clip] = await db
+    .select()
+    .from(clips)
+    .where(and(eq(clips.id, clipId), eq(clips.campaignId, campaignId), eq(clips.creatorUserId, actorId)))
+    .limit(1);
+  if (!clip) throw new Error("Clip not found.");
+  if (clip.paidStatus === "paid") throw new Error("This clip has already been paid.");
+  if (!canSubmitScreenshot(clip.views)) {
+    throw new Error(
+      `Screenshots are only accepted for clips with fewer than ${SCREENSHOT_VIEWS_LIMIT.toLocaleString("en-US")} views. This clip has ${clip.views.toLocaleString("en-US")}, so please submit a video link instead.`,
+    );
+  }
+  const kind = validateScreenshot(file.bytes);
+
+  const campaign = await loadCampaign(campaignId);
+  // Random UUID in the path: unguessable, and a re-upload never overwrites the previous one.
+  const pathname = `analytics-proof/${campaignId}/${clipId}/${randomUUID()}.${kind.ext}`;
+  await store.put(pathname, file.bytes, kind.contentType);
+
+  const next = { ...clip, videoProofUrl: null, analyticsScreenshotPathname: pathname };
+  let row: typeof clips.$inferSelect;
+  try {
+    [row] = await db
+      .update(clips)
+      .set({
+        analyticsScreenshotPathname: pathname,
+        analyticsScreenshotSubmittedAt: new Date(),
+        analyticsScreenshotViewsAtSubmit: clip.views,
+        videoProofUrl: null,
+        videoProofSubmittedAt: null,
+        ...economicsColumns(next, campaign),
+      })
+      .where(and(eq(clips.id, clipId), eq(clips.campaignId, campaignId)))
+      .returning();
+  } catch (e) {
+    await store.del(pathname).catch(() => {}); // don't leave an orphaned upload behind
+    throw e;
+  }
+  if (clip.analyticsScreenshotPathname) await store.del(clip.analyticsScreenshotPathname).catch(() => {});
+  return row;
+}
+
+/**
+ * Stream a clip's screenshot to someone allowed to see it: the creator who owns the clip, or a Mod/Admin/
+ * Owner of THIS campaign. Anyone else gets "not found" (indistinguishable from a clip with no screenshot).
+ */
+export async function getProofImage(
+  actorId: string,
+  campaignId: string,
+  clipId: string,
+  store: ProofImageStore = vercelBlobStore,
+) {
+  const role = await getRoleForCampaign(actorId, campaignId);
+  if (!role) throw new Error("Clip not found.");
+  const clip = await loadClip(campaignId, clipId);
+  if (role === "creator" && clip.creatorUserId !== actorId) throw new Error("Clip not found.");
+  if (!clip.analyticsScreenshotPathname) throw new Error("Clip not found.");
+  const blob = await store.get(clip.analyticsScreenshotPathname);
+  if (!blob) throw new Error("Clip not found.");
+  return blob;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -283,7 +389,7 @@ export async function setQualifyingAudiencePct(actorId: string, campaignId: stri
   const clip = await loadClip(campaignId, clipId);
   if (clip.paidStatus === "paid") throw new Error("This clip has already been paid.");
   // CLAUDE.md verification flow: proof must exist before a % can be entered.
-  if (!clip.videoProofUrl) throw new Error("Analytics proof is missing — the creator must attach it before a Qualifying Audience % can be entered.");
+  if (!hasAnalyticsProof(clip)) throw new Error("Analytics proof is missing — the creator must attach it before a Qualifying Audience % can be entered.");
   if (!roleCanOverride(role, actorId, clip.qualifyingPctSetBy)) {
     throw new Error("Access denied: only an Admin or Owner can edit a % another reviewer entered.");
   }

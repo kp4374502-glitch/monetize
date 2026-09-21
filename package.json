@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^6",
+    "@vercel/blob": "^2.8.0",
     "clsx": "^2",
     "drizzle-orm": "^0.44",
     "lucide-react": "^1.47.0",

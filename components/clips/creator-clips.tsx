@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Callout, Card, SectionHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { attachProofAction, refreshViewsAction, submitClipAction } from "@/app/campaigns/clip-actions";
+import { SCREENSHOT_VIEWS_LIMIT, canSubmitScreenshot, hasAnalyticsProof } from "@/lib/clips/rules";
+import { ScreenshotUpload } from "./screenshot-upload";
 import { StatusBadge, Stats, Thumb, money, type ClipRow } from "./clip-parts";
 
 /** Creator view: add a clip, and see ONLY their own clips. No payout formula or budget shown. */
@@ -58,10 +60,23 @@ export function CreatorClips({ campaignId, clips, viewMinimum }: { campaignId: s
                       </Callout>
                     )}
 
-                    {c.videoProofUrl ? (
-                      <p className="flex items-center gap-1.5 text-xs text-green-400">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Proof submitted
-                      </p>
+                    {hasAnalyticsProof(c) ? (
+                      <div className="space-y-1.5">
+                        <p className="flex items-center gap-1.5 text-xs text-green-400">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Proof submitted{c.analyticsScreenshotPathname && " (screenshot)"}
+                        </p>
+                        {c.analyticsScreenshotPathname && (
+                          <a href={`/api/proof/${campaignId}/${c.id}`} target="_blank" rel="noreferrer" className="inline-block">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={`/api/proof/${campaignId}/${c.id}`}
+                              alt="Your analytics screenshot"
+                              loading="lazy"
+                              className="h-24 w-auto rounded-lg border border-subtle bg-black object-contain"
+                            />
+                          </a>
+                        )}
+                      </div>
                     ) : (
                       c.status !== "rejected" && (
                         <Callout tone="warning">
@@ -99,17 +114,40 @@ export function CreatorClips({ campaignId, clips, viewMinimum }: { campaignId: s
                         <ActionForm action={attachProofAction.bind(null, campaignId, c.id)} className="flex min-w-64 flex-1 flex-wrap items-center gap-2">
                           <Input
                             name="proofUrl"
-                            placeholder={c.videoProofUrl ? "Replace analytics proof link" : "Analytics proof link (YouTube unlisted / Drive)"}
+                            placeholder={hasAnalyticsProof(c) ? "Replace analytics proof link" : "Analytics proof link (YouTube unlisted / Drive)"}
                             required
                             className="min-w-56 flex-1"
                           />
-                          <Button type="submit" variant="outline" size="sm">{c.videoProofUrl ? "Replace proof" : "Submit proof"}</Button>
+                          <Button type="submit" variant="outline" size="sm">{hasAnalyticsProof(c) ? "Replace proof" : "Submit proof"}</Button>
                         </ActionForm>
                       )}
                       <ActionForm action={refreshViewsAction.bind(null, campaignId, c.id)}>
                         <Button type="submit" variant="ghost" size="sm">Refresh views now</Button>
                       </ActionForm>
                     </div>
+
+                    {c.paidStatus === "unpaid" && (
+                      <div data-testid="screenshot-option" className="space-y-1.5 border-t border-subtle pt-2.5">
+                        {canSubmitScreenshot(c.views) ? (
+                          <>
+                            <p className="text-xs text-text-secondary">
+                              Or, since this clip has under {SCREENSHOT_VIEWS_LIMIT.toLocaleString("en-US")} views, you can upload a screenshot
+                              of your full audience analytics instead of a video.
+                            </p>
+                            <ScreenshotUpload campaignId={campaignId} clipId={c.id} replacing={!!c.analyticsScreenshotPathname} />
+                          </>
+                        ) : c.analyticsScreenshotPathname ? (
+                          <p className="text-xs text-text-secondary">
+                            Your screenshot was accepted while this clip was under {SCREENSHOT_VIEWS_LIMIT.toLocaleString("en-US")} views and
+                            stays valid. To replace it, submit a video link above.
+                          </p>
+                        ) : (
+                          <p className="text-xs text-text-secondary">
+                            This clip has {SCREENSHOT_VIEWS_LIMIT.toLocaleString("en-US")}+ views, so analytics proof must be a video link.
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </Card>

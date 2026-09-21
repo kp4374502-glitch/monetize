@@ -18,6 +18,7 @@ moves money).
 - **External data:** ScrapeCreators API (https://scrapecreators.com/) for views/likes/post
   metadata on TikTok/Instagram/YouTube — public-data lookups only, no OAuth, no creator
   account-connect flow. See docs/PRODUCT_SPEC.md → "Clip data layer" for scope limits.
+- **File storage:** Vercel Blob (private) — analytics-proof screenshots only, for clips under 10,000 views
 - **Source control:** GitHub, connected to the Vercel project
 
 ## Non-negotiable architectural rule
@@ -49,8 +50,9 @@ Payout   = min(Earnings, Max Pay Per Post)
 worked example are in docs/PRODUCT_SPEC.md → "Payout formula".
 
 ## Verification flow
-A clip needs a 7-day-later analytics-proof link (YouTube unlisted / Drive) before an Admin/Mod can
-enter a Qualifying Audience %. No file-upload/screenshot step exists in the current spec — see
+A clip needs 7-day-later analytics proof — a video link (YouTube unlisted / Drive), or, only while the clip
+has <10,000 views, an uploaded screenshot (Vercel Blob; stays valid if views later pass 10k) — before an Admin/Mod can
+enter a Qualifying Audience %. See
 docs/PRODUCT_SPEC.md → "Tier 1 audience verification" before changing this flow.
 
 ## Conventions

@@ -199,7 +199,15 @@ Views, likes, captions, and thumbnails are pulled automatically via the [ScrapeC
 
 TikTok does not expose per-video audience-demographic data to anyone but the account owner, so this step is manual and human-reviewed — the following proof is **required** for every clip before it can earn anything:
 
-1. **Analytics proof, 7 days later** — creator submits an unlisted YouTube or Drive video link of their TikTok analytics, filed 7 days after the clip was posted. Recording must start from the home screen of the creator's phone or computer, show 2–3 seconds of the post itself playing, then navigate into that post's analytics and show all analytics data before ending.
+1. **Analytics proof, 7 days later** — filed 7 days after the clip was posted, in one of two forms depending on the clip's current view count:
+   - **Video link (always available):** an unlisted YouTube or Drive video link of their TikTok analytics. Recording must start from the home screen of the creator's phone or computer, show 2–3 seconds of the post itself playing, then navigate into that post's analytics and show all analytics data before ending.
+   - **Screenshot upload (only while the clip has fewer than 10,000 views):** a real image file (PNG, JPEG or WebP, up to 4 MB) of the full audience analytics, stored privately in Vercel Blob.
+
+   **The 10,000-view rule.** A clip with **fewer than 10,000** views may use either option. A clip with **10,000 or more** views may use the video link only — screenshot uploads are refused. The check uses the clip's stored view count at the moment of upload (exactly 10,000 is *not* eligible).
+
+   **Not retroactive.** A screenshot validly accepted while the clip was under 10,000 views **stays valid** if the clip's views later pass 10,000: it still counts as proof, the reviewer can still enter a Qualifying Audience %, and the clip can still be approved and paid. The threshold only governs what a creator may submit going forward. Once over 10,000 views, a creator can no longer upload a new or replacement screenshot — replacing the proof then requires a video link. The views-at-submission and time are recorded on the clip as evidence.
+
+   A clip holds one proof at a time: submitting a video link removes a previous screenshot, and uploading a screenshot replaces a previous link. Reviewers see a submitted screenshot **inline** in the review queue (with a click-through to full size), not just a link. Screenshots are private: only the clip's own creator and the Mod/Admin/Owner of that campaign can view them.
 
 An Admin or Mod reads the proof and manually enters the **Qualifying Audience %** on the clip — this is never self-reported by the creator directly into a number field. Until the proof is attached and a % is entered, the clip shows a blocking warning and earns $0, even if it has cleared the view minimum.
 
@@ -258,7 +266,7 @@ The app calculates what's owed but **never moves money**. Actual payment happens
 - **Framework/hosting:** Next.js on Vercel, source on GitHub (kept from the current build).
 - **Scale target:** thousands of creator/reviewer accounts spread across many independent campaigns — implies the data model must be tenant-scoped from the start (every core table keyed by campaign\_id), not retrofitted later.
 - **External dependency:** ScrapeCreators API for view/like/metadata refresh — needs a background job (Vercel Cron or similar) for scheduled refresh plus the existing manual "Refresh views now" trigger, with sensible rate/credit-usage handling given ScrapeCreators is metered per request.
-- **File storage:** none needed for proof — Tier 1 audience proof is an external video link (YouTube unlisted / Drive), not an uploaded file.
+- **File storage:** Vercel Blob (private store, `BLOB_READ_WRITE_TOKEN`) holds only analytics-proof screenshots, and only for clips under 10,000 views; images are served through an access-checked route (`/api/proof/[campaignId]/[clipId]`), never a public URL. The video-link option stays external (YouTube unlisted / Drive).
 - **Database:** Postgres, provisioned directly through Vercel's Storage/Marketplace tab (Neon-backed) — no separate Neon or Supabase account.
 - **Auth:** turnkey provider (e.g. Clerk), chosen and fully implemented end-to-end — handles multi-role (Owner/Admin/Mod/Creator), platform-wide and per-campaign scoping. **Login is username + password** (no email required, matching the current Liftly UI), with a forgot-password/reset flow.
 - **Creator onboarding:** an Owner or Mod generates a reusable invite link per campaign — the same link can onboard many creators and stays active until the Owner/Mod revokes it. No public self-signup.

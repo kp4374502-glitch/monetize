@@ -4,11 +4,39 @@ import { Button } from "@/components/ui/button";
 import { Callout, Card, SectionHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { markPaidAction, reviewAction, setPctAction } from "@/app/campaigns/clip-actions";
+import { hasAnalyticsProof } from "@/lib/clips/rules";
 import { Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
 
 type Row = { clip: ClipRow; creatorUsername: string };
 
-function ProofLine({ clip, missingId }: { clip: ClipRow; missingId?: string }) {
+function ProofLine({ clip, campaignId, missingId }: { clip: ClipRow; campaignId: string; missingId?: string }) {
+  if (clip.analyticsScreenshotPathname) {
+    // Private image, served through the access-checked /api/proof route (never a direct storage URL).
+    const src = `/api/proof/${campaignId}/${clip.id}`;
+    return (
+      <div className="space-y-1.5" data-testid="proof-screenshot">
+        <p className="flex flex-wrap items-center gap-1.5 text-sm">
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-green-400" />
+          <span className="text-text-secondary">Proof:</span>
+          <span>Analytics screenshot</span>
+          {clip.analyticsScreenshotViewsAtSubmit !== null && (
+            <span className="text-xs text-text-secondary">
+              (accepted at {clip.analyticsScreenshotViewsAtSubmit.toLocaleString("en-US")} views)
+            </span>
+          )}
+        </p>
+        <a href={src} target="_blank" rel="noreferrer" className="block" title="Open full size">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src}
+            alt="Analytics screenshot submitted by the creator"
+            loading="lazy"
+            className="max-h-[28rem] w-full max-w-lg rounded-xl border border-subtle bg-black object-contain"
+          />
+        </a>
+      </div>
+    );
+  }
   return clip.videoProofUrl ? (
     <p className="flex items-center gap-1.5 text-sm">
       <CheckCircle2 className="h-4 w-4 shrink-0 text-green-400" />
@@ -36,11 +64,11 @@ function PctForm({ campaignId, clip }: { campaignId: string; clip: ClipRow }) {
         max="100"
         placeholder="Qualifying audience %"
         defaultValue={clip.qualifyingAudiencePct ?? ""}
-        disabled={!clip.videoProofUrl}
+        disabled={!hasAnalyticsProof(clip)}
         className="w-52"
         required
       />
-      <Button type="submit" variant="outline" size="sm" disabled={!clip.videoProofUrl}>Save %</Button>
+      <Button type="submit" variant="outline" size="sm" disabled={!hasAnalyticsProof(clip)}>Save %</Button>
       <span className="text-sm text-text-secondary" data-testid="queue-payout">
         Payout: <span className="font-bold text-gold-light">{money(clip.payout)}</span>
       </span>
@@ -89,7 +117,7 @@ export function ReviewQueue({
                         <span>{c.flaggedReason}</span>
                       </Callout>
                     )}
-                    <ProofLine clip={c} missingId="proof-missing" />
+                    <ProofLine clip={c} campaignId={campaignId} missingId="proof-missing" />
                     <PctForm campaignId={campaignId} clip={c} />
                     <ActionForm action={reviewAction.bind(null, campaignId, c.id)} className="flex flex-wrap items-center gap-2 border-t border-subtle pt-3">
                       <Input name="reason" placeholder="Reason (required to reject)" className="min-w-56 flex-1" />
@@ -125,7 +153,7 @@ export function ReviewQueue({
                   </ActionForm>
                 </div>
                 <div className="mt-3 space-y-2.5">
-                  <ProofLine clip={c} />
+                  <ProofLine clip={c} campaignId={campaignId} />
                   <PctForm campaignId={campaignId} clip={c} />
                 </div>
               </Card>

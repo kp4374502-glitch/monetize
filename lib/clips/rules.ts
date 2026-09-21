@@ -9,6 +9,8 @@ export interface EconomicsInput {
   views: number;
   qualifyingAudiencePct: number | null;
   videoProofUrl: string | null;
+  /** Private-blob pathname of an uploaded analytics screenshot; counts as proof just like a video link. */
+  analyticsScreenshotPathname?: string | null;
   campaign: { baseRate: number; divisor: number; maxPayPerPost: number; viewMinimum: number };
 }
 
@@ -23,7 +25,7 @@ export type Economics =
  * cpm keeps 4 decimals; earnings and payout are rounded to cents.
  */
 export function computeEconomics(i: EconomicsInput): Economics {
-  if (!i.videoProofUrl) return { eligible: false, reason: "no_proof" };
+  if (!i.videoProofUrl && !i.analyticsScreenshotPathname) return { eligible: false, reason: "no_proof" };
   if (i.qualifyingAudiencePct === null) return { eligible: false, reason: "no_pct" };
   if (i.views < i.campaign.viewMinimum) return { eligible: false, reason: "below_view_minimum" };
 
@@ -85,3 +87,20 @@ export function duplicateFlag(
 export function startOfUtcDay(now: Date): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
+
+/**
+ * Analytics-proof screenshots are only ACCEPTED for clips with FEWER than this many views (docs/PRODUCT_SPEC.md
+ * -> "Tier 1 audience verification"). At or above it, only a video link may be submitted. This governs new
+ * submissions only: a screenshot accepted while the clip was under the limit stays valid forever, even after
+ * the clip's views grow past it. Deliberately a platform-wide constant, not a per-campaign setting.
+ */
+export const SCREENSHOT_VIEWS_LIMIT = 10_000;
+
+/** May the creator submit a screenshot for a clip that currently has this many views? Strictly fewer than 10,000. */
+export const canSubmitScreenshot = (views: number): boolean => views < SCREENSHOT_VIEWS_LIMIT;
+
+/** A clip has analytics proof if it carries a video link OR an accepted screenshot. */
+export const hasAnalyticsProof = (c: {
+  videoProofUrl: string | null;
+  analyticsScreenshotPathname?: string | null;
+}): boolean => !!(c.videoProofUrl || c.analyticsScreenshotPathname);

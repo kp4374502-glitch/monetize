@@ -46,6 +46,7 @@ export async function sendProofReminders(now: Date = new Date()): Promise<number
     .where(
       and(
         isNull(clips.videoProofUrl),
+        isNull(clips.analyticsScreenshotPathname), // a screenshot counts as proof too
         isNull(clips.videoProofReminderSentAt),
         ne(clips.status, "rejected"),
         eq(campaigns.status, "active"),
