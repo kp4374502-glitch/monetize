@@ -40,7 +40,6 @@ export default async function BrandSignupPage() {
     return (
       <AuthShell title="Brand" accent="sign-up" subtitle="Enter the access code you were given to continue.">
         <BrandCodeForm />
-        {alreadyHaveAccount}
       </AuthShell>
     );
   }
