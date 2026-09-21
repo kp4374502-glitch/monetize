@@ -13,7 +13,7 @@ import { Card, SectionHeader } from "@/components/ui/card";
 
 const features = [
   { icon: Film, title: "Creators submit clips", body: "Paste a TikTok, Instagram or YouTube link — views and likes are pulled in automatically." },
-  { icon: BadgeCheck, title: "Reviewers verify", body: "Approve or reject with a reason, check the video proof, and set the qualifying audience." },
+  { icon: BadgeCheck, title: "Reviewers verify", body: "Approve or reject with a reason, check the analytics proof, and set the qualifying audience." },
   { icon: Wallet, title: "Payouts calculate themselves", body: "Each campaign's formula, budget cap and mark-paid limits are enforced for you." },
 ];
 

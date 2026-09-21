@@ -194,7 +194,7 @@ describe("submitClip", () => {
   });
 });
 
-describe("video proof + qualifying audience %", () => {
+describe("analytics proof + qualifying audience %", () => {
   it("won't take a % before proof exists; then computes the payout with gating", async () => {
     const clip = await makeClip("c1", camp, 4_000_000);
     await expect(svc.setQualifyingAudiencePct("modA", camp, clip.id, 25)).rejects.toThrow(/proof is missing/);

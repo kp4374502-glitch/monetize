@@ -79,7 +79,7 @@ export function StatCard({
   );
 }
 
-/** Amber warning treatment (e.g. missing video proof, duplicate flags). */
+/** Amber warning treatment (e.g. missing analytics proof, duplicate flags). */
 export function Callout({
   children,
   tone = "warning",

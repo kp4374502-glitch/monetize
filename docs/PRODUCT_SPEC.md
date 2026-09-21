@@ -165,9 +165,9 @@ Unlike Admin, a Mod is **not** automatic across campaigns — they must be expli
 
 **Proof submission**
 
-- Dashboard shows a visible countdown/reminder for when the 7-day video-proof window opens.
-- A creator can submit the video proof early, before day 7 — not forced to wait exactly until then.
-- A creator can replace/resubmit their video proof link if they submitted the wrong one.
+- Dashboard shows a visible countdown/reminder for when the 7-day analytics-proof window opens.
+- A creator can submit the analytics proof early, before day 7 — not forced to wait exactly until then.
+- A creator can replace/resubmit their analytics proof link if they submitted the wrong one.
 
 **Visibility & stats**
 
@@ -199,11 +199,11 @@ Views, likes, captions, and thumbnails are pulled automatically via the [ScrapeC
 
 TikTok does not expose per-video audience-demographic data to anyone but the account owner, so this step is manual and human-reviewed — the following proof is **required** for every clip before it can earn anything:
 
-1. **Video proof, 7 days later** — creator submits an unlisted YouTube or Drive video link of their TikTok analytics, filed 7 days after the clip was posted. Recording must start from the home screen of the creator's phone or computer, show 2–3 seconds of the post itself playing, then navigate into that post's analytics and show all analytics data before ending.
+1. **Analytics proof, 7 days later** — creator submits an unlisted YouTube or Drive video link of their TikTok analytics, filed 7 days after the clip was posted. Recording must start from the home screen of the creator's phone or computer, show 2–3 seconds of the post itself playing, then navigate into that post's analytics and show all analytics data before ending.
 
 An Admin or Mod reads the proof and manually enters the **Qualifying Audience %** on the clip — this is never self-reported by the creator directly into a number field. Until the proof is attached and a % is entered, the clip shows a blocking warning and earns $0, even if it has cleared the view minimum.
 
-If a creator never submits the 7-day video proof, there's no automatic rejection or expiry — the clip just stays blocked, and the assigned reviewer gets an in-app notification reminding them to chase it up.
+If a creator never submits the 7-day analytics proof, there's no automatic rejection or expiry — the clip just stays blocked, and the assigned reviewer gets an in-app notification reminding them to chase it up.
 
 ## Payout formula
 
@@ -229,7 +229,7 @@ Payout   = min(Earnings, Max Pay Per Post)
 
 **Worked example** (Divisor 50, Base Rate $1.00): a clip with 25% qualifying audience → CPM = (25÷50)×$1.00 = $0.50. At 4,000,000 views → Earnings = $0.50 × 4,000 = $2,000 → capped at the campaign's Max Pay Per Post (e.g. $500), so the clip pays out $500, not $2,000.
 
-Nothing is owed until a clip is: (1) approved, (2) past the campaign's view minimum, and (3) has the video proof attached and a Qualifying Audience % entered.
+Nothing is owed until a clip is: (1) approved, (2) past the campaign's view minimum, and (3) has the analytics proof attached and a Qualifying Audience % entered.
 
 Once a campaign's Total Budget is fully spent, no further clips are approved or paid out on it — the Owner/Admin sees remaining budget and can raise the cap or close the campaign.
 
@@ -247,7 +247,7 @@ New capability (the original Monetize build had none). **In-app only** — no em
 
 **Delivery:** a bell icon with a dropdown list, notifications persist until the user dismisses them (standard SaaS pattern) — not a disappearing toast.
 
-**Events that trigger a notification** (kept to the essentials): clip approved, clip rejected (with reason), payout marked paid, and a reviewer reminder when a clip's 7-day video proof is still missing.
+**Events that trigger a notification** (kept to the essentials): clip approved, clip rejected (with reason), payout marked paid, and a reviewer reminder when a clip's 7-day analytics proof is still missing.
 
 ## Payouts
 
@@ -305,11 +305,11 @@ Beyond the uniqueness constraints already in the schema: `clips(campaign_id, sta
 
 ### Timezone handling
 
-All timestamps stored in UTC. The 7-day video-proof window and the daily submission-limit reset are both computed in UTC uniformly, not per-campaign local time — flag if a campaign needs its own timezone instead.
+All timestamps stored in UTC. The 7-day analytics-proof window and the daily submission-limit reset are both computed in UTC uniformly, not per-campaign local time — flag if a campaign needs its own timezone instead.
 
 ### Legal basics
 
-A lightweight privacy policy should exist at launch, covering stored usernames/passwords (via Clerk), stored video-proof links, and campaign/creator data — standard financial-services compliance doesn't apply since payouts happen outside the app on Discord. This still needs a human (ideally legal) review, not something Claude Code should draft as binding legal text.
+A lightweight privacy policy should exist at launch, covering stored usernames/passwords (via Clerk), stored analytics-proof links, and campaign/creator data — standard financial-services compliance doesn't apply since payouts happen outside the app on Discord. This still needs a human (ideally legal) review, not something Claude Code should draft as binding legal text.
 
 
 ## Design system

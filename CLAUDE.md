@@ -49,7 +49,7 @@ Payout   = min(Earnings, Max Pay Per Post)
 worked example are in docs/PRODUCT_SPEC.md → "Payout formula".
 
 ## Verification flow
-A clip needs a 7-day-later video-proof link (YouTube unlisted / Drive) before an Admin/Mod can
+A clip needs a 7-day-later analytics-proof link (YouTube unlisted / Drive) before an Admin/Mod can
 enter a Qualifying Audience %. No file-upload/screenshot step exists in the current spec — see
 docs/PRODUCT_SPEC.md → "Tier 1 audience verification" before changing this flow.
 

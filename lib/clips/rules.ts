@@ -18,7 +18,7 @@ export type Economics =
 
 /**
  * Gating per docs/PRODUCT_SPEC.md ("Tier 1 audience verification" + "Payout formula"): no payout
- * until video proof is attached, a Qualifying Audience % is entered, and views clear the campaign's
+ * until analytics proof is attached, a Qualifying Audience % is entered, and views clear the campaign's
  * View Minimum. (Approval is checked separately — it gates owing/paying, not the calculation.)
  * cpm keeps 4 decimals; earnings and payout are rounded to cents.
  */

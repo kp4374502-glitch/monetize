@@ -53,7 +53,7 @@ export function parseClipUrl(raw: string): ParsedClipUrl | null {
   return null;
 }
 
-/** Video-proof links: YouTube (unlisted) or Google Drive only, per docs/PRODUCT_SPEC.md. */
+/** Analytics-proof links: YouTube (unlisted) or Google Drive only, per docs/PRODUCT_SPEC.md. */
 export function isValidProofUrl(raw: string): boolean {
   try {
     const u = new URL(raw.trim());

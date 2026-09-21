@@ -74,7 +74,7 @@ test.describe("core flow", () => {
     await creator.getByPlaceholder(/paste a tiktok/i).fill(process.env.E2E_CLIP_URL!);
     await creator.getByRole("button", { name: "Submit", exact: true }).click();
     await expect(creator.getByTestId("my-clip").first()).toBeVisible();
-    await creator.getByPlaceholder(/video proof link/i).first().fill("https://youtu.be/dQw4w9WgXcQ");
+    await creator.getByPlaceholder(/analytics proof link/i).first().fill("https://youtu.be/dQw4w9WgXcQ");
     await creator.getByRole("button", { name: "Submit proof" }).click();
     await expect(creator.getByText("Proof submitted")).toBeVisible();
 

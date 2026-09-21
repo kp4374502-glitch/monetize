@@ -138,7 +138,7 @@ export async function submitClip(actorId: string, campaignId: string, rawUrl: st
   }
 }
 
-const proofSchema = z.string().trim().refine(isValidProofUrl, "Video proof must be a YouTube (unlisted) or Google Drive link.");
+const proofSchema = z.string().trim().refine(isValidProofUrl, "Analytics proof must be a YouTube (unlisted) or Google Drive link.");
 
 /** Creator-only, own clips. Early submission and replacement are both allowed (no date checks). */
 export async function attachVideoProof(actorId: string, campaignId: string, clipId: string, rawUrl: string) {
@@ -283,7 +283,7 @@ export async function setQualifyingAudiencePct(actorId: string, campaignId: stri
   const clip = await loadClip(campaignId, clipId);
   if (clip.paidStatus === "paid") throw new Error("This clip has already been paid.");
   // CLAUDE.md verification flow: proof must exist before a % can be entered.
-  if (!clip.videoProofUrl) throw new Error("Video proof is missing — the creator must attach it before a Qualifying Audience % can be entered.");
+  if (!clip.videoProofUrl) throw new Error("Analytics proof is missing — the creator must attach it before a Qualifying Audience % can be entered.");
   if (!roleCanOverride(role, actorId, clip.qualifyingPctSetBy)) {
     throw new Error("Access denied: only an Admin or Owner can edit a % another reviewer entered.");
   }

@@ -33,7 +33,7 @@ export async function markNotificationRead(userId: string, notificationId: strin
 export const PROOF_REMINDER_AFTER_DAYS = 7;
 
 /**
- * Reviewer reminder: a non-rejected clip in an active campaign still has no video proof 7 days
+ * Reviewer reminder: a non-rejected clip in an active campaign still has no analytics proof 7 days
  * after submission. Recipients are that campaign's Mods plus its owner (Admins are platform-wide,
  * so they are not pinged per clip). Each clip is reminded once (video_proof_reminder_sent_at).
  */
@@ -66,7 +66,7 @@ export async function sendProofReminders(now: Date = new Date()): Promise<number
           campaignId: c.campaignId,
           clipId: c.id,
           type: "proof_reminder",
-          message: `A clip is ${PROOF_REMINDER_AFTER_DAYS}+ days old and still has no video proof.`,
+          message: `A clip is ${PROOF_REMINDER_AFTER_DAYS}+ days old and still has no analytics proof.`,
         });
       }
       await tx

@@ -20,7 +20,7 @@ function ProofLine({ clip, missingId }: { clip: ClipRow; missingId?: string }) {
   ) : (
     <Callout tone="warning" data-testid={missingId}>
       <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
-      <span>Video proof missing — earns $0 until the creator attaches it.</span>
+      <span>Analytics proof missing — earns $0 until the creator attaches it.</span>
     </Callout>
   );
 }

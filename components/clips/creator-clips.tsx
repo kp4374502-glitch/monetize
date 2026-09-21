@@ -13,7 +13,7 @@ export function CreatorClips({ campaignId, clips, viewMinimum }: { campaignId: s
       <Card>
         <SectionHeader
           title="Add a clip"
-          description={`Clips earn once they pass ${viewMinimum.toLocaleString()} views and are approved with video proof.`}
+          description={`Clips earn once they pass ${viewMinimum.toLocaleString()} views and are approved with analytics proof.`}
         />
         <ActionForm action={submitClipAction.bind(null, campaignId)} className="flex flex-wrap items-start gap-2">
           <Input name="url" placeholder="Paste a TikTok, Instagram or YouTube link" required className="min-w-72 flex-1" />
@@ -65,7 +65,7 @@ export function CreatorClips({ campaignId, clips, viewMinimum }: { campaignId: s
                       c.status !== "rejected" && (
                         <Callout tone="warning">
                           <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                          <span>Video proof needed — this clip earns $0 until you attach it.</span>
+                          <span>Analytics proof needed — this clip earns $0 until you attach it.</span>
                         </Callout>
                       )
                     )}
@@ -75,7 +75,7 @@ export function CreatorClips({ campaignId, clips, viewMinimum }: { campaignId: s
                         <ActionForm action={attachProofAction.bind(null, campaignId, c.id)} className="flex min-w-64 flex-1 flex-wrap items-center gap-2">
                           <Input
                             name="proofUrl"
-                            placeholder={c.videoProofUrl ? "Replace video proof link" : "Video proof link (YouTube unlisted / Drive)"}
+                            placeholder={c.videoProofUrl ? "Replace analytics proof link" : "Analytics proof link (YouTube unlisted / Drive)"}
                             required
                             className="min-w-56 flex-1"
                           />
