@@ -77,7 +77,16 @@ export function CreatorClips({ campaignId, clips, viewMinimum }: { campaignId: s
                                 <li>Upload the video to YouTube (unlisted) or Google Drive, then paste the link below.</li>
                               </ol>
                               <p className="break-all pt-1 text-xs text-text-secondary">
-                                Example of a valid proof link: https://youtube.com/shorts/jxGG6URvhZQ?si=KbmrzYhnU9LV-Nh8
+                                Example of a valid proof link:{" "}
+                                {/* Clickable but deliberately low-key: inherits the muted colour, underlines only on hover. */}
+                                <a
+                                  href="https://youtube.com/shorts/jxGG6URvhZQ?si=KbmrzYhnU9LV-Nh8"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="underline-offset-2 hover:underline"
+                                >
+                                  https://youtube.com/shorts/jxGG6URvhZQ?si=KbmrzYhnU9LV-Nh8
+                                </a>
                               </p>
                             </div>
                           </div>
