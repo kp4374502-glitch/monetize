@@ -31,12 +31,12 @@ export default async function BrandRequestsPage() {
       {rows.length === 0 && (
         <Card innerClassName="py-10 text-center text-sm text-text-secondary">No brand requests yet.</Card>
       )}
-      <ul className="grid gap-3">
+      <ul className="grid grid-cols-1 gap-3">
         {rows.map(({ request: r, username }) => (
           <li key={r.id} data-testid="brand-request-row">
             <Card innerClassName="p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
+                <div className="min-w-0 [overflow-wrap:anywhere]">
                   <h2 className="text-lg font-extrabold tracking-tight">{r.brandName}</h2>
                   <p className="text-sm text-text-secondary">
                     Account: <span className="font-semibold text-text-primary">{username}</span> · Discord:{" "}
@@ -46,7 +46,7 @@ export default async function BrandRequestsPage() {
                 </div>
                 <Badge status={r.status} />
               </div>
-              {r.note && <p className="mt-3 whitespace-pre-wrap rounded-xl bg-white/5 p-3 text-sm">{r.note}</p>}
+              {r.note && <p className="mt-3 whitespace-pre-wrap rounded-xl bg-white/5 p-3 text-sm [overflow-wrap:anywhere]">{r.note}</p>}
               <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-subtle pt-3">
                 {r.status !== "approved" && (
                   <ActionForm action={reviewBrandRequestAction.bind(null, r.id, "approved")}>

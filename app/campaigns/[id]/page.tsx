@@ -106,7 +106,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
           />
           <Card>
             {links.length === 0 && <p className="text-sm text-text-secondary">No invite links yet.</p>}
-            <ul className="grid gap-2.5">
+            <ul className="grid grid-cols-1 gap-2.5">
               {links.map((l) => (
                 <li key={l.id} className="flex flex-wrap items-center justify-between gap-3 text-sm" data-testid="invite-row">
                   <code
