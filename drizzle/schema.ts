@@ -184,6 +184,17 @@ export const clips = pgTable(
     // The clip's view count when the screenshot was accepted — the evidence that it was valid at the time.
     // Never re-checked: later view growth does not invalidate accepted proof.
     analyticsScreenshotViewsAtSubmit: integer("analytics_screenshot_views_at_submit"),
+    // ScrapeCreators' own confirmation of content type (its "is_video" field) — Instagram only. null
+    // means not yet known (never successfully fetched) or not applicable (TikTok/YouTube posts are
+    // always video). false = confirmed photo/carousel, which is what unlocks manual view entry below.
+    isVideo: boolean("is_video"),
+    // A Mod/Admin/Owner's manually-entered view count, for a confirmed Instagram photo/carousel post
+    // where ScrapeCreators has no automatic view number at all (see lib/clips/rules.ts effectiveViews,
+    // canSetManualViews). Wins over the auto-fetched `views` everywhere views matter for payout/display.
+    // A refresh never touches this — only setManualViews (reviewer-only) does.
+    manualViews: integer("manual_views"),
+    manualViewsSetBy: text("manual_views_set_by").references(() => users.id),
+    manualViewsSetAt: timestamp("manual_views_set_at", { withTimezone: true }),
     cpm: numeric("cpm", { precision: 10, scale: 4 }),
     earnings: numeric("earnings", { precision: 12, scale: 2 }),
     payout: numeric("payout", { precision: 12, scale: 2 }),
@@ -257,6 +268,8 @@ export const scrapeCreatorsCache = pgTable(
     // Task 3: added so a cache hit can fully populate a clip (thumbnail/caption) without an API call.
     thumbnailUrl: text("thumbnail_url"),
     caption: text("caption"),
+    // Mirrors clips.is_video — a cache hit must be able to fully populate a clip, including this flag.
+    isVideo: boolean("is_video"),
     fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({

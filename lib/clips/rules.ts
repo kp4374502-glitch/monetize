@@ -104,3 +104,20 @@ export const hasAnalyticsProof = (c: {
   videoProofUrl: string | null;
   analyticsScreenshotPathname?: string | null;
 }): boolean => !!(c.videoProofUrl || c.analyticsScreenshotPathname);
+
+/**
+ * The view count actually used everywhere views matter — payout, the view-minimum gate, and every
+ * display of "views". A Mod/Admin/Owner's manual entry (see canSetManualViews) always wins over the
+ * auto-fetched number when present; a refresh never clears or overrides it.
+ */
+export const effectiveViews = (c: { views: number; manualViews: number | null }): number =>
+  c.manualViews ?? c.views;
+
+/**
+ * Manual view entry exists only for a clip ScrapeCreators has CONFIRMED is an Instagram photo/
+ * carousel post (is_video: false) — that post type has no automatic view data at all. It is never
+ * offered for a real video: there, the auto-fetched number is trusted as-is. `isVideo` is null until
+ * a fetch has actually succeeded at least once, so an unrefreshed clip can't be hand-edited either.
+ */
+export const canSetManualViews = (c: { platform: string; isVideo: boolean | null }): boolean =>
+  c.platform === "instagram" && c.isVideo === false;

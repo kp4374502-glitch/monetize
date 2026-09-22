@@ -12,7 +12,9 @@ import { validateScreenshot } from "./image";
 import { vercelBlobStore, type ProofImageStore } from "./proof-store";
 import {
   SCREENSHOT_VIEWS_LIMIT,
+  canSetManualViews,
   canSubmitScreenshot,
+  effectiveViews,
   hasAnalyticsProof,
   computeEconomics,
   duplicateFlag,
@@ -53,11 +55,11 @@ async function loadClip(campaignId: string, clipId: string): Promise<Clip> {
 
 /** cpm/earnings/payout columns for a clip's current state; nulls when not (yet) earning. */
 function economicsColumns(
-  clip: Pick<Clip, "views" | "qualifyingAudiencePct" | "videoProofUrl" | "analyticsScreenshotPathname">,
+  clip: Pick<Clip, "views" | "manualViews" | "qualifyingAudiencePct" | "videoProofUrl" | "analyticsScreenshotPathname">,
   campaign: Campaign,
 ) {
   const e = computeEconomics({
-    views: clip.views,
+    views: effectiveViews(clip),
     qualifyingAudiencePct: clip.qualifyingAudiencePct === null ? null : Number(clip.qualifyingAudiencePct),
     videoProofUrl: clip.videoProofUrl,
     analyticsScreenshotPathname: clip.analyticsScreenshotPathname,
@@ -136,6 +138,7 @@ export async function submitClip(actorId: string, campaignId: string, rawUrl: st
         likes: meta.ok ? meta.data.likes : 0,
         thumbnailUrl: meta.ok ? meta.data.thumbnailUrl : null,
         caption: meta.ok ? meta.data.caption : null,
+        isVideo: meta.ok ? meta.data.isVideo : null,
         // null when the lookup failed: the UI shows "stats pending" and the cron fills it in later
         lastRefreshedAt: meta.ok && !meta.stale ? meta.fetchedAt : null,
         flaggedDuplicate: flag.reason !== null,
@@ -221,9 +224,10 @@ export async function attachAnalyticsScreenshot(
     .limit(1);
   if (!clip) throw new Error("Clip not found.");
   if (clip.paidStatus === "paid") throw new Error("This clip has already been paid.");
-  if (!canSubmitScreenshot(clip.views)) {
+  const views = effectiveViews(clip);
+  if (!canSubmitScreenshot(views)) {
     throw new Error(
-      `Screenshots are only accepted for clips with fewer than ${SCREENSHOT_VIEWS_LIMIT.toLocaleString("en-US")} views. This clip has ${clip.views.toLocaleString("en-US")}, so please submit a video link instead.`,
+      `Screenshots are only accepted for clips with fewer than ${SCREENSHOT_VIEWS_LIMIT.toLocaleString("en-US")} views. This clip has ${views.toLocaleString("en-US")}, so please submit a video link instead.`,
     );
   }
   const kind = validateScreenshot(file.bytes);
@@ -241,7 +245,7 @@ export async function attachAnalyticsScreenshot(
       .set({
         analyticsScreenshotPathname: pathname,
         analyticsScreenshotSubmittedAt: new Date(),
-        analyticsScreenshotViewsAtSubmit: clip.views,
+        analyticsScreenshotViewsAtSubmit: views,
         videoProofUrl: null,
         videoProofSubmittedAt: null,
         ...economicsColumns(next, campaign),
@@ -294,6 +298,9 @@ async function refreshClipRow(clip: Clip, campaign: Campaign, opts: FetchOptions
       likes: meta.data.likes,
       thumbnailUrl: meta.data.thumbnailUrl ?? clip.thumbnailUrl,
       caption: meta.data.caption ?? clip.caption,
+      // Keeps canSetManualViews current. Never touches manualViews itself — a refresh can update
+      // what ScrapeCreators says, but only setManualViews (reviewer-only) can change the override.
+      isVideo: meta.data.isVideo,
       lastRefreshedAt: meta.fetchedAt,
       ...econ,
     })
@@ -434,6 +441,52 @@ export async function setQualifyingAudiencePct(actorId: string, campaignId: stri
   const [row] = await db
     .update(clips)
     .set({ qualifyingAudiencePct: String(pct), qualifyingPctSetBy: actorId, ...economicsColumns(next, campaign) })
+    .where(and(eq(clips.id, clipId), eq(clips.campaignId, campaignId)))
+    .returning();
+  return row;
+}
+
+// A blank submission clears the override (reverts to the automatic number); otherwise a whole,
+// non-negative view count. Kept generous on the upper end (clips.views is a 32-bit int column).
+const manualViewsSchema = z.union([
+  z.literal("").transform(() => null),
+  z.coerce
+    .number()
+    .int("Enter a whole number of views.")
+    .min(0, "Must be 0 or greater.")
+    .max(2_000_000_000, "That number is too large."),
+]);
+
+/**
+ * Mod/Admin/Owner only: manually record a view count for a clip ScrapeCreators has confirmed is an
+ * Instagram photo/carousel — that post type has no automatic view data at all (canSetManualViews).
+ * Real videos always use the auto-fetched number; this is refused for them. Feeds the payout formula
+ * exactly like an auto-fetched count would (effectiveViews). A blank value clears the override.
+ */
+export async function setManualViews(actorId: string, campaignId: string, clipId: string, rawViews: unknown) {
+  const role = await requireRole(actorId, campaignId, "mod");
+  const manualViews = manualViewsSchema.parse(rawViews);
+  const clip = await loadClip(campaignId, clipId);
+  if (clip.paidStatus === "paid") throw new Error("This clip has already been paid.");
+  if (!canSetManualViews(clip)) {
+    throw new Error(
+      "Manual view entry is only for an Instagram post ScrapeCreators has confirmed is a photo/carousel — a real video's automatic view count is used as-is.",
+    );
+  }
+  if (!roleCanOverride(role, actorId, clip.manualViewsSetBy)) {
+    throw new Error("Access denied: only an Admin or Owner can edit a manual view count another reviewer entered.");
+  }
+
+  const campaign = await loadCampaign(campaignId);
+  const next = { ...clip, manualViews };
+  const [row] = await db
+    .update(clips)
+    .set({
+      manualViews,
+      manualViewsSetBy: manualViews === null ? null : actorId,
+      manualViewsSetAt: manualViews === null ? null : new Date(),
+      ...economicsColumns(next, campaign),
+    })
     .where(and(eq(clips.id, clipId), eq(clips.campaignId, campaignId)))
     .returning();
   return row;
@@ -592,7 +645,7 @@ export async function getCreatorRoster(actorId: string, campaignId: string) {
       suspended: campaignCreators.suspended,
       joinedAt: campaignCreators.joinedAt,
       clips: sql<number>`count(${clips.id})::int`,
-      views: sql<string>`coalesce(sum(${clips.views}), 0)`,
+      views: sql<string>`coalesce(sum(coalesce(${clips.manualViews}, ${clips.views})), 0)`,
       earned: sql<string>`coalesce(sum(${clips.payout}) filter (where ${clips.status} = 'approved'), 0)`,
       owed: sql<string>`coalesce(sum(${clips.payout}) filter (where ${clips.status} = 'approved' and ${clips.paidStatus} = 'unpaid'), 0)`,
     })

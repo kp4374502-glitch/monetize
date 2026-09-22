@@ -9,6 +9,7 @@ import { CreatorClips } from "@/components/clips/creator-clips";
 import { ReviewQueue } from "@/components/clips/review-queue";
 import { ClipHistory } from "@/components/clips/clip-history";
 import { money } from "@/components/clips/clip-parts";
+import { effectiveViews } from "@/lib/clips/rules";
 import {
   deleteCampaignAction,
   generateInviteLinkAction,
@@ -40,7 +41,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
   const roster = canInvite ? await getCreatorRoster(userId, id) : null;
 
   // Creator stat cards come from their own clip list (no extra query).
-  const myViews = myClips.reduce((n, c) => n + c.views, 0);
+  const myViews = myClips.reduce((n, c) => n + effectiveViews(c), 0);
   const myEarned = myClips.filter((c) => c.status === "approved").reduce((n, c) => n + Number(c.payout ?? 0), 0);
 
   return (

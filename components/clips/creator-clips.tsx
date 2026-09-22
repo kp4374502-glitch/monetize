@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Callout, Card, SectionHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { attachProofAction, refreshViewsAction, submitClipAction } from "@/app/campaigns/clip-actions";
-import { SCREENSHOT_VIEWS_LIMIT, canSubmitScreenshot, hasAnalyticsProof } from "@/lib/clips/rules";
+import { SCREENSHOT_VIEWS_LIMIT, canSubmitScreenshot, effectiveViews, hasAnalyticsProof } from "@/lib/clips/rules";
 import { ScreenshotUpload } from "./screenshot-upload";
 import { StatusBadge, Stats, Thumb, money, type ClipRow } from "./clip-parts";
 
@@ -128,7 +128,7 @@ export function CreatorClips({ campaignId, clips, viewMinimum }: { campaignId: s
 
                     {c.paidStatus === "unpaid" && (
                       <div data-testid="screenshot-option" className="space-y-1.5 border-t border-subtle pt-2.5">
-                        {canSubmitScreenshot(c.views) ? (
+                        {canSubmitScreenshot(effectiveViews(c)) ? (
                           <>
                             <p className="text-xs text-text-secondary">
                               Or, since this clip has under {SCREENSHOT_VIEWS_LIMIT.toLocaleString("en-US")} views, you can upload a screenshot

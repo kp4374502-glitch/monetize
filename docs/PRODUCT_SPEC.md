@@ -194,6 +194,28 @@ Views, likes, captions, and thumbnails are pulled automatically via the [ScrapeC
 - Scope of use: **views, likes, and post metadata only.** It does not replace the audience-quality verification step (see next section).
 - It is a third-party scraping service, not an official platform API — no ToS-backed data guarantee from TikTok/Meta/Google. Worth monitoring for reliability as usage scales.
 - "Refresh views now" (manual trigger) and a scheduled background refresh (e.g. Vercel Cron) both call ScrapeCreators to update view/like counts on existing clips.
+- **Instagram photo/carousel posts have no view data at all.** Instagram's public data only exposes a
+  view/play count for video content (Reels); a multi-photo carousel post genuinely carries no such
+  field, confirmed by ScrapeCreators' own `is_video: false`. This is a hard platform limitation, not a
+  bug — see "Manual view entry" below for how those clips still earn.
+
+### Manual view entry (Instagram photo/carousel posts only)
+
+For a clip ScrapeCreators has confirmed is an Instagram photo/carousel (`is_video: false`), a Mod/
+Admin/Owner may manually type in a view count — read off the creator's own private analytics screen in
+their proof video — instead of relying on the (nonexistent) automatic number. Rules:
+
+- **Never for a real video.** A clip where ScrapeCreators returns `is_video: true` always uses the
+  automatic number; manual entry is refused server-side regardless of what the UI shows. An unrefreshed
+  clip (`is_video` still unknown) is refused too — confirmation must come from an actual successful fetch.
+- **Feeds the payout formula exactly like an auto-fetched count would** — same CPM formula, same budget
+  cap, same view-minimum gate. The manual number always wins over the (0) automatic one when present; a
+  later "Refresh views now" never overwrites or clears it.
+- **Reviewer-only.** The creator's own submission flow is unchanged — they still submit the same
+  Analytics proof (video link or screenshot) as for any other clip; entering the view count is not
+  something they do. The same "a Mod can't override another reviewer's entry, but Admin/Owner can" rule
+  used for Qualifying Audience % applies here too.
+- A blank submission clears the override and reverts to the automatic (0) number.
 
 ## Tier 1 audience verification
 

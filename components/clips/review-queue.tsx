@@ -3,8 +3,8 @@ import { ActionForm } from "@/components/action-form";
 import { Button } from "@/components/ui/button";
 import { Callout, Card, SectionHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { markPaidAction, reviewAction, setPctAction } from "@/app/campaigns/clip-actions";
-import { hasAnalyticsProof } from "@/lib/clips/rules";
+import { markPaidAction, reviewAction, setManualViewsAction, setPctAction } from "@/app/campaigns/clip-actions";
+import { canSetManualViews, hasAnalyticsProof } from "@/lib/clips/rules";
 import { Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
 
 type Row = { clip: ClipRow; creatorUsername: string };
@@ -76,6 +76,39 @@ function PctForm({ campaignId, clip }: { campaignId: string; clip: ClipRow }) {
   );
 }
 
+/**
+ * Only shown for a clip ScrapeCreators has confirmed is an Instagram photo/carousel — that post
+ * type has no automatic view number at all, so a Mod/Admin/Owner enters one after checking the
+ * creator's analytics proof video themselves. Never offered for a real video (the auto-fetched
+ * number is trusted there); the service re-checks this regardless of what the UI shows.
+ */
+function ManualViewsForm({ campaignId, clip }: { campaignId: string; clip: ClipRow }) {
+  return (
+    <div className="space-y-1 border-t border-subtle pt-2.5" data-testid="manual-views">
+      <p className="text-xs text-text-secondary">
+        ScrapeCreators has no view data for this post — it's a photo/carousel, not a video. After checking the
+        creator's proof video, you can enter the view count shown on their private analytics screen.
+      </p>
+      <ActionForm action={setManualViewsAction.bind(null, campaignId, clip.id)} className="flex flex-wrap items-center gap-2">
+        <Input
+          name="manualViews"
+          type="number"
+          step="1"
+          min="0"
+          placeholder="Manual view count"
+          defaultValue={clip.manualViews ?? ""}
+          className="w-44"
+          data-testid="manual-views-input"
+        />
+        <Button type="submit" variant="outline" size="sm">
+          {clip.manualViews !== null ? "Update views" : "Set views"}
+        </Button>
+        {clip.manualViews !== null && <span className="text-xs text-text-secondary">Leave blank and submit to clear it.</span>}
+      </ActionForm>
+    </div>
+  );
+}
+
 export function ReviewQueue({
   campaignId,
   pending,
@@ -119,6 +152,7 @@ export function ReviewQueue({
                     )}
                     <ProofLine clip={c} campaignId={campaignId} missingId="proof-missing" />
                     <PctForm campaignId={campaignId} clip={c} />
+                    {canSetManualViews(c) && <ManualViewsForm campaignId={campaignId} clip={c} />}
                     <ActionForm action={reviewAction.bind(null, campaignId, c.id)} className="flex flex-wrap items-center gap-2 border-t border-subtle pt-3">
                       <Input name="reason" placeholder="Reason (required to reject)" className="min-w-56 flex-1" />
                       <Button type="submit" name="intent" value="approve" formNoValidate size="sm">Approve</Button>
@@ -145,7 +179,7 @@ export function ReviewQueue({
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                     <StatusBadge clip={c} />
                     <span className="font-bold">{creatorUsername}</span>
-                    <span className="text-text-secondary">{c.views.toLocaleString()} views</span>
+                    <Stats clip={c} />
                     <span className="text-base font-extrabold text-gold-light" data-testid="payment-amount">{money(c.payout)}</span>
                   </div>
                   <ActionForm action={markPaidAction.bind(null, campaignId, c.id)}>
@@ -155,6 +189,7 @@ export function ReviewQueue({
                 <div className="mt-3 space-y-2.5">
                   <ProofLine clip={c} campaignId={campaignId} />
                   <PctForm campaignId={campaignId} clip={c} />
+                  {canSetManualViews(c) && <ManualViewsForm campaignId={campaignId} clip={c} />}
                 </div>
               </Card>
             </li>

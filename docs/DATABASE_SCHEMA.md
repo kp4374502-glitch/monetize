@@ -64,6 +64,12 @@ Every table holding campaign-specific data carries a `campaign_id` — this is t
 - `url`, `unique(campaign_id, url)` — blocks exact-duplicate submission by the same creator
 - `thumbnail_url`, `caption`
 - `views`, `likes`, `last_refreshed_at` (kept in sync via ScrapeCreators)
+- `is_video` (nullable bool; ScrapeCreators' own confirmation, Instagram-specific — `false` means a
+  confirmed photo/carousel with no automatic view data; `null` = not yet known or not applicable)
+- `manual_views` (nullable int, reviewer-entered view count; only settable when `is_video = false` —
+  see PRODUCT_SPEC.md "Manual view entry"), `manual_views_set_by` (fk users, nullable),
+  `manual_views_set_at` (nullable). Wins over `views` everywhere views matter for payout/display; a
+  refresh never touches these three columns.
 - `status` (pending | approved | rejected)
 - `rejection_reason` (nullable, shown to the creator)
 - `qualifying_audience_pct` (nullable, entered by Admin/Mod)

@@ -60,6 +60,14 @@ export const refreshCampaignViewsAction = async (campaignId: string, _p: ActionS
 export const setPctAction = async (campaignId: string, clipId: string, _p: ActionState, fd: FormData) =>
   run(campaignId, (u) => svc.setQualifyingAudiencePct(u, campaignId, clipId, text(fd, "pct")));
 
+/**
+ * Mod/Admin/Owner only: manual view count for a clip ScrapeCreators confirms is an Instagram photo/
+ * carousel (no automatic view data exists for that post type — see canSetManualViews). Blank clears
+ * the override. Refused server-side for anything else, regardless of what the UI shows.
+ */
+export const setManualViewsAction = async (campaignId: string, clipId: string, _p: ActionState, fd: FormData) =>
+  run(campaignId, (u) => svc.setManualViews(u, campaignId, clipId, text(fd, "manualViews")));
+
 export const reviewAction = async (campaignId: string, clipId: string, _p: ActionState, fd: FormData) =>
   run(campaignId, (u) =>
     svc.reviewClip(

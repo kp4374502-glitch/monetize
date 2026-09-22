@@ -44,6 +44,21 @@ const failFetch = (async () => ({ ok: false, status: 500, json: async () => ({})
 const sleep = async () => {};
 const opts = (views = 5000) => ({ fetchImpl: okFetch(views), sleep });
 
+// Real Instagram shape: a photo/carousel has is_video: false and NO video_play_count/video_view_count at
+// all — that's the confirmation manual view entry relies on, not the views number itself being 0.
+const igBody = (isVideo: boolean, views: number, likes = 40) => ({
+  data: {
+    xdt_shortcode_media: {
+      is_video: isVideo,
+      ...(isVideo ? { video_play_count: views } : {}),
+      edge_media_preview_like: { count: likes },
+    },
+  },
+});
+const igFetch = (isVideo: boolean, views: number, likes = 40) =>
+  (async () => ({ ok: true, status: 200, json: async () => igBody(isVideo, views, likes) })) as unknown as typeof fetch;
+const igOpts = (isVideo: boolean, views = 0, likes = 40) => ({ fetchImpl: igFetch(isVideo, views, likes), sleep });
+
 async function makeClip(creator: string, campaignId = camp, views = 5000) {
   const { clip } = await svc.submitClip(creator, campaignId, tiktok(), opts(views));
   return clip;
@@ -270,6 +285,114 @@ describe("analytics proof + qualifying audience %", () => {
     const clip = await makeClip("c1");
     await expect(svc.setQualifyingAudiencePct("c1", camp, clip.id, 10)).rejects.toThrow(/Access denied/);
     await expect(svc.setQualifyingAudiencePct("modOther", camp, clip.id, 10)).rejects.toThrow(/Access denied/);
+  });
+});
+
+describe("setManualViews (Instagram photo/carousel posts)", () => {
+  const igCamp = "IG manual views";
+  async function igCampaign() {
+    const c = (await campaignSvc.createCampaign("owner", { ...validCampaign, name: igCamp, eligiblePlatforms: ["instagram", "tiktok"] })).id;
+    await db.insert(campaignCreators).values({ campaignId: c, userId: "c1" });
+    return c;
+  }
+  async function igClip(id: string, isVideo: boolean, views = 0) {
+    const { clip } = await svc.submitClip("c1", id, `https://www.instagram.com/p/ig${++n}/`, igOpts(isVideo, views));
+    return clip;
+  }
+
+  it("is refused for a real video, an unrefreshed clip, and a non-Instagram platform — only a confirmed photo/carousel qualifies", async () => {
+    const c = await igCampaign();
+    const video = await igClip(c, true, 500_000);
+    await expect(svc.setManualViews("owner", c, video.id, "1000")).rejects.toThrow(/photo\/carousel/);
+
+    // Same platform as a real carousel, but never successfully fetched — isVideo is null, not false, so it's refused too.
+    const { clip: unrefreshed } = await svc.submitClip("c1", c, `https://www.instagram.com/p/ig${++n}/`, { fetchImpl: failFetch, sleep });
+    expect(unrefreshed.isVideo).toBeNull();
+    await expect(svc.setManualViews("owner", c, unrefreshed.id, "1000")).rejects.toThrow(/photo\/carousel/);
+
+    const tiktokClip = await makeClip("c1", c, 500);
+    await expect(svc.setManualViews("owner", c, tiktokClip.id, "1000")).rejects.toThrow(/photo\/carousel/);
+
+    const carousel = await igClip(c, false);
+    const row = await svc.setManualViews("owner", c, carousel.id, "12345");
+    expect(row.manualViews).toBe(12345);
+  });
+
+  it("feeds the payout formula exactly like an auto-fetched view count would", async () => {
+    const c = await igCampaign();
+    const clip = await igClip(c, false); // auto views stuck at 0 forever — genuine carousel
+    await svc.attachVideoProof("c1", c, clip.id, "https://youtu.be/aaaaaaaaaaa");
+    await svc.setQualifyingAudiencePct("owner", c, clip.id, 50);
+    expect((await db.select().from(clips).where(eq(clips.id, clip.id)))[0].payout).toBeNull(); // 0 views: below minimum
+
+    const set = await svc.setManualViews("owner", c, clip.id, "10000");
+    expect([set.views, set.manualViews, set.cpm, set.payout]).toEqual([0, 10000, "1.0000", "10.00"]);
+  });
+
+  it("a blank submission clears the override and reverts to the automatic number", async () => {
+    const c = await igCampaign();
+    const clip = await igClip(c, false);
+    await svc.attachVideoProof("c1", c, clip.id, "https://youtu.be/aaaaaaaaaaa");
+    await svc.setQualifyingAudiencePct("owner", c, clip.id, 50);
+    await svc.setManualViews("owner", c, clip.id, "10000");
+    const cleared = await svc.setManualViews("owner", c, clip.id, "");
+    expect(cleared.manualViews).toBeNull();
+    expect(cleared.payout).toBeNull(); // back to the real (0) auto views, below minimum
+  });
+
+  it("is Mod/Admin/Owner only — a creator and an outsider are denied", async () => {
+    const c = await igCampaign();
+    const clip = await igClip(c, false);
+    await expect(svc.setManualViews("c1", c, clip.id, "1000")).rejects.toThrow(/Access denied/);
+    await expect(svc.setManualViews("outsider", c, clip.id, "1000")).rejects.toThrow(/Access denied/);
+  });
+
+  it("a Mod can't edit another Mod's manual entry; Admin/Owner can", async () => {
+    const c = await igCampaign();
+    // Dedicated Mod users — a Mod can only be on one campaign at a time (modA/modB already belong to `camp`).
+    await db.insert(users).values([{ id: "ivModA", username: "ivModA" }, { id: "ivModB", username: "ivModB" }]);
+    await db.insert(campaignMods).values([
+      { campaignId: c, userId: "ivModA", addedBy: "owner" },
+      { campaignId: c, userId: "ivModB", addedBy: "owner" },
+    ]);
+    const clip = await igClip(c, false);
+    await svc.setManualViews("ivModA", c, clip.id, "1000");
+    await expect(svc.setManualViews("ivModB", c, clip.id, "2000")).rejects.toThrow(/Admin or Owner/);
+    expect((await svc.setManualViews("admin", c, clip.id, "3000")).manualViewsSetBy).toBe("admin");
+  });
+
+  it("rejects a paid clip, and validates the input", async () => {
+    const c = await igCampaign();
+    const clip = await igClip(c, false, 0);
+    await svc.attachVideoProof("c1", c, clip.id, "https://youtu.be/aaaaaaaaaaa");
+    await svc.setQualifyingAudiencePct("owner", c, clip.id, 50);
+    await svc.setManualViews("owner", c, clip.id, "10000");
+    await svc.reviewClip("owner", c, clip.id, { action: "approve" });
+    await svc.markPaid("owner", c, clip.id);
+    await expect(svc.setManualViews("owner", c, clip.id, "20000")).rejects.toThrow(/already been paid/);
+
+    const other = await igClip(c, false);
+    await expect(svc.setManualViews("owner", c, other.id, "not a number")).rejects.toThrow();
+    await expect(svc.setManualViews("owner", c, other.id, "-5")).rejects.toThrow();
+    await expect(svc.setManualViews("owner", c, other.id, "1.5")).rejects.toThrow();
+  });
+
+  it("a refresh never clobbers a manual override, even when ScrapeCreators keeps returning 0", async () => {
+    const c = await igCampaign();
+    const clip = await igClip(c, false);
+    await svc.setManualViews("owner", c, clip.id, "10000");
+    await svc.refreshViews("owner", c, clip.id, igOpts(false, 0));
+    const [row] = await db.select().from(clips).where(eq(clips.id, clip.id));
+    expect(row).toMatchObject({ views: 0, manualViews: 10000 });
+  });
+
+  it("a manual view count also governs screenshot-proof eligibility (the 10,000-view threshold), same as an auto-fetched count", async () => {
+    const c = await igCampaign();
+    const clip = await igClip(c, false);
+    await svc.setManualViews("owner", c, clip.id, "10000");
+    await expect(
+      svc.attachAnalyticsScreenshot("c1", c, clip.id, { bytes: Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]) }),
+    ).rejects.toThrow(/fewer than 10,000/);
   });
 });
 

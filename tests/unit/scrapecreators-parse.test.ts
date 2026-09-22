@@ -19,3 +19,22 @@ describe("Instagram views parsing", () => {
     expect(parse("instagram", j).views).toBe(0);
   });
 });
+
+describe("isVideo (drives manual view entry)", () => {
+  it("TikTok and YouTube are always video", () => {
+    expect(parse("tiktok", {}).isVideo).toBe(true);
+    expect(parse("youtube", {}).isVideo).toBe(true);
+  });
+
+  it("Instagram: reads the real is_video flag from ScrapeCreators — false for a confirmed photo/carousel", () => {
+    const carousel = { data: { xdt_shortcode_media: { is_video: false, edge_media_preview_like: { count: 10 } } } };
+    expect(parse("instagram", carousel).isVideo).toBe(false);
+    const reel = { data: { xdt_shortcode_media: { is_video: true, video_play_count: 500, edge_media_preview_like: { count: 10 } } } };
+    expect(parse("instagram", reel).isVideo).toBe(true);
+  });
+
+  it("Instagram: null when the field is missing, rather than assuming either way", () => {
+    const j = { data: { xdt_shortcode_media: { edge_media_preview_like: { count: 10 } } } };
+    expect(parse("instagram", j).isVideo).toBeNull();
+  });
+});

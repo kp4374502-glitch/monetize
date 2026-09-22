@@ -1,5 +1,6 @@
 import { clips } from "@/drizzle/schema";
 import { Badge } from "@/components/ui/badge";
+import { effectiveViews } from "@/lib/clips/rules";
 
 export type ClipRow = typeof clips.$inferSelect;
 
@@ -25,14 +26,19 @@ export function Thumb({ clip }: { clip: ClipRow }) {
 }
 
 export function Stats({ clip }: { clip: ClipRow }) {
-  const stale = !clip.lastRefreshedAt
-    ? "stats pending"
-    : Date.now() - clip.lastRefreshedAt.getTime() > STALE_AFTER_MS
-      ? "stats may be outdated"
-      : null;
+  // A manual view count is authoritative and doesn't go stale via the ScrapeCreators refresh cadence.
+  const stale =
+    clip.manualViews !== null
+      ? null
+      : !clip.lastRefreshedAt
+        ? "stats pending"
+        : Date.now() - clip.lastRefreshedAt.getTime() > STALE_AFTER_MS
+          ? "stats may be outdated"
+          : null;
   return (
     <span className="text-sm text-text-secondary">
-      <span className="font-semibold text-text-primary">{clip.views.toLocaleString()}</span> views ·{" "}
+      <span className="font-semibold text-text-primary">{effectiveViews(clip).toLocaleString()}</span> views
+      {clip.manualViews !== null && <span className="ml-1 text-xs text-gold-light">(manual)</span>} ·{" "}
       <span className="font-semibold text-text-primary">{clip.likes.toLocaleString()}</span> likes
       {stale && <span className="ml-2 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-300">{stale}</span>}
     </span>

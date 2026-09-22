@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  canSetManualViews,
   computeEconomics,
   duplicateFlag,
+  effectiveViews,
   roleCanMarkPaid,
   roleCanOverride,
   startOfUtcDay,
@@ -121,5 +123,22 @@ describe("clip URL parsing", () => {
     expect(isValidProofUrl("https://drive.google.com/file/d/xyz/view")).toBe(true);
     expect(isValidProofUrl("http://youtu.be/abc123")).toBe(false);
     expect(isValidProofUrl("https://evil.com/youtu.be/abc")).toBe(false);
+  });
+});
+
+describe("manual view entry (Instagram photo/carousel posts)", () => {
+  it("effectiveViews: a manual entry wins over the auto-fetched number, including an explicit 0", () => {
+    expect(effectiveViews({ views: 0, manualViews: 42_000 })).toBe(42_000);
+    expect(effectiveViews({ views: 0, manualViews: 0 })).toBe(0);
+    expect(effectiveViews({ views: 5000, manualViews: null })).toBe(5000);
+  });
+
+  it("canSetManualViews: only an Instagram post ScrapeCreators has confirmed is NOT a video", () => {
+    expect(canSetManualViews({ platform: "instagram", isVideo: false })).toBe(true);
+    expect(canSetManualViews({ platform: "instagram", isVideo: true })).toBe(false);
+    // null = never successfully fetched, or not applicable — not confirmed either way, so refused.
+    expect(canSetManualViews({ platform: "instagram", isVideo: null })).toBe(false);
+    expect(canSetManualViews({ platform: "tiktok", isVideo: null })).toBe(false);
+    expect(canSetManualViews({ platform: "youtube", isVideo: null })).toBe(false);
   });
 });

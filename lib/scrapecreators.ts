@@ -14,6 +14,13 @@ export interface ClipMetadata {
   likes: number;
   thumbnailUrl: string | null;
   caption: string | null;
+  /**
+   * ScrapeCreators' own "is_video" flag — Instagram-specific. TikTok/YouTube posts our URL parser
+   * accepts are always video, so this is always `true` for them. For Instagram it's `false` for a
+   * confirmed photo/carousel (no view data exists for that post type at all) and `true` for a real
+   * Reel; see lib/clips/rules.ts canSetManualViews, which this flag exists to drive.
+   */
+  isVideo: boolean | null;
 }
 
 export type FetchResult =
@@ -51,6 +58,7 @@ export function parse(platform: Platform, j: any): ClipMetadata {
       likes: num(get(j, `${s}.digg_count`)),
       caption: str(get(j, "aweme_detail.desc")),
       thumbnailUrl: str(get(j, "aweme_detail.video.cover.url_list.0")),
+      isVideo: true,
     };
   }
   if (platform === "instagram") {
@@ -59,11 +67,15 @@ export function parse(platform: Platform, j: any): ClipMetadata {
     // varies by post (observed live: video_play_count came back 0 while video_view_count held the
     // real number), so try both rather than trusting either alone.
     const views = num(get(j, `${m}.video_play_count`)) || num(get(j, `${m}.video_view_count`));
+    const isVideoRaw = get(j, `${m}.is_video`);
     return {
       views,
       likes: num(get(j, `${m}.edge_media_preview_like.count`)),
       caption: str(get(j, `${m}.edge_media_to_caption.edges.0.node.text`)),
       thumbnailUrl: str(get(j, `${m}.thumbnail_src`)),
+      // A photo/carousel post genuinely has no view data — that's confirmed by is_video, not by
+      // views coming back 0 (an unlucky/unpopular real Reel could also be 0).
+      isVideo: typeof isVideoRaw === "boolean" ? isVideoRaw : null,
     };
   }
   return {
@@ -71,6 +83,7 @@ export function parse(platform: Platform, j: any): ClipMetadata {
     likes: num(j?.likeCountInt ?? j?.likeCountText),
     caption: str(j?.title) ?? str(j?.description),
     thumbnailUrl: str(j?.thumbnail),
+    isVideo: true,
   };
 }
 
@@ -93,6 +106,7 @@ export async function fetchClipMetadata(url: string, platform: Platform, opts: F
     likes: c.likes,
     thumbnailUrl: c.thumbnailUrl,
     caption: c.caption,
+    isVideo: c.isVideo,
   });
 
   const maxAge = opts.maxCacheAgeMs ?? DEFAULT_CACHE_MAX_AGE_MS;
@@ -121,7 +135,7 @@ export async function fetchClipMetadata(url: string, platform: Platform, opts: F
           .values({ platform, url, ...data, fetchedAt })
           .onConflictDoUpdate({
             target: [scrapeCreatorsCache.platform, scrapeCreatorsCache.url],
-            set: { views: data.views, likes: data.likes, thumbnailUrl: data.thumbnailUrl, caption: data.caption, fetchedAt },
+            set: { views: data.views, likes: data.likes, thumbnailUrl: data.thumbnailUrl, caption: data.caption, isVideo: data.isVideo, fetchedAt },
           });
         return { ok: true, data, fetchedAt, stale: false, fromCache: false };
       } catch (e) {
