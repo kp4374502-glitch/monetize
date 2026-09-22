@@ -106,10 +106,10 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
               Refresh all views now
             </Button>
           </ActionForm>
-          <ReviewQueue campaignId={id} pending={queue.pending} awaitingPayment={queue.awaitingPayment} />
+          <ReviewQueue campaignId={id} pending={queue.pending} awaitingPayment={queue.awaitingPayment} canDelete={isAdmin} />
         </>
       )}
-      {history && <ClipHistory history={history} />}
+      {history && <ClipHistory history={history} campaignId={id} canDelete={isAdmin} />}
 
       {canInvite && (
         <section>

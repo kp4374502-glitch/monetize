@@ -50,7 +50,7 @@ async function snapshot() {
     requests: await n(brandRequests),
     owners: (await db.select().from(users).where(eq(users.isPlatformOwner, true))).map((u) => u.id),
     campaignRows: (await db.select().from(campaigns)).map((c) => `${c.id}:${c.status}:${c.ownerUserId}:${c.budgetSpent}`),
-    clipRows: (await db.select().from(clips)).map((c) => `${c.id}:${c.status}:${c.paidStatus}:${c.qualifyingAudiencePct}`),
+    clipRows: (await db.select().from(clips)).map((c) => `${c.id}:${c.status}:${c.paidStatus}:${c.qualifyingAudiencePct}:${c.deletedAt}`),
   };
 }
 
@@ -113,6 +113,7 @@ describe("a brand-new account (users row with no roles) and one that never logge
       await denied(clipSvc.getClipHistory(who, camp));
       await denied(clipSvc.getCreatorRoster(who, camp));
       await denied(clipSvc.refreshViews(who, camp, clipId));
+      await denied(clipSvc.deleteClip(who, camp, clipId)); // Owner/Admin only, per Task 5
       // creator-only actions need a campaign_creators row they don't have
       await denied(clipSvc.submitClip(who, camp, "https://www.tiktok.com/@u/video/222"));
       await denied(clipSvc.attachVideoProof(who, camp, clipId, "https://youtu.be/aaaaaaaaaaa"));

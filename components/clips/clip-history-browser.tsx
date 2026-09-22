@@ -3,6 +3,7 @@ import { Card, SectionHeader, StatCard } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import type { ClipHistoryStatusFilter } from "@/lib/clips/service";
+import { DeleteClipButton } from "./delete-clip-button";
 import { Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
 
 type Row = { clip: ClipRow; creatorUsername: string };
@@ -23,6 +24,7 @@ const submittedOn = (d: Date) => d.toISOString().slice(0, 10);
  * whole page stays server-rendered and shareable/bookmarkable as a URL, no client state needed.
  */
 export function ClipHistoryBrowser({
+  campaignId,
   basePath,
   status,
   from,
@@ -30,7 +32,9 @@ export function ClipHistoryBrowser({
   summary,
   rows,
   showCreator,
+  canDelete = false,
 }: {
+  campaignId: string;
   basePath: string;
   status: ClipHistoryStatusFilter;
   from: string;
@@ -38,6 +42,8 @@ export function ClipHistoryBrowser({
   summary: { total: number; pending: number; approved: number; rejected: number; paid: number };
   rows: Row[];
   showCreator: boolean;
+  /** Owner/Admin only — the server re-checks this regardless of what's rendered. */
+  canDelete?: boolean;
 }) {
   const filtered = status !== "all" || !!from || !!to;
   return (
@@ -111,6 +117,7 @@ export function ClipHistoryBrowser({
                 <span className="text-base font-extrabold text-gold-light" data-testid="history-payout">
                   {money(c.payout)}
                 </span>
+                {canDelete && <DeleteClipButton campaignId={campaignId} clipId={c.id} />}
               </Card>
             </li>
           ))}

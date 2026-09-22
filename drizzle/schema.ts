@@ -8,8 +8,10 @@ import {
   integer,
   pgEnum,
   unique,
+  uniqueIndex,
   index,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 // ---------------------------------------------------------------------------
 // Enums
@@ -27,7 +29,7 @@ export const clipStatusEnum = pgEnum("clip_status", ["pending", "approved", "rej
 
 export const paidStatusEnum = pgEnum("paid_status", ["unpaid", "paid"]);
 
-export const reviewActionEnum = pgEnum("review_action", ["approve", "reject"]);
+export const reviewActionEnum = pgEnum("review_action", ["approve", "reject", "delete"]);
 
 export const notificationTypeEnum = pgEnum("notification_type", [
   "clip_approved",
@@ -204,9 +206,18 @@ export const clips = pgTable(
     flaggedDuplicate: boolean("flagged_duplicate").notNull().default(false),
     flaggedReason: text("flagged_reason"),
     submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
+    // Soft delete (Owner/Admin only) — never a hard DELETE, so payout math and the audit trail
+    // (clip_review_events) for anything ever paid stay intact. A deleted clip is excluded from every
+    // list/query app-wide (see lib/clips/rules.ts NOT_DELETED and its call sites).
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    deletedBy: text("deleted_by").references(() => users.id),
   },
   (t) => ({
-    noDuplicateUrlPerCampaign: unique("clips_campaign_url_unique").on(t.campaignId, t.url),
+    // Partial (not table-level unique): a deleted clip's URL frees up for resubmission, since it's
+    // no longer "in" the campaign for any practical purpose — see lib/clips/service.ts deleteClip.
+    noDuplicateUrlPerCampaign: uniqueIndex("clips_campaign_url_unique")
+      .on(t.campaignId, t.url)
+      .where(sql`${t.deletedAt} is null`),
     reviewQueueIdx: index("clips_campaign_status_idx").on(t.campaignId, t.status),
     dailyLimitIdx: index("clips_campaign_creator_submitted_idx").on(
       t.campaignId,

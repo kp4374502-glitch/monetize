@@ -9,14 +9,17 @@ export function ActionForm({
   action,
   children,
   className,
+  onSubmit,
 }: {
   action: (prev: ActionState, fd: FormData) => Promise<ActionState>;
   children: React.ReactNode;
   className?: string;
+  /** e.g. a confirm() gate — call e.preventDefault() to stop the submission. */
+  onSubmit?: (e: React.FormEvent<HTMLFormElement>) => void;
 }) {
   const [state, formAction] = useActionState(action, {} as ActionState);
   return (
-    <form action={formAction} className={className}>
+    <form action={formAction} className={className} onSubmit={onSubmit}>
       {children}
       {state.error && (
         <p role="alert" className="mt-2 text-sm text-red-400" data-testid="form-error">

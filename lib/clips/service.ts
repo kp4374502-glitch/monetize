@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, like, sql, gte, lte, count, ne, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, like, sql, gte, lte, count, ne, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -43,11 +43,12 @@ async function loadCampaign(campaignId: string): Promise<Campaign> {
   return c;
 }
 
+/** Never returns a soft-deleted clip — every mutation that loads through here treats it as gone. */
 async function loadClip(campaignId: string, clipId: string): Promise<Clip> {
   const [c] = await db
     .select()
     .from(clips)
-    .where(and(eq(clips.id, clipId), eq(clips.campaignId, campaignId)))
+    .where(and(eq(clips.id, clipId), eq(clips.campaignId, campaignId), isNull(clips.deletedAt)))
     .limit(1);
   if (!c) throw new Error("Clip not found.");
   return c;
@@ -106,6 +107,7 @@ export async function submitClip(actorId: string, campaignId: string, rawUrl: st
         eq(clips.campaignId, campaignId),
         eq(clips.creatorUserId, actorId),
         gte(clips.submittedAt, startOfUtcDay(now)),
+        isNull(clips.deletedAt),
       ),
     );
   if (n >= campaign.dailySubmissionLimit) {
@@ -119,7 +121,7 @@ export async function submitClip(actorId: string, campaignId: string, rawUrl: st
   const matches = await db
     .select({ creatorUserId: clips.creatorUserId, url: clips.url })
     .from(clips)
-    .where(and(eq(clips.campaignId, campaignId), eq(clips.platform, parsed.platform), like(clips.url, likePattern)));
+    .where(and(eq(clips.campaignId, campaignId), eq(clips.platform, parsed.platform), like(clips.url, likePattern), isNull(clips.deletedAt)));
   const flag = duplicateFlag(actorId, matches);
   if (flag.sameCreator) throw new Error(OWN_DUPLICATE_MESSAGE);
   if (matches.some((m) => m.url === parsed.url)) throw new Error(OTHER_DUPLICATE_MESSAGE);
@@ -152,7 +154,7 @@ export async function submitClip(actorId: string, campaignId: string, rawUrl: st
       const [existing] = await db
         .select({ creatorUserId: clips.creatorUserId })
         .from(clips)
-        .where(and(eq(clips.campaignId, campaignId), eq(clips.url, parsed.url)))
+        .where(and(eq(clips.campaignId, campaignId), eq(clips.url, parsed.url), isNull(clips.deletedAt)))
         .limit(1);
       throw new Error(existing?.creatorUserId === actorId ? OWN_DUPLICATE_MESSAGE : OTHER_DUPLICATE_MESSAGE);
     }
@@ -178,7 +180,7 @@ export async function attachVideoProof(
   const [clip] = await db
     .select()
     .from(clips)
-    .where(and(eq(clips.id, clipId), eq(clips.campaignId, campaignId), eq(clips.creatorUserId, actorId)))
+    .where(and(eq(clips.id, clipId), eq(clips.campaignId, campaignId), eq(clips.creatorUserId, actorId), isNull(clips.deletedAt)))
     .limit(1);
   if (!clip) throw new Error("Clip not found.");
   if (clip.paidStatus === "paid") throw new Error("This clip has already been paid.");
@@ -220,7 +222,7 @@ export async function attachAnalyticsScreenshot(
   const [clip] = await db
     .select()
     .from(clips)
-    .where(and(eq(clips.id, clipId), eq(clips.campaignId, campaignId), eq(clips.creatorUserId, actorId)))
+    .where(and(eq(clips.id, clipId), eq(clips.campaignId, campaignId), eq(clips.creatorUserId, actorId), isNull(clips.deletedAt)))
     .limit(1);
   if (!clip) throw new Error("Clip not found.");
   if (clip.paidStatus === "paid") throw new Error("This clip has already been paid.");
@@ -329,7 +331,7 @@ export async function refreshCampaignClips(actorId: string, campaignId: string, 
   const due = await db
     .select()
     .from(clips)
-    .where(and(eq(clips.campaignId, campaignId), ne(clips.status, "rejected"), eq(clips.paidStatus, "unpaid")))
+    .where(and(eq(clips.campaignId, campaignId), ne(clips.status, "rejected"), eq(clips.paidStatus, "unpaid"), isNull(clips.deletedAt)))
     .orderBy(sql`${clips.lastRefreshedAt} asc nulls first`)
     .limit(limit);
 
@@ -349,7 +351,7 @@ export async function refreshAllClips(opts: FetchOptions = {}, limit = 200) {
     .select({ clip: clips, campaign: campaigns })
     .from(clips)
     .innerJoin(campaigns, eq(campaigns.id, clips.campaignId))
-    .where(and(eq(campaigns.status, "active"), ne(clips.status, "rejected"), eq(clips.paidStatus, "unpaid")))
+    .where(and(eq(campaigns.status, "active"), ne(clips.status, "rejected"), eq(clips.paidStatus, "unpaid"), isNull(clips.deletedAt)))
     .orderBy(sql`${clips.lastRefreshedAt} asc nulls first`)
     .limit(limit);
 
@@ -538,6 +540,37 @@ export async function markPaid(actorId: string, campaignId: string, clipId: stri
 }
 
 // ---------------------------------------------------------------------------------------------
+// Admin
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Soft delete — Owner/Admin only (platform-wide roles; "owner" here also covers a campaign's own
+ * owner, and ROLE_RANK treats admin as rank-equal — mod and creator are refused). Works on ANY
+ * status, including paid. Never a hard DELETE: sets deleted_at/deleted_by so the row drops out of
+ * every list/query app-wide (loadClip and every read function above all exclude it), while its
+ * payout math and clip_review_events audit trail stay intact for anything that was ever paid — same
+ * treatment the rest of this app gives clip_review_events elsewhere. Frees the clip's URL up for
+ * resubmission (the unique index is partial: WHERE deleted_at IS NULL).
+ */
+export async function deleteClip(actorId: string, campaignId: string, clipId: string) {
+  await requireRole(actorId, campaignId, "owner");
+  const clip = await loadClip(campaignId, clipId);
+
+  await db.transaction(async (tx) => {
+    await tx.insert(clipReviewEvents).values({
+      clipId,
+      actorUserId: actorId,
+      action: "delete",
+      reason: `Prior status: ${clip.status}${clip.paidStatus === "paid" ? " (paid)" : ""}.`,
+    });
+    await tx
+      .update(clips)
+      .set({ deletedAt: new Date(), deletedBy: actorId })
+      .where(and(eq(clips.id, clipId), eq(clips.campaignId, campaignId)));
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
 // Reads for the dashboard
 // ---------------------------------------------------------------------------------------------
 
@@ -546,7 +579,7 @@ export async function getCreatorClips(actorId: string, campaignId: string) {
   return db
     .select()
     .from(clips)
-    .where(and(eq(clips.campaignId, campaignId), eq(clips.creatorUserId, actorId)))
+    .where(and(eq(clips.campaignId, campaignId), eq(clips.creatorUserId, actorId), isNull(clips.deletedAt)))
     .orderBy(desc(clips.submittedAt));
 }
 
@@ -559,8 +592,8 @@ export async function getReviewQueue(actorId: string, campaignId: string) {
       .innerJoin(users, eq(users.id, clips.creatorUserId))
       .where(
         status === "pending"
-          ? and(eq(clips.campaignId, campaignId), eq(clips.status, "pending"))
-          : and(eq(clips.campaignId, campaignId), eq(clips.status, "approved"), eq(clips.paidStatus, "unpaid")),
+          ? and(eq(clips.campaignId, campaignId), eq(clips.status, "pending"), isNull(clips.deletedAt))
+          : and(eq(clips.campaignId, campaignId), eq(clips.status, "approved"), eq(clips.paidStatus, "unpaid"), isNull(clips.deletedAt)),
       )
       .orderBy(asc(clips.submittedAt));
   return { pending: await rows("pending"), awaitingPayment: await rows("approved") };
@@ -582,7 +615,7 @@ export async function getClipHistory(actorId: string, campaignId: string) {
     .from(clips)
     .innerJoin(users, eq(users.id, clips.creatorUserId))
     .leftJoin(payer, eq(payer.id, clips.paidBy))
-    .where(and(eq(clips.campaignId, campaignId), eq(clips.paidStatus, "paid")))
+    .where(and(eq(clips.campaignId, campaignId), eq(clips.paidStatus, "paid"), isNull(clips.deletedAt)))
     .orderBy(desc(clips.paidAt))
     .limit(HISTORY_LIMIT);
 
@@ -590,7 +623,7 @@ export async function getClipHistory(actorId: string, campaignId: string) {
     .select({ clip: clips, creatorUsername: users.username })
     .from(clips)
     .innerJoin(users, eq(users.id, clips.creatorUserId))
-    .where(and(eq(clips.campaignId, campaignId), eq(clips.status, "rejected")))
+    .where(and(eq(clips.campaignId, campaignId), eq(clips.status, "rejected"), isNull(clips.deletedAt)))
     .orderBy(desc(clips.submittedAt))
     .limit(HISTORY_LIMIT);
 
@@ -617,7 +650,7 @@ export async function getClipHistory(actorId: string, campaignId: string) {
       owed: sql<string>`coalesce(sum(${clips.payout}) filter (where ${clips.status} = 'approved' and ${clips.paidStatus} = 'unpaid'), 0)`,
     })
     .from(clips)
-    .where(eq(clips.campaignId, campaignId));
+    .where(and(eq(clips.campaignId, campaignId), isNull(clips.deletedAt)));
 
   return {
     paid,
@@ -702,12 +735,12 @@ async function filteredClipHistory(scope: SQL, filters: ClipHistoryFilters) {
 /** Every clip ever submitted to THIS campaign, filtered — Mod/Admin/Owner only. */
 export async function getReviewerClipHistory(actorId: string, campaignId: string, filters: ClipHistoryFilters = {}) {
   await requireRole(actorId, campaignId, "mod");
-  return filteredClipHistory(eq(clips.campaignId, campaignId), filters);
+  return filteredClipHistory(and(eq(clips.campaignId, campaignId), isNull(clips.deletedAt))!, filters);
 }
 
 /** A creator's own submissions to THIS campaign, filtered — never anyone else's (same scoping as getCreatorClips). */
 export async function getMyClipHistory(actorId: string, campaignId: string, filters: ClipHistoryFilters = {}) {
-  return filteredClipHistory(and(eq(clips.campaignId, campaignId), eq(clips.creatorUserId, actorId))!, filters);
+  return filteredClipHistory(and(eq(clips.campaignId, campaignId), eq(clips.creatorUserId, actorId), isNull(clips.deletedAt))!, filters);
 }
 
 const ROSTER_LIMIT = 500;
@@ -735,7 +768,10 @@ export async function getCreatorRoster(actorId: string, campaignId: string) {
     })
     .from(campaignCreators)
     .innerJoin(users, eq(users.id, campaignCreators.userId))
-    .leftJoin(clips, and(eq(clips.campaignId, campaignCreators.campaignId), eq(clips.creatorUserId, campaignCreators.userId)))
+    .leftJoin(
+      clips,
+      and(eq(clips.campaignId, campaignCreators.campaignId), eq(clips.creatorUserId, campaignCreators.userId), isNull(clips.deletedAt)),
+    )
     .where(eq(campaignCreators.campaignId, campaignId))
     .groupBy(campaignCreators.id, users.username)
     .orderBy(sql`coalesce(sum(${clips.payout}) filter (where ${clips.status} = 'approved'), 0) desc`, asc(users.username))

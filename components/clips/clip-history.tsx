@@ -1,6 +1,7 @@
 import type { getClipHistory } from "@/lib/clips/service";
 import { Card, SectionHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { DeleteClipButton } from "./delete-clip-button";
 import { Thumb, money } from "./clip-parts";
 
 type History = Awaited<ReturnType<typeof getClipHistory>>;
@@ -8,7 +9,16 @@ type History = Awaited<ReturnType<typeof getClipHistory>>;
 const when = (d: Date | null) => (d ? d.toISOString().slice(0, 16).replace("T", " ") + " UTC" : "—");
 
 /** Paid and Rejected lists (newest first, up to 50 each). The money totals live in the stat cards. */
-export function ClipHistory({ history }: { history: History }) {
+export function ClipHistory({
+  history,
+  campaignId,
+  canDelete = false,
+}: {
+  history: History;
+  campaignId: string;
+  /** Owner/Admin only — the server re-checks this regardless of what's rendered. */
+  canDelete?: boolean;
+}) {
   return (
     <>
       <section>
@@ -32,6 +42,7 @@ export function ClipHistory({ history }: { history: History }) {
                   </p>
                 </div>
                 <span className="text-xl font-extrabold text-gold-light" data-testid="paid-amount">{money(c.payout)}</span>
+                {canDelete && <DeleteClipButton campaignId={campaignId} clipId={c.id} />}
               </Card>
             </li>
           ))}
@@ -60,6 +71,7 @@ export function ClipHistory({ history }: { history: History }) {
                     Rejected{rejectedBy ? ` by ${rejectedBy}` : ""}: {c.rejectionReason ?? "no reason recorded"}
                   </p>
                 </div>
+                {canDelete && <DeleteClipButton campaignId={campaignId} clipId={c.id} />}
               </Card>
             </li>
           ))}

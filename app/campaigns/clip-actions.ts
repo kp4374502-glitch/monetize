@@ -20,6 +20,7 @@ async function run(campaignId: string, fn: (userId: string) => Promise<unknown>)
     return { error: e instanceof Error ? e.message : "Something went wrong." };
   }
   revalidatePath(`/campaigns/${campaignId}`);
+  revalidatePath(`/campaigns/${campaignId}/history`); // deleteClipAction can run from either page
   return typeof result === "string" ? { ok: true, message: result } : { ok: true };
 }
 
@@ -80,3 +81,7 @@ export const reviewAction = async (campaignId: string, clipId: string, _p: Actio
 
 export const markPaidAction = async (campaignId: string, clipId: string, _p: ActionState, _fd: FormData) =>
   run(campaignId, (u) => svc.markPaid(u, campaignId, clipId));
+
+/** Owner/Admin only, any status — soft delete (see svc.deleteClip). The frontend confirms before submitting. */
+export const deleteClipAction = async (campaignId: string, clipId: string, _p: ActionState, _fd: FormData) =>
+  run(campaignId, (u) => svc.deleteClip(u, campaignId, clipId));

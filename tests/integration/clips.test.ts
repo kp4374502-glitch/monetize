@@ -8,6 +8,7 @@ import {
   campaignCreators,
   campaigns,
   clips,
+  clipReviewEvents,
   notifications,
   scrapeCreatorsCache,
 } from "../../drizzle/schema";
@@ -512,6 +513,112 @@ describe("markPaid", () => {
   it("creators can't mark paid", async () => {
     const clip = await approvedWithPayout(camp, "c1", 50, 10_000);
     await expect(svc.markPaid("c1", camp, clip.id)).rejects.toThrow(/Access denied/);
+  });
+});
+
+describe("deleteClip (soft delete — Owner/Admin only)", () => {
+  async function freshCampaign(name: string) {
+    const c = (await campaignSvc.createCampaign("owner", { ...validCampaign, name })).id;
+    await db.insert(campaignCreators).values([{ campaignId: c, userId: "c1" }, { campaignId: c, userId: "c2" }]);
+    return c;
+  }
+
+  it("is Owner/Admin only — a Mod, a creator, and an outsider are all refused", async () => {
+    const campX = await freshCampaign("Delete access");
+    const clip = await makeClip("c1", campX, 1000);
+    await expect(svc.deleteClip("modA", campX, clip.id)).rejects.toThrow(/Access denied/); // modA belongs to `camp`, not this one anyway
+    await expect(svc.deleteClip("c1", campX, clip.id)).rejects.toThrow(/Access denied/);
+    await expect(svc.deleteClip("outsider", campX, clip.id)).rejects.toThrow(/Access denied/);
+    // untouched by every refusal
+    const [row] = await db.select().from(clips).where(eq(clips.id, clip.id));
+    expect(row.deletedAt).toBeNull();
+  });
+
+  it("Owner/Admin can delete a clip in ANY status — pending, approved-unpaid, rejected, and paid", async () => {
+    const campX = await freshCampaign("Delete any status");
+    const pending = await makeClip("c1", campX, 1000);
+    const rejected = await makeClip("c1", campX, 1000);
+    await svc.reviewClip("owner", campX, rejected.id, { action: "reject", reason: "spam" });
+    const approvedUnpaid = await approvedWithPayout(campX, "c1", 60, 4000);
+    const paid = await approvedWithPayout(campX, "c1", 60, 4000);
+    await svc.markPaid("owner", campX, paid.id);
+
+    await svc.deleteClip("owner", campX, pending.id);
+    await svc.deleteClip("admin", campX, rejected.id);
+    await svc.deleteClip("owner", campX, approvedUnpaid.id);
+    await svc.deleteClip("admin", campX, paid.id);
+
+    for (const id of [pending.id, rejected.id, approvedUnpaid.id, paid.id]) {
+      const [row] = await db.select().from(clips).where(eq(clips.id, id));
+      expect(row.deletedAt).not.toBeNull();
+    }
+    // the paid clip's payout/audit data is untouched, just no longer listed anywhere (checked below)
+    const [paidRow] = await db.select().from(clips).where(eq(clips.id, paid.id));
+    expect(paidRow).toMatchObject({ paidStatus: "paid", payout: "4.00", deletedBy: "admin" });
+  });
+
+  it("logs a clip_review_events entry recording the actor and the prior status", async () => {
+    const campX = await freshCampaign("Delete audit trail");
+    const clip = await approvedWithPayout(campX, "c1", 50, 10_000);
+    await svc.deleteClip("owner", campX, clip.id);
+    const [event] = await db
+      .select()
+      .from(clipReviewEvents)
+      .where(and(eq(clipReviewEvents.clipId, clip.id), eq(clipReviewEvents.action, "delete")));
+    expect(event).toMatchObject({ actorUserId: "owner" });
+    expect(event.reason).toMatch(/approved/i);
+  });
+
+  it("disappears from every list/query: review queue, both history views, and the roster's aggregates", async () => {
+    const campX = await freshCampaign("Delete visibility");
+    const pending = await makeClip("c1", campX, 1000);
+    const rejected = await makeClip("c1", campX, 1000);
+    await svc.reviewClip("owner", campX, rejected.id, { action: "reject", reason: "spam" });
+    const paid = await approvedWithPayout(campX, "c1", 60, 4000);
+    await svc.markPaid("owner", campX, paid.id);
+
+    const rosterBefore = await svc.getCreatorRoster("owner", campX);
+    const c1Before = rosterBefore.find((r) => r.userId === "c1")!;
+
+    await svc.deleteClip("owner", campX, pending.id);
+    await svc.deleteClip("owner", campX, rejected.id);
+    await svc.deleteClip("owner", campX, paid.id);
+
+    expect((await svc.getReviewQueue("owner", campX)).pending.map((r) => r.clip.id)).not.toContain(pending.id);
+    const history = await svc.getClipHistory("owner", campX);
+    expect(history.paid.map((r) => r.clip.id)).not.toContain(paid.id);
+    expect(history.rejected.map((r) => r.clip.id)).not.toContain(rejected.id);
+    const filtered = await svc.getReviewerClipHistory("owner", campX);
+    expect(filtered.rows.map((r) => r.clip.id)).toEqual([]);
+    expect(filtered.summary.total).toBe(0);
+
+    const rosterAfter = await svc.getCreatorRoster("owner", campX);
+    const c1After = rosterAfter.find((r) => r.userId === "c1")!;
+    expect(c1After.clips).toBe(c1Before.clips - 3);
+    expect(Number(c1Before.earned)).toBeGreaterThan(0); // sanity: the paid clip really was counted before
+    expect(c1After.earned).toBe("0.00"); // every clip (including the paid one) is now deleted, so nothing is left to count
+  });
+
+  it("frees the clip's URL up for resubmission — by the same creator, or a different one", async () => {
+    const campX = await freshCampaign("Delete frees URL");
+    const url = tiktok();
+    const original = (await svc.submitClip("c1", campX, url, opts())).clip;
+    await svc.deleteClip("owner", campX, original.id);
+
+    const resubmitted = await svc.submitClip("c1", campX, url, opts()); // same creator, same exact link
+    expect(resubmitted.clip.deletedAt).toBeNull();
+    await svc.deleteClip("owner", campX, resubmitted.clip.id);
+    const byOther = await svc.submitClip("c2", campX, url, opts()); // different creator, after a second delete
+    expect(byOther.clip.deletedAt).toBeNull();
+  });
+
+  it("deleting an already-deleted clip, or one from another campaign, is refused as \"not found\"", async () => {
+    const campX = await freshCampaign("Delete idempotency");
+    const campY = await freshCampaign("Delete idempotency B");
+    const clip = await makeClip("c1", campX, 1000);
+    await svc.deleteClip("owner", campX, clip.id);
+    await expect(svc.deleteClip("owner", campX, clip.id)).rejects.toThrow(/not found/i);
+    await expect(svc.deleteClip("owner", campY, clip.id)).rejects.toThrow(/not found/i);
   });
 });
 

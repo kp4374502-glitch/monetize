@@ -53,6 +53,7 @@ export default async function ClipHistoryPage({
         </p>
       </div>
       <ClipHistoryBrowser
+        campaignId={id}
         basePath={`/campaigns/${id}/history`}
         status={status}
         from={sp.from ?? ""}
@@ -60,6 +61,7 @@ export default async function ClipHistoryPage({
         summary={summary}
         rows={rows}
         showCreator={!isCreator}
+        canDelete={role === "owner" || role === "admin"}
       />
     </main>
   );

@@ -5,6 +5,7 @@ import { Callout, Card, SectionHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { markPaidAction, reviewAction, setManualViewsAction, setPctAction } from "@/app/campaigns/clip-actions";
 import { canSetManualViews, hasAnalyticsProof } from "@/lib/clips/rules";
+import { DeleteClipButton } from "./delete-clip-button";
 import { Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
 
 type Row = { clip: ClipRow; creatorUsername: string };
@@ -113,10 +114,13 @@ export function ReviewQueue({
   campaignId,
   pending,
   awaitingPayment,
+  canDelete = false,
 }: {
   campaignId: string;
   pending: Row[];
   awaitingPayment: Row[];
+  /** Owner/Admin only — the server re-checks this regardless of what's rendered. */
+  canDelete?: boolean;
 }) {
   return (
     <>
@@ -153,11 +157,14 @@ export function ReviewQueue({
                     <ProofLine clip={c} campaignId={campaignId} missingId="proof-missing" />
                     <PctForm campaignId={campaignId} clip={c} />
                     {canSetManualViews(c) && <ManualViewsForm campaignId={campaignId} clip={c} />}
-                    <ActionForm action={reviewAction.bind(null, campaignId, c.id)} className="flex flex-wrap items-center gap-2 border-t border-subtle pt-3">
-                      <Input name="reason" placeholder="Reason (required to reject)" className="min-w-56 flex-1" />
-                      <Button type="submit" name="intent" value="approve" formNoValidate size="sm">Approve</Button>
-                      <Button type="submit" name="intent" value="reject" variant="danger" formNoValidate size="sm">Reject</Button>
-                    </ActionForm>
+                    <div className="flex flex-wrap items-center gap-2 border-t border-subtle pt-3">
+                      <ActionForm action={reviewAction.bind(null, campaignId, c.id)} className="flex flex-1 flex-wrap items-center gap-2">
+                        <Input name="reason" placeholder="Reason (required to reject)" className="min-w-56 flex-1" />
+                        <Button type="submit" name="intent" value="approve" formNoValidate size="sm">Approve</Button>
+                        <Button type="submit" name="intent" value="reject" variant="danger" formNoValidate size="sm">Reject</Button>
+                      </ActionForm>
+                      {canDelete && <DeleteClipButton campaignId={campaignId} clipId={c.id} />}
+                    </div>
                   </div>
                 </div>
               </Card>
@@ -185,9 +192,12 @@ export function ReviewQueue({
                     <Stats clip={c} />
                     <span className="text-base font-extrabold text-gold-light" data-testid="payment-amount">{money(c.payout)}</span>
                   </div>
-                  <ActionForm action={markPaidAction.bind(null, campaignId, c.id)}>
-                    <Button type="submit" size="sm" disabled={c.payout === null}>Mark paid</Button>
-                  </ActionForm>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ActionForm action={markPaidAction.bind(null, campaignId, c.id)}>
+                      <Button type="submit" size="sm" disabled={c.payout === null}>Mark paid</Button>
+                    </ActionForm>
+                    {canDelete && <DeleteClipButton campaignId={campaignId} clipId={c.id} />}
+                  </div>
                 </div>
                 <div className="mt-3 space-y-2.5">
                   <ProofLine clip={c} campaignId={campaignId} />

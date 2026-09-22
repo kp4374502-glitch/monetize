@@ -56,6 +56,7 @@ A platform-wide **Admin is a strict superset of Mod** — anything a Mod can do,
 
 - Can override a Mod's decision (re-approve something rejected, or reverse an approval).
 - Can edit a Qualifying Audience % that a Mod already entered.
+- Can delete a clip in any status (pending, approved, rejected, or paid) — see "Clip deletion" below. A Mod cannot.
 
 **Money**
 
@@ -89,6 +90,7 @@ Unlike Admin, a Mod is **not** automatic across campaigns — they must be expli
 - Cannot override another Mod's approve/reject decision on the same clip.
 - Cannot edit a Qualifying Audience % that a different Mod already entered.
 - A Mod's approve/reject decision is final on its own — but an Admin can review and change it afterward.
+- Cannot delete a clip in any status — that's Owner/Admin-only.
 
 **Campaign & money**
 
@@ -130,6 +132,7 @@ Unlike Admin, a Mod is **not** automatic across campaigns — they must be expli
 
 - Same review powers as Admin: can override a Mod's decision and edit a Qualifying Audience % already entered.
 - Can see everyone's individual review speed/activity, same as Admin.
+- Can delete a clip in any status, same as Admin — see "Clip deletion" below.
 
 **Money**
 
@@ -158,8 +161,8 @@ Unlike Admin, a Mod is **not** automatic across campaigns — they must be expli
 **Submitting clips**
 
 - Exact-duplicate link submissions from the same creator are blocked by the system.
-- A creator can only delete and resubmit a clip to change its details — no in-place editing of a submitted link.
-- Cannot delete/withdraw their own clip once submitted.
+- No in-place editing of a submitted link — a mistake can only be fixed by an Owner/Admin deleting the clip (see "Clip deletion" below), not by the creator themselves.
+- Cannot delete/withdraw their own clip once submitted — that's Owner/Admin-only.
 - Once a clip is rejected, the creator **cannot** resubmit the same link again.
 - No minimum wait before a clip is eligible for review — a reviewer can review it immediately regardless of current view count (though it won't earn anything until it clears the campaign's View Minimum).
 
@@ -275,6 +278,21 @@ Once a campaign's Total Budget is fully spent, no further clips are approved or 
 - **Submission rate limit:** 100 clip submissions per creator per day by default — configurable per campaign by the Owner.
 
 *At launch, bot-behavior detection is fully manual* — no automated flagging. Admins/Mods judge suspicious view/like patterns themselves when deciding whether to reject with a reason. Automated detection (ratio checks, velocity thresholds) is a future enhancement, not required for v1.
+
+## Clip deletion
+
+**Owner/Admin only** — a Mod or Creator has no delete option anywhere in the UI, and the server refuses
+the attempt regardless. Works on a clip in **any** status: pending, approved-unpaid, rejected, or paid.
+
+- **Soft delete, never a hard `DELETE`.** The row gets `deleted_at`/`deleted_by` set and drops out of
+  every list and query app-wide — the review queue, both clip-history views, and the creator roster's
+  aggregates (clip count, views, earned, owed) — but the row itself, its payout math, and its
+  `clip_review_events` audit trail stay intact, the same treatment already given to anything ever paid.
+- A `clip_review_events` row is logged for the deletion (actor, timestamp, and the clip's prior status),
+  same as an approve/reject decision.
+- **The deleted clip's URL frees up** for resubmission — by the same creator or a different one — since
+  the uniqueness check on `(campaign_id, url)` only applies to non-deleted rows.
+- The frontend confirms before submitting a delete; there's no "undo" once it's confirmed.
 
 ## Notifications
 

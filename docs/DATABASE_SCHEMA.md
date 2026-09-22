@@ -61,7 +61,8 @@ Every table holding campaign-specific data carries a `campaign_id` — this is t
 - `campaign_id` (fk campaigns)
 - `creator_user_id` (fk users)
 - `platform` (tiktok | instagram | youtube)
-- `url`, `unique(campaign_id, url)` — blocks exact-duplicate submission by the same creator
+- `url`, partial `unique(campaign_id, url) where deleted_at is null` — blocks exact-duplicate
+  submission by the same creator, but frees up once the clip is soft-deleted (see below)
 - `thumbnail_url`, `caption`
 - `views`, `likes`, `last_refreshed_at` (kept in sync via ScrapeCreators)
 - `is_video` (nullable bool; ScrapeCreators' own confirmation, Instagram-specific — `false` means a
@@ -82,14 +83,17 @@ Every table holding campaign-specific data carries a `campaign_id` — this is t
 - `paid_by` (fk users, nullable), `paid_at` (nullable)
 - `flagged_duplicate` (boolean), `flagged_reason` (nullable, manual review flag for cross-creator theft)
 - `submitted_at`
+- `deleted_at` (nullable), `deleted_by` (fk users, nullable) — soft delete, Owner/Admin only, any
+  status. Excluded from every list/query app-wide; never a hard `DELETE` (see PRODUCT_SPEC.md
+  "Clip deletion"). Payout/audit data on the row itself is untouched.
 
 ## clip\_review\_events
 
 - `id` (pk)
 - `clip_id` (fk clips)
 - `actor_user_id` (fk users)
-- `action` (approve | reject)
-- `reason` (nullable)
+- `action` (approve | reject | delete)
+- `reason` (nullable; for a delete, records the clip's prior status)
 - `created_at`
 
 Supports multi-round review (a clip can be approved, later reverted, re-approved) and gives Admin/Owner the audit log/history they're entitled to see.
