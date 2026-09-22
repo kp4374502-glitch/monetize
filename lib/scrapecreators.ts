@@ -5,8 +5,8 @@ import type { Platform } from "./clips/url";
 
 /**
  * The ONLY module that talks to ScrapeCreators (cost/rate-limit handling and caching live here).
- * Public data lookups only — no OAuth. Response field paths follow docs.scrapecreators.com and
- * have not been verified against a live key.
+ * Public data lookups only — no OAuth. Response field paths follow docs.scrapecreators.com; the
+ * Instagram views fallback below was added after live data showed video_play_count alone is unreliable.
  */
 
 export interface ClipMetadata {
@@ -43,7 +43,7 @@ const str = (v: unknown): string | null => (typeof v === "string" && v.length ? 
 const get = (o: any, path: string): any => path.split(".").reduce((a, k) => (a == null ? undefined : a[k]), o);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function parse(platform: Platform, j: any): ClipMetadata {
+export function parse(platform: Platform, j: any): ClipMetadata {
   if (platform === "tiktok") {
     const s = "aweme_detail.statistics";
     return {
@@ -55,8 +55,12 @@ function parse(platform: Platform, j: any): ClipMetadata {
   }
   if (platform === "instagram") {
     const m = "data.xdt_shortcode_media";
+    // ScrapeCreators exposes two view-count fields for video posts/Reels; which one is populated
+    // varies by post (observed live: video_play_count came back 0 while video_view_count held the
+    // real number), so try both rather than trusting either alone.
+    const views = num(get(j, `${m}.video_play_count`)) || num(get(j, `${m}.video_view_count`));
     return {
-      views: num(get(j, `${m}.video_play_count`)),
+      views,
       likes: num(get(j, `${m}.edge_media_preview_like.count`)),
       caption: str(get(j, `${m}.edge_media_to_caption.edges.0.node.text`)),
       thumbnailUrl: str(get(j, `${m}.thumbnail_src`)),
