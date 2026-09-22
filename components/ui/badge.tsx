@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 /** One color map for every status/role the app shows. Unknown values fall back to neutral. */
 const tones: Record<string, string> = {
   // clip lifecycle
+  awaiting_analytics: "border-sky-400/50 bg-sky-400/10 text-sky-300",
   pending: "border-amber-500/50 bg-amber-500/10 text-amber-300",
   approved: "border-green-500/50 bg-green-500/10 text-green-400",
   rejected: "border-red-500/50 bg-red-500/10 text-red-400",

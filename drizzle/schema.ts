@@ -25,11 +25,14 @@ export const campaignStatusEnum = pgEnum("campaign_status", [
 
 export const platformEnum = pgEnum("platform", ["tiktok", "instagram", "youtube"]);
 
-export const clipStatusEnum = pgEnum("clip_status", ["pending", "approved", "rejected"]);
+// "awaiting_analytics" (Task 5 Part 3): a pre-review gate, not a terminal status — a clip sits here
+// from submission until 7 days have passed since the POST's own publish date AND proof is attached;
+// only then does it move to "pending". See lib/clips/rules.ts analyticsGateState.
+export const clipStatusEnum = pgEnum("clip_status", ["pending", "approved", "rejected", "awaiting_analytics"]);
 
 export const paidStatusEnum = pgEnum("paid_status", ["unpaid", "paid"]);
 
-export const reviewActionEnum = pgEnum("review_action", ["approve", "reject", "delete"]);
+export const reviewActionEnum = pgEnum("review_action", ["approve", "reject", "delete", "set_posted_at"]);
 
 export const notificationTypeEnum = pgEnum("notification_type", [
   "clip_approved",
@@ -37,6 +40,7 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "payout_paid",
   "proof_reminder",
   "budget_low",
+  "analytics_unlocked",
 ]);
 
 // ---------------------------------------------------------------------------
@@ -211,6 +215,14 @@ export const clips = pgTable(
     // list/query app-wide (see lib/clips/rules.ts NOT_DELETED and its call sites).
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     deletedBy: text("deleted_by").references(() => users.id),
+    // The POST's own real publish date (Task 5 Part 3) — NOT when it was submitted to Monetize.
+    // Captured from ScrapeCreators at submission (and filled in on a later refresh if it was missing
+    // then), never overwritten once set. null = never successfully captured; see setPostedAt for the
+    // Mod/Admin/Owner manual fallback — a null value never silently counts as "7 days have passed".
+    postedAt: timestamp("posted_at", { withTimezone: true }),
+    postedAtSetBy: text("posted_at_set_by").references(() => users.id), // non-null only if a reviewer set it manually
+    // Cron dedup: the "you can now submit your analytics proof" notification fires at most once.
+    analyticsUnlockNotifiedAt: timestamp("analytics_unlock_notified_at", { withTimezone: true }),
   },
   (t) => ({
     // Partial (not table-level unique): a deleted clip's URL frees up for resubmission — EXCEPT a
@@ -282,6 +294,8 @@ export const scrapeCreatorsCache = pgTable(
     caption: text("caption"),
     // Mirrors clips.is_video — a cache hit must be able to fully populate a clip, including this flag.
     isVideo: boolean("is_video"),
+    // Mirrors clips.posted_at — the post's real publish date (Task 5 Part 3).
+    postedAt: timestamp("posted_at", { withTimezone: true }),
     fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({

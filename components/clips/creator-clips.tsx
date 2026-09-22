@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Callout, Card, SectionHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { attachProofAction, refreshViewsAction, submitClipAction } from "@/app/campaigns/clip-actions";
-import { hasAnalyticsProof } from "@/lib/clips/rules";
+import { analyticsGateState, hasAnalyticsProof } from "@/lib/clips/rules";
 import { StatusBadge, Stats, Thumb, money, type ClipRow } from "./clip-parts";
+
+const onDate = (d: Date) => d.toISOString().slice(0, 10);
 
 /** Creator view: add a clip, and see ONLY their own clips. No payout formula or budget shown. */
 export function CreatorClips({ campaignId, clips, viewMinimum }: { campaignId: string; clips: ClipRow[]; viewMinimum: number }) {
@@ -31,7 +33,9 @@ export function CreatorClips({ campaignId, clips, viewMinimum }: { campaignId: s
         )}
         {/* grid-cols-1 = minmax(0,1fr): without it a long unbreakable URL widens the whole column on phones */}
         <ul className="grid grid-cols-1 gap-3">
-          {clips.map((c) => (
+          {clips.map((c) => {
+            const gate = analyticsGateState(c);
+            return (
             <li key={c.id} data-testid="my-clip">
               <Card innerClassName="p-4">
                 <div className="flex gap-4">
@@ -76,6 +80,23 @@ export function CreatorClips({ campaignId, clips, viewMinimum }: { campaignId: s
                           </a>
                         )}
                       </div>
+                    ) : gate.locked ? (
+                      <Callout tone="info" data-testid="analytics-gate-locked">
+                        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                        <div className="min-w-0 space-y-1">
+                          {gate.reason === "unknown_posted_at" ? (
+                            <p>
+                              We don't have a confirmed post date for this clip yet, so the 7-day analytics window hasn't started. A
+                              reviewer needs to confirm it before you can submit proof — check back soon.
+                            </p>
+                          ) : (
+                            <p>
+                              Analytics proof unlocks 7 days after this post went live — on <strong>{onDate(gate.unlocksAt)}</strong>.
+                              Check back then.
+                            </p>
+                          )}
+                        </div>
+                      </Callout>
                     ) : (
                       c.status !== "rejected" && (
                         <Callout tone="warning">
@@ -109,7 +130,7 @@ export function CreatorClips({ campaignId, clips, viewMinimum }: { campaignId: s
                     )}
 
                     <div className="flex flex-wrap items-start gap-2 pt-1">
-                      {c.paidStatus === "unpaid" && (
+                      {c.paidStatus === "unpaid" && !gate.locked && (
                         <ActionForm action={attachProofAction.bind(null, campaignId, c.id)} className="flex min-w-64 flex-1 flex-wrap items-center gap-2">
                           <Input
                             name="proofUrl"
@@ -130,7 +151,8 @@ export function CreatorClips({ campaignId, clips, viewMinimum }: { campaignId: s
                 </div>
               </Card>
             </li>
-          ))}
+            );
+          })}
         </ul>
       </section>
     </>

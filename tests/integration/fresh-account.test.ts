@@ -110,10 +110,12 @@ describe("a brand-new account (users row with no roles) and one that never logge
       await denied(clipSvc.setQualifyingAudiencePct(who, camp, clipId, 50));
       await denied(clipSvc.markPaid(who, camp, clipId));
       await denied(clipSvc.getReviewQueue(who, camp));
+      await denied(clipSvc.getReviewerClipHistory(who, camp));
       await denied(clipSvc.getClipHistory(who, camp));
       await denied(clipSvc.getCreatorRoster(who, camp));
       await denied(clipSvc.refreshViews(who, camp, clipId));
       await denied(clipSvc.deleteClip(who, camp, clipId)); // Owner/Admin only, per Task 5
+      await denied(clipSvc.setPostedAt(who, camp, clipId, "2020-01-01")); // Mod/Admin/Owner only, per Task 5 Part 3
       // creator-only actions need a campaign_creators row they don't have
       await denied(clipSvc.submitClip(who, camp, "https://www.tiktok.com/@u/video/222"));
       await denied(clipSvc.attachVideoProof(who, camp, clipId, "https://youtu.be/aaaaaaaaaaa"));

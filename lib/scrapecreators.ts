@@ -21,6 +21,15 @@ export interface ClipMetadata {
    * Reel; see lib/clips/rules.ts canSetManualViews, which this flag exists to drive.
    */
   isVideo: boolean | null;
+  /**
+   * The post's own real publish date — NOT when it was submitted to Monetize (Task 5 Part 3). Confirmed
+   * live per platform: TikTok aweme_detail.create_time (epoch seconds), Instagram
+   * xdt_shortcode_media.taken_at_timestamp (epoch seconds, present even for a photo/carousel post),
+   * YouTube's top-level publishDate (ISO string with a real timezone offset — never publishDateText,
+   * which is coarse/relative, and never anything under watchNextVideos, which is a different video).
+   * null if ScrapeCreators didn't return one — never guessed or defaulted; see setPostedAt.
+   */
+  postedAt: Date | null;
 }
 
 export type FetchResult =
@@ -46,6 +55,15 @@ const num = (v: unknown): number => {
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
 };
 const str = (v: unknown): string | null => (typeof v === "string" && v.length ? v : null);
+const dateFromEpochSeconds = (v: unknown): Date | null => {
+  const n = typeof v === "string" ? Number(v) : v;
+  return typeof n === "number" && Number.isFinite(n) && n > 0 ? new Date(n * 1000) : null;
+};
+const dateFromIso = (v: unknown): Date | null => {
+  if (typeof v !== "string" || !v) return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const get = (o: any, path: string): any => path.split(".").reduce((a, k) => (a == null ? undefined : a[k]), o);
 
@@ -59,6 +77,7 @@ export function parse(platform: Platform, j: any): ClipMetadata {
       caption: str(get(j, "aweme_detail.desc")),
       thumbnailUrl: str(get(j, "aweme_detail.video.cover.url_list.0")),
       isVideo: true,
+      postedAt: dateFromEpochSeconds(get(j, "aweme_detail.create_time")),
     };
   }
   if (platform === "instagram") {
@@ -76,6 +95,8 @@ export function parse(platform: Platform, j: any): ClipMetadata {
       // A photo/carousel post genuinely has no view data — that's confirmed by is_video, not by
       // views coming back 0 (an unlucky/unpopular real Reel could also be 0).
       isVideo: typeof isVideoRaw === "boolean" ? isVideoRaw : null,
+      // Present for a photo/carousel post too (confirmed live) — unaffected by the views problem.
+      postedAt: dateFromEpochSeconds(get(j, `${m}.taken_at_timestamp`)),
     };
   }
   return {
@@ -84,6 +105,9 @@ export function parse(platform: Platform, j: any): ClipMetadata {
     caption: str(j?.title) ?? str(j?.description),
     thumbnailUrl: str(j?.thumbnail),
     isVideo: true,
+    // Top-level publishDate only (ISO with a real timezone offset). Deliberately never
+    // publishDateText (coarse/relative) or anything under watchNextVideos (a different video).
+    postedAt: dateFromIso(j?.publishDate),
   };
 }
 
@@ -107,6 +131,7 @@ export async function fetchClipMetadata(url: string, platform: Platform, opts: F
     thumbnailUrl: c.thumbnailUrl,
     caption: c.caption,
     isVideo: c.isVideo,
+    postedAt: c.postedAt,
   });
 
   const maxAge = opts.maxCacheAgeMs ?? DEFAULT_CACHE_MAX_AGE_MS;
@@ -128,14 +153,25 @@ export async function fetchClipMetadata(url: string, platform: Platform, opts: F
           headers: { "x-api-key": apiKey },
         });
         if (!res.ok) throw new Error(`ScrapeCreators responded ${res.status}`);
-        const data = parse(platform, await res.json());
+        const parsed = parse(platform, await res.json());
+        // A post's publish date never changes, so never let a fetch that came back without one
+        // (e.g. the platform omitted the field this time) clobber an already-known-good value.
+        const data = { ...parsed, postedAt: parsed.postedAt ?? cached?.postedAt ?? null };
         const fetchedAt = now();
         await db
           .insert(scrapeCreatorsCache)
           .values({ platform, url, ...data, fetchedAt })
           .onConflictDoUpdate({
             target: [scrapeCreatorsCache.platform, scrapeCreatorsCache.url],
-            set: { views: data.views, likes: data.likes, thumbnailUrl: data.thumbnailUrl, caption: data.caption, isVideo: data.isVideo, fetchedAt },
+            set: {
+              views: data.views,
+              likes: data.likes,
+              thumbnailUrl: data.thumbnailUrl,
+              caption: data.caption,
+              isVideo: data.isVideo,
+              postedAt: data.postedAt,
+              fetchedAt,
+            },
           });
         return { ok: true, data, fetchedAt, stale: false, fromCache: false };
       } catch (e) {

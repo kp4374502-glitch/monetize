@@ -224,15 +224,27 @@ their proof video — instead of relying on the (nonexistent) automatic number. 
 
 TikTok does not expose per-video audience-demographic data to anyone but the account owner, so this step is manual and human-reviewed — the following proof is **required** for every clip before it can earn anything:
 
-1. **Analytics proof, 7 days later** — filed 7 days after the clip was posted:
-   - **Video link (the only way to submit NEW proof):** an unlisted YouTube or Drive video link of their TikTok analytics. Recording must start from the home screen of the creator's phone or computer, show 2–3 seconds of the post itself playing, then navigate into that post's analytics and show all analytics data before ending.
+1. **Analytics proof, 7 days after the POST went live** (Task 5 Part 3 — this is 7 days since the post's own publish date, **not** since it was submitted to Monetize):
+   - **Video link (the only proof method):** an unlisted YouTube or Drive video link of their TikTok analytics. Recording must start from the home screen of the creator's phone or computer, show 2–3 seconds of the post itself playing, then navigate into that post's analytics and show all analytics data before ending.
    - **Screenshot upload has been removed** (Task 5 Part 2) — a creator can no longer submit a new screenshot, regardless of the clip's view count. **Existing clips that already have an accepted screenshot on file are unaffected:** it stays valid proof exactly as before (no resubmission required, no expiry), the reviewer can still enter a Qualifying Audience % against it, and the clip can still be approved and paid. Reviewers still see it **inline** in the review queue (private: only the clip's own creator and the Mod/Admin/Owner of that campaign can view it), served from Vercel Blob, which stays in place purely to keep serving these — nothing writes to it anymore.
 
    A clip holds one proof at a time: submitting a video link on a clip that still has an old screenshot removes it. There is no way to go the other direction (screenshot replacing a video link) any more.
 
+**The 7-day gate (`awaiting_analytics`).** A creator submits just the post link — no proof field is shown at all yet. The clip sits in a pre-review status, `awaiting_analytics` (not a terminal status; approved/rejected/paid are unaffected), until BOTH of these clear:
+- 7 days have passed since the post's own real publish date (`posted_at`, captured from ScrapeCreators at submission — confirmed live per platform: TikTok's `create_time`, Instagram's `taken_at_timestamp` [present even for a photo/carousel], YouTube's top-level `publishDate`), **and**
+- the creator has submitted the video-link proof.
+
+Only once both are true does the clip move into the normal `pending` review queue — before that, it's invisible to the reviewer's default queue (still visible via History → "Waiting for Analytics").
+
+**A missing `posted_at` never silently counts as "7 days have passed."** If ScrapeCreators couldn't return a publish date (rate-limited, a later refresh usually fills it in), the clip stays locked indefinitely rather than guessing either way, until a Mod/Admin/Owner manually confirms the real date (a one-time action, refused if a date is already known).
+
+**Notification.** Once the 7 days elapse and the creator still hasn't submitted proof, a daily cron notifies them ("...you can now submit your Analytics proof"), sent at most once per clip. A clip that already has proof (the retroactive case below, or a race with the cron) instead flows straight into `pending` silently — no notification, since the creator already did their part.
+
+**Retroactive handling.** Every clip that was already `pending` before this gate existed already has proof (the old flow required link+proof together). A one-time migration backfilled each one's `posted_at` and re-bucketed by post age: 7+ days old stayed `pending` untouched; younger than 7 days moved to `awaiting_analytics` even though proof is already attached — no resubmission needed, it flows back into `pending` automatically once the window clears. A handful where ScrapeCreators couldn't return a date at all were also moved to `awaiting_analytics`, flagged for manual confirmation, per the same "never guess" rule above.
+
 An Admin or Mod reads the proof and manually enters the **Qualifying Audience %** on the clip — this is never self-reported by the creator directly into a number field. Until the proof is attached and a % is entered, the clip shows a blocking warning and earns $0, even if it has cleared the view minimum.
 
-If a creator never submits the 7-day analytics proof, there's no automatic rejection or expiry — the clip just stays blocked, and the assigned reviewer gets an in-app notification reminding them to chase it up.
+If a creator never submits the analytics proof once unlocked, there's no automatic rejection or expiry — the clip just stays blocked, and the assigned reviewer gets an in-app notification reminding them to chase it up (this older per-campaign reminder is separate from the unlock notification above, and no longer fires for a clip still gated — it would always be a false alarm, since a gated clip can't have proof yet by construction).
 
 ## Payout formula
 
@@ -298,7 +310,7 @@ New capability (the original Monetize build had none). **In-app only** — no em
 
 **Delivery:** a bell icon with a dropdown list, notifications persist until the user dismisses them (standard SaaS pattern) — not a disappearing toast.
 
-**Events that trigger a notification** (kept to the essentials): clip approved, clip rejected (with reason), payout marked paid, and a reviewer reminder when a clip's 7-day analytics proof is still missing.
+**Events that trigger a notification** (kept to the essentials): clip approved, clip rejected (with reason), payout marked paid, a reviewer reminder when a clip's proof is still missing 7 days after submission, and (Task 5 Part 3) a creator notification once their clip's 7-day analytics window clears and they haven't submitted proof yet — sent at most once per clip.
 
 ## Payouts
 

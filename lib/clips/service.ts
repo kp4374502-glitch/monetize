@@ -9,6 +9,8 @@ import { notify } from "../notifications";
 import { isValidProofUrl, parseClipUrl } from "./url";
 import { vercelBlobStore, type ProofImageStore } from "./proof-store";
 import {
+  ANALYTICS_GATE_DAYS,
+  analyticsGateState,
   canSetManualViews,
   effectiveViews,
   hasAnalyticsProof,
@@ -141,6 +143,10 @@ export async function submitClip(actorId: string, campaignId: string, rawUrl: st
         lastRefreshedAt: meta.ok && !meta.stale ? meta.fetchedAt : null,
         flaggedDuplicate: flag.reason !== null,
         flaggedReason: flag.reason,
+        // Task 5 Part 3: every new clip starts gated, regardless of how old the post already is —
+        // only attachVideoProof (once the 7-day gate actually clears) moves it into "pending".
+        status: "awaiting_analytics",
+        postedAt: meta.ok ? meta.data.postedAt : null,
       })
       .returning();
     return { clip: row, statsAvailable: meta.ok };
@@ -162,10 +168,20 @@ export async function submitClip(actorId: string, campaignId: string, rawUrl: st
 
 const proofSchema = z.string().trim().refine(isValidProofUrl, "Analytics proof must be a YouTube (unlisted) or Google Drive link.");
 
+function analyticsGateError(gate: Extract<ReturnType<typeof analyticsGateState>, { locked: true }>): Error {
+  return new Error(
+    gate.reason === "unknown_posted_at"
+      ? "This clip's post date isn't available yet, so we can't confirm the 7-day analytics window — ask a Mod/Admin/Owner to confirm it before submitting proof."
+      : `Analytics proof can't be submitted until 7 days after the post went live (unlocks ${gate.unlocksAt.toISOString().slice(0, 10)}).`,
+  );
+}
+
 /**
- * Creator-only, own clips. Early submission and replacement are both allowed (no date checks), and a video
- * link is accepted at ANY view count. A clip has one proof at a time, so this also replaces (and deletes)
- * an earlier screenshot.
+ * Creator-only, own clips. A clip has one proof at a time, so this also replaces (and deletes) an
+ * earlier screenshot. Task 5 Part 3: while the clip is still "awaiting_analytics" (i.e. this would be
+ * its FIRST proof), the 7-day-since-the-post's-own-publish-date gate applies — see analyticsGateState.
+ * Once proof clears the gate, the clip moves to "pending" right here. After that, replacing proof on
+ * an already-"pending"/approved/rejected clip is unrestricted (existing behavior, unaffected).
  */
 export async function attachVideoProof(
   actorId: string,
@@ -183,6 +199,12 @@ export async function attachVideoProof(
   if (!clip) throw new Error("Clip not found.");
   if (clip.paidStatus === "paid") throw new Error("This clip has already been paid.");
 
+  const wasAwaitingAnalytics = clip.status === "awaiting_analytics";
+  if (wasAwaitingAnalytics) {
+    const gate = analyticsGateState(clip);
+    if (gate.locked) throw analyticsGateError(gate);
+  }
+
   const campaign = await loadCampaign(campaignId);
   const next = { ...clip, videoProofUrl: url, analyticsScreenshotPathname: null };
   const [row] = await db
@@ -193,6 +215,7 @@ export async function attachVideoProof(
       analyticsScreenshotPathname: null,
       analyticsScreenshotSubmittedAt: null,
       analyticsScreenshotViewsAtSubmit: null,
+      ...(wasAwaitingAnalytics ? { status: "pending" as const } : {}),
       ...economicsColumns(next, campaign),
     })
     .where(and(eq(clips.id, clipId), eq(clips.campaignId, campaignId)))
@@ -246,6 +269,10 @@ async function refreshClipRow(clip: Clip, campaign: Campaign, opts: FetchOptions
       // Keeps canSetManualViews current. Never touches manualViews itself — a refresh can update
       // what ScrapeCreators says, but only setManualViews (reviewer-only) can change the override.
       isVideo: meta.data.isVideo,
+      // Fills in a still-missing posted_at (e.g. the submission-time fetch failed); never overwrites
+      // an already-known value — a post's publish date doesn't change, and a reviewer may have
+      // manually confirmed it via setPostedAt.
+      postedAt: clip.postedAt ?? meta.data.postedAt,
       lastRefreshedAt: meta.fetchedAt,
       ...econ,
     })
@@ -306,6 +333,62 @@ export async function refreshAllClips(opts: FetchOptions = {}, limit = 200) {
     else failed++;
   }
   return { attempted: due.length, updated, failed };
+}
+
+/**
+ * Task 5 Part 3 cron helper — one daily pass, two jobs, both keyed off the SAME cutoff
+ * (posted_at + 7 days <= now, and posted_at itself known — never guessed for a null one):
+ *   1. Already has proof (the retroactive case, or a race between cron runs) -> flip straight to
+ *      "pending", silently. No notification: the creator already did their part before this
+ *      feature (or before the gate cleared) existed to ask them to wait.
+ *   2. No proof yet and never notified -> tell the creator they can submit it now, and mark it sent
+ *      (analyticsUnlockNotifiedAt) so it never fires twice for the same clip.
+ * Deleted clips and paused/closed/archived campaigns are excluded from both, same as sendProofReminders.
+ */
+export async function runAnalyticsGateSweep(now: Date = new Date()) {
+  const cutoff = new Date(now.getTime() - ANALYTICS_GATE_DAYS * 24 * 60 * 60 * 1000);
+  const dueBase = and(
+    eq(clips.status, "awaiting_analytics"),
+    isNull(clips.deletedAt),
+    sql`${clips.postedAt} is not null`,
+    lte(clips.postedAt, cutoff),
+  );
+
+  const readyWithProof = await db
+    .select({ id: clips.id, campaignId: clips.campaignId })
+    .from(clips)
+    .where(and(dueBase, sql`(${clips.videoProofUrl} is not null or ${clips.analyticsScreenshotPathname} is not null)`));
+  for (const c of readyWithProof) {
+    await db.update(clips).set({ status: "pending" }).where(and(eq(clips.id, c.id), eq(clips.campaignId, c.campaignId)));
+  }
+
+  const dueToNotify = await db
+    .select({ id: clips.id, campaignId: clips.campaignId, creatorUserId: clips.creatorUserId, url: clips.url })
+    .from(clips)
+    .innerJoin(campaigns, eq(campaigns.id, clips.campaignId))
+    .where(
+      and(
+        dueBase,
+        isNull(clips.videoProofUrl),
+        isNull(clips.analyticsScreenshotPathname),
+        isNull(clips.analyticsUnlockNotifiedAt),
+        eq(campaigns.status, "active"),
+      ),
+    );
+  for (const c of dueToNotify) {
+    await db.transaction(async (tx) => {
+      await notify(tx, {
+        userId: c.creatorUserId,
+        campaignId: c.campaignId,
+        clipId: c.id,
+        type: "analytics_unlocked",
+        message: `Your post (${c.url}) has been live for ${ANALYTICS_GATE_DAYS} days — you can now submit your Analytics proof.`,
+      });
+      await tx.update(clips).set({ analyticsUnlockNotifiedAt: now }).where(and(eq(clips.id, c.id), eq(clips.campaignId, c.campaignId)));
+    });
+  }
+
+  return { transitioned: readyWithProof.length, notified: dueToNotify.length };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -434,6 +517,34 @@ export async function setManualViews(actorId: string, campaignId: string, clipId
     })
     .where(and(eq(clips.id, clipId), eq(clips.campaignId, campaignId)))
     .returning();
+  return row;
+}
+
+const postedAtSchema = z.coerce.date().refine((d) => d.getTime() <= Date.now(), "The post date can't be in the future.");
+
+/**
+ * Mod/Admin/Owner only, one-time: manually confirm a clip's post date when ScrapeCreators never
+ * captured one (analyticsGateState — a null posted_at is never guessed or defaulted). Refuses if a
+ * date is already known, auto-captured or previously confirmed, to avoid silently overriding real
+ * data. If the clip already has proof and this newly-set date already clears the 7-day gate, unlocks
+ * it into "pending" immediately — no need to wait for the creator to resubmit or the next cron pass.
+ */
+export async function setPostedAt(actorId: string, campaignId: string, clipId: string, rawDate: unknown) {
+  await requireRole(actorId, campaignId, "mod");
+  const postedAt = postedAtSchema.parse(rawDate);
+  const clip = await loadClip(campaignId, clipId);
+  if (clip.postedAt !== null) throw new Error("This clip's post date is already known.");
+
+  const shouldUnlock = clip.status === "awaiting_analytics" && hasAnalyticsProof(clip) && !analyticsGateState({ ...clip, postedAt }).locked;
+
+  const [row] = await db.transaction(async (tx) => {
+    await tx.insert(clipReviewEvents).values({ clipId, actorUserId: actorId, action: "set_posted_at" });
+    return tx
+      .update(clips)
+      .set({ postedAt, postedAtSetBy: actorId, ...(shouldUnlock ? { status: "pending" as const } : {}) })
+      .where(and(eq(clips.id, clipId), eq(clips.campaignId, campaignId)))
+      .returning();
+  });
   return row;
 }
 
@@ -607,7 +718,7 @@ export async function getClipHistory(actorId: string, campaignId: string) {
 // same clips rows getReviewQueue/getClipHistory already read, not a separate data model.
 // ---------------------------------------------------------------------------------------------
 
-export type ClipHistoryStatusFilter = "all" | "pending" | "approved" | "rejected" | "paid";
+export type ClipHistoryStatusFilter = "all" | "awaiting_analytics" | "pending" | "approved" | "rejected" | "paid";
 export interface ClipHistoryFilters {
   status?: ClipHistoryStatusFilter;
   from?: Date;
@@ -617,6 +728,11 @@ const CLIP_HISTORY_LIMIT = 500;
 
 function clipHistoryStatusCondition(status: ClipHistoryStatusFilter | undefined) {
   switch (status) {
+    // "Waiting for Analytics" (Task 5 Part 3): covers a clip whether still locked (posted_at unknown,
+    // or the 7 days haven't passed) or already unlocked but the creator hasn't submitted proof yet —
+    // both are the same status value, so this one condition covers the whole bucket.
+    case "awaiting_analytics":
+      return eq(clips.status, "awaiting_analytics");
     case "pending":
       return eq(clips.status, "pending");
     case "approved":
@@ -646,6 +762,7 @@ async function filteredClipHistory(scope: SQL, filters: ClipHistoryFilters) {
   const [summaryRow] = await db
     .select({
       total: count(),
+      awaitingAnalytics: sql<number>`count(*) filter (where ${clips.status} = 'awaiting_analytics')`,
       pending: sql<number>`count(*) filter (where ${clips.status} = 'pending')`,
       approved: sql<number>`count(*) filter (where ${clips.status} = 'approved')`,
       rejected: sql<number>`count(*) filter (where ${clips.status} = 'rejected')`,
@@ -666,6 +783,7 @@ async function filteredClipHistory(scope: SQL, filters: ClipHistoryFilters) {
   return {
     summary: {
       total: Number(summaryRow.total),
+      awaitingAnalytics: Number(summaryRow.awaitingAnalytics),
       pending: Number(summaryRow.pending),
       approved: Number(summaryRow.approved),
       rejected: Number(summaryRow.rejected),

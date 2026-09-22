@@ -32,32 +32,40 @@ let small: string; // tiny budget campaign
 let n = 0;
 const tiktok = () => `https://www.tiktok.com/@u/video/${900000 + ++n}`;
 
-const tiktokBody = (views: number) => ({
+// Task 5 Part 3: every clip needs a posted_at before proof can ever be attached. Every existing test
+// predates that gate and assumes "submit, then immediately attach proof" — so the default here is a
+// post from well outside the 7-day window (30 days ago), unlocked from the moment it's created.
+// Gate-specific tests below override this explicitly (recent, or null entirely).
+const daysAgoEpochSeconds = (days: number) => Math.floor(Date.now() / 1000) - days * 86_400;
+
+const tiktokBody = (views: number, postedDaysAgo: number | null = 30) => ({
   aweme_detail: {
     statistics: { play_count: views, digg_count: 42 },
     desc: "a caption",
     video: { cover: { url_list: ["https://img.example/c.jpg"] } },
+    ...(postedDaysAgo !== null ? { create_time: daysAgoEpochSeconds(postedDaysAgo) } : {}),
   },
 });
-const okFetch = (views: number) =>
-  (async () => ({ ok: true, status: 200, json: async () => tiktokBody(views) })) as unknown as typeof fetch;
+const okFetch = (views: number, postedDaysAgo: number | null = 30) =>
+  (async () => ({ ok: true, status: 200, json: async () => tiktokBody(views, postedDaysAgo) })) as unknown as typeof fetch;
 const failFetch = (async () => ({ ok: false, status: 500, json: async () => ({}) })) as unknown as typeof fetch;
 const sleep = async () => {};
-const opts = (views = 5000) => ({ fetchImpl: okFetch(views), sleep });
+const opts = (views = 5000, postedDaysAgo: number | null = 30) => ({ fetchImpl: okFetch(views, postedDaysAgo), sleep });
 
 // Real Instagram shape: a photo/carousel has is_video: false and NO video_play_count/video_view_count at
 // all — that's the confirmation manual view entry relies on, not the views number itself being 0.
-const igBody = (isVideo: boolean, views: number, likes = 40) => ({
+const igBody = (isVideo: boolean, views: number, likes = 40, postedDaysAgo: number | null = 30) => ({
   data: {
     xdt_shortcode_media: {
       is_video: isVideo,
       ...(isVideo ? { video_play_count: views } : {}),
       edge_media_preview_like: { count: likes },
+      ...(postedDaysAgo !== null ? { taken_at_timestamp: daysAgoEpochSeconds(postedDaysAgo) } : {}),
     },
   },
 });
-const igFetch = (isVideo: boolean, views: number, likes = 40) =>
-  (async () => ({ ok: true, status: 200, json: async () => igBody(isVideo, views, likes) })) as unknown as typeof fetch;
+const igFetch = (isVideo: boolean, views: number, likes = 40, postedDaysAgo: number | null = 30) =>
+  (async () => ({ ok: true, status: 200, json: async () => igBody(isVideo, views, likes, postedDaysAgo) })) as unknown as typeof fetch;
 const igOpts = (isVideo: boolean, views = 0, likes = 40) => ({ fetchImpl: igFetch(isVideo, views, likes), sleep });
 
 async function makeClip(creator: string, campaignId = camp, views = 5000) {
@@ -139,10 +147,11 @@ describe("ScrapeCreators module", () => {
 });
 
 describe("submitClip", () => {
-  it("creates a pending clip populated from ScrapeCreators", async () => {
+  it("creates an awaiting_analytics clip populated from ScrapeCreators, including its posted_at", async () => {
     const { clip } = await svc.submitClip("c1", camp, tiktok(), opts(1234));
-    expect(clip).toMatchObject({ status: "pending", views: 1234, likes: 42, caption: "a caption", thumbnailUrl: "https://img.example/c.jpg" });
+    expect(clip).toMatchObject({ status: "awaiting_analytics", views: 1234, likes: 42, caption: "a caption", thumbnailUrl: "https://img.example/c.jpg" });
     expect(clip.lastRefreshedAt).not.toBeNull();
+    expect(clip.postedAt).not.toBeNull(); // 30 days ago per the default test fixture
   });
 
   it("rejects a duplicate URL — same creator, and a different creator", async () => {
@@ -229,6 +238,160 @@ describe("submitClip", () => {
     const { clip, statsAvailable } = await svc.submitClip("c1", camp, tiktok(), { fetchImpl: failFetch, sleep });
     expect(statsAvailable).toBe(false);
     expect(clip).toMatchObject({ views: 0, lastRefreshedAt: null });
+  });
+});
+
+describe("Task 5 Part 3: 7-day analytics-proof gate", () => {
+  async function freshCampaign(name: string) {
+    const c = (await campaignSvc.createCampaign("owner", { ...validCampaign, name })).id;
+    await db.insert(campaignCreators).values({ campaignId: c, userId: "c1" });
+    return c;
+  }
+
+  it("a post <7 days old: proof is refused, and the clip never appears in the reviewer's pending queue", async () => {
+    const campX = await freshCampaign("Gate: too young");
+    const { clip } = await svc.submitClip("c1", campX, tiktok(), opts(1000, 3)); // posted 3 days ago
+    expect(clip.status).toBe("awaiting_analytics");
+    await expect(svc.attachVideoProof("c1", campX, clip.id, "https://youtu.be/aaaaaaaaaaa")).rejects.toThrow(
+      /can't be submitted until 7 days/,
+    );
+    const [row] = await db.select().from(clips).where(eq(clips.id, clip.id));
+    expect(row).toMatchObject({ status: "awaiting_analytics", videoProofUrl: null });
+    expect((await svc.getReviewQueue("owner", campX)).pending.some((r) => r.clip.id === clip.id)).toBe(false);
+  });
+
+  it("a post >=7 days old: proof is accepted and the clip moves straight into the pending review queue", async () => {
+    const campX = await freshCampaign("Gate: old enough");
+    const { clip } = await svc.submitClip("c1", campX, tiktok(), opts(1000, 7)); // exactly at the boundary
+    const row = await svc.attachVideoProof("c1", campX, clip.id, "https://youtu.be/aaaaaaaaaaa");
+    expect(row.status).toBe("pending");
+    expect((await svc.getReviewQueue("owner", campX)).pending.some((r) => r.clip.id === clip.id)).toBe(true);
+  });
+
+  it("an unknown posted_at NEVER counts as '7 days have passed' — stays locked no matter how long ago it was submitted", async () => {
+    const campX = await freshCampaign("Gate: unknown date");
+    const { clip } = await svc.submitClip("c1", campX, tiktok(), { fetchImpl: failFetch, sleep }); // ScrapeCreators down at submission
+    expect(clip.postedAt).toBeNull();
+    await db.update(clips).set({ submittedAt: new Date(Date.now() - 365 * 86_400_000) }).where(eq(clips.id, clip.id));
+    await expect(svc.attachVideoProof("c1", campX, clip.id, "https://youtu.be/aaaaaaaaaaa")).rejects.toThrow(
+      /post date isn't available/,
+    );
+  });
+
+  it("a refresh fills in a posted_at that was missing, and never overwrites one that's already set", async () => {
+    const campX = await freshCampaign("Gate: refresh fills in date");
+    const { clip } = await svc.submitClip("c1", campX, tiktok(), { fetchImpl: failFetch, sleep });
+    expect(clip.postedAt).toBeNull();
+    await svc.refreshViews("c1", campX, clip.id, opts(2000, 10)); // now succeeds, posted 10 days ago
+    const [afterFirst] = await db.select().from(clips).where(eq(clips.id, clip.id));
+    expect(afterFirst.postedAt).not.toBeNull();
+    const capturedAt = afterFirst.postedAt;
+
+    await svc.refreshViews("c1", campX, clip.id, opts(3000, 1)); // a later, different date must never overwrite it
+    const [afterSecond] = await db.select().from(clips).where(eq(clips.id, clip.id));
+    expect(afterSecond.postedAt).toEqual(capturedAt);
+  });
+
+  it("setPostedAt: Mod/Admin/Owner only, refuses once a date is already known, and unlocks + logs the event when proof already exists", async () => {
+    const campX = await freshCampaign("Gate: manual override");
+    const { clip } = await svc.submitClip("c1", campX, tiktok(), { fetchImpl: failFetch, sleep });
+    await expect(svc.setPostedAt("c1", campX, clip.id, "2020-01-01")).rejects.toThrow(/Access denied/);
+
+    // Proof can't be attached yet (posted_at unknown) — seed it directly to simulate a creator who
+    // was told to just wait, exactly like the retroactive case: proof exists, the gate is what's stuck.
+    await db.update(clips).set({ videoProofUrl: "https://youtu.be/aaaaaaaaaaa" }).where(eq(clips.id, clip.id));
+
+    const old = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+    const row = await svc.setPostedAt("owner", campX, clip.id, old);
+    expect(row.status).toBe("pending"); // proof was already there and this date clears the gate -> unlocked immediately
+    expect(row.postedAtSetBy).toBe("owner");
+
+    const [event] = await db
+      .select()
+      .from(clipReviewEvents)
+      .where(and(eq(clipReviewEvents.clipId, clip.id), eq(clipReviewEvents.action, "set_posted_at")));
+    expect(event).toMatchObject({ actorUserId: "owner" });
+
+    await expect(svc.setPostedAt("owner", campX, clip.id, "2021-01-01")).rejects.toThrow(/already known/);
+  });
+
+  it("setPostedAt rejects a future date", async () => {
+    const campX = await freshCampaign("Gate: future date");
+    const { clip } = await svc.submitClip("c1", campX, tiktok(), { fetchImpl: failFetch, sleep });
+    const future = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+    await expect(svc.setPostedAt("owner", campX, clip.id, future)).rejects.toThrow(/future/);
+  });
+
+  describe("runAnalyticsGateSweep", () => {
+    it("silently unlocks a clip that already has proof once its window clears — no notification", async () => {
+      const campX = await freshCampaign("Sweep: silent unlock");
+      const { clip } = await svc.submitClip("c1", campX, tiktok(), opts(1000, 8)); // 8 days ago, past the gate
+      await db.update(clips).set({ videoProofUrl: "https://youtu.be/aaaaaaaaaaa" }).where(eq(clips.id, clip.id)); // proof landed directly, bypassing attachVideoProof's own unlock
+
+      const r = await svc.runAnalyticsGateSweep();
+      expect(r.transitioned).toBeGreaterThanOrEqual(1);
+      const [row] = await db.select().from(clips).where(eq(clips.id, clip.id));
+      expect(row.status).toBe("pending");
+      expect((await db.select().from(notifications).where(eq(notifications.clipId, clip.id))).length).toBe(0);
+    });
+
+    it("notifies exactly once for a clip that's unlocked but has no proof yet", async () => {
+      const campX = await freshCampaign("Sweep: notify once");
+      const { clip } = await svc.submitClip("c1", campX, tiktok(), opts(1000, 8));
+
+      const first = await svc.runAnalyticsGateSweep();
+      expect(first.notified).toBeGreaterThanOrEqual(1);
+      const notesAfterFirst = await db.select().from(notifications).where(eq(notifications.clipId, clip.id));
+      expect(notesAfterFirst).toHaveLength(1);
+      expect(notesAfterFirst[0]).toMatchObject({ userId: "c1", type: "analytics_unlocked" });
+
+      const second = await svc.runAnalyticsGateSweep();
+      const notesAfterSecond = await db.select().from(notifications).where(eq(notifications.clipId, clip.id));
+      expect(notesAfterSecond).toHaveLength(1); // not sent twice
+      expect(second.notified).toBe(0);
+    });
+
+    it("touches neither a clip still within its 7-day window nor one with an unknown posted_at", async () => {
+      const campX = await freshCampaign("Sweep: leaves locked clips alone");
+      const { clip: tooYoung } = await svc.submitClip("c1", campX, tiktok(), opts(1000, 2));
+      const { clip: unknownDate } = await svc.submitClip("c1", campX, tiktok(), { fetchImpl: failFetch, sleep });
+
+      await svc.runAnalyticsGateSweep();
+      for (const id of [tooYoung.id, unknownDate.id]) {
+        const [row] = await db.select().from(clips).where(eq(clips.id, id));
+        expect(row.status).toBe("awaiting_analytics");
+        expect((await db.select().from(notifications).where(eq(notifications.clipId, id))).length).toBe(0);
+      }
+    });
+
+    it("skips a deleted clip and a clip in a paused campaign", async () => {
+      const campX = await freshCampaign("Sweep: excludes deleted/paused");
+      const { clip: deleted } = await svc.submitClip("c1", campX, tiktok(), opts(1000, 8));
+      await svc.deleteClip("owner", campX, deleted.id);
+
+      const campY = await freshCampaign("Sweep: paused campaign");
+      const { clip: paused } = await svc.submitClip("c1", campY, tiktok(), opts(1000, 8));
+      await campaignSvc.pauseCampaign("owner", campY);
+
+      const r = await svc.runAnalyticsGateSweep();
+      expect(r.notified).toBe(0);
+      const [pausedRow] = await db.select().from(clips).where(eq(clips.id, paused.id));
+      expect(pausedRow.status).toBe("awaiting_analytics"); // untouched — a paused campaign gets no notifications
+    });
+  });
+
+  it("the History 'Waiting for Analytics' filter surfaces the whole bucket — locked and unlocked-but-unsubmitted alike", async () => {
+    const campX = await freshCampaign("History: waiting for analytics");
+    const { clip: locked } = await svc.submitClip("c1", campX, tiktok(), opts(1000, 2));
+    const { clip: unlockedNoProof } = await svc.submitClip("c1", campX, tiktok(), opts(1000, 8));
+    const { clip: unknownDate } = await svc.submitClip("c1", campX, tiktok(), { fetchImpl: failFetch, sleep });
+    const { clip: pendingClip } = await svc.submitClip("c1", campX, tiktok(), opts(1000, 30));
+    await svc.attachVideoProof("c1", campX, pendingClip.id, "https://youtu.be/aaaaaaaaaaa");
+
+    const { rows, summary } = await svc.getReviewerClipHistory("owner", campX, { status: "awaiting_analytics" });
+    expect(rows.map((r) => r.clip.id).sort()).toEqual([locked.id, unknownDate.id, unlockedNoProof.id].sort());
+    expect(summary.awaitingAnalytics).toBe(3);
+    expect(summary.pending).toBe(1);
   });
 });
 
@@ -740,6 +903,7 @@ describe("filterable clip history (getReviewerClipHistory / getMyClipHistory)", 
     const campX = await freshCampaign("History scope A");
     const campY = await freshCampaign("History scope B");
     const pending = await makeClip("c1", campX, 1000);
+    await svc.attachVideoProof("c1", campX, pending.id, "https://youtu.be/aaaaaaaaaaa"); // clears the gate -> genuinely "pending"
     const rejected = await makeClip("c1", campX, 1000);
     await svc.reviewClip("owner", campX, rejected.id, { action: "reject", reason: "spam" });
     const approvedUnpaid = await approvedWithPayout(campX, "c1", 60, 4000);
@@ -757,6 +921,7 @@ describe("filterable clip history (getReviewerClipHistory / getMyClipHistory)", 
   it("the status filter narrows the list but the summary counts stay the full-range breakdown", async () => {
     const campX = await freshCampaign("History filter tabs");
     const pending = await makeClip("c1", campX, 1000);
+    await svc.attachVideoProof("c1", campX, pending.id, "https://youtu.be/aaaaaaaaaaa"); // clears the gate -> genuinely "pending"
     const rejected = await makeClip("c1", campX, 1000);
     await svc.reviewClip("owner", campX, rejected.id, { action: "reject", reason: "spam" });
     const paid = await approvedWithPayout(campX, "c1", 60, 4000);
@@ -818,7 +983,11 @@ describe("cron helpers", () => {
     await db.insert(campaignMods).values({ campaignId: c.id, userId: "remMod", addedBy: "owner" });
     const old = await makeClip("c1", c.id);
     const fresh = await makeClip("c1", c.id);
-    await db.update(clips).set({ submittedAt: new Date(Date.now() - 8 * 86_400_000) }).where(eq(clips.id, old.id));
+    // Task 5 Part 3: a freshly-submitted clip is "awaiting_analytics", which can never have proof by
+    // construction — sendProofReminders now excludes that bucket entirely (see runAnalyticsGateSweep
+    // for its own reminder). Force this one to "pending" to simulate the (now rare/legacy) case this
+    // reminder still exists for: a pending clip that somehow still has no proof.
+    await db.update(clips).set({ submittedAt: new Date(Date.now() - 8 * 86_400_000), status: "pending" }).where(eq(clips.id, old.id));
 
     await sendProofReminders();
     const notes = await db.select().from(notifications).where(eq(notifications.type, "proof_reminder"));
@@ -853,6 +1022,9 @@ describe("an existing screenshot proof (seeded directly — Task 5 Part 2 remove
     await db
       .update(clips)
       .set({
+        // A pre-Part-3 legacy row: already "pending" with a screenshot on file, exactly the
+        // retroactive scenario Task 5 Part 3 describes (proof already existed before the gate did).
+        status: "pending",
         analyticsScreenshotPathname: "analytics-proof/seed/legacy.png",
         analyticsScreenshotSubmittedAt: new Date(),
         analyticsScreenshotViewsAtSubmit: 9000,

@@ -54,7 +54,13 @@ worked example are in docs/PRODUCT_SPEC.md → "Payout formula".
 A clip needs analytics proof — a video link (YouTube unlisted / Drive) — before an Admin/Mod can enter a
 Qualifying Audience %. Screenshot-upload proof was removed (Task 5 Part 2): a video link is the only way
 to submit NEW proof, but a clip with an already-accepted screenshot on file (Vercel Blob) keeps it and
-stays valid, no resubmission required. See docs/PRODUCT_SPEC.md → "Tier 1 audience verification" before
+stays valid, no resubmission required.
+
+**7-day gate (Task 5 Part 3):** a clip can't receive proof until 7 days have passed since the POST's own
+publish date (`clips.posted_at`, captured from ScrapeCreators — never since submission). Until then it
+sits in `awaiting_analytics`, a pre-review status invisible to the reviewer's default queue. A null
+`posted_at` never counts as "7 days have passed" either way — see `analyticsGateState` and `setPostedAt`
+for the Mod/Admin/Owner manual fallback. See docs/PRODUCT_SPEC.md → "Tier 1 audience verification" before
 changing this flow.
 
 ## Conventions

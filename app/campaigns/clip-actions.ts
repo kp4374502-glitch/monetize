@@ -76,3 +76,11 @@ export const markPaidAction = async (campaignId: string, clipId: string, _p: Act
 /** Owner/Admin only, any status — soft delete (see svc.deleteClip). The frontend confirms before submitting. */
 export const deleteClipAction = async (campaignId: string, clipId: string, _p: ActionState, _fd: FormData) =>
   run(campaignId, (u) => svc.deleteClip(u, campaignId, clipId));
+
+/**
+ * Mod/Admin/Owner only, one-time: manually confirm a clip's post date when ScrapeCreators never
+ * captured one — the only way out of an indefinitely-locked "awaiting_analytics" clip (see
+ * analyticsGateState / svc.setPostedAt). Refused server-side if a date is already known.
+ */
+export const setPostedAtAction = async (campaignId: string, clipId: string, _p: ActionState, fd: FormData) =>
+  run(campaignId, (u) => svc.setPostedAt(u, campaignId, clipId, text(fd, "postedAt")));

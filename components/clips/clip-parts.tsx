@@ -11,7 +11,13 @@ export const money = (v: string | number | null) =>
 
 export function StatusBadge({ clip }: { clip: ClipRow }) {
   const label = clip.paidStatus === "paid" ? "paid" : clip.status;
-  return <Badge status={label} data-testid="clip-status" />;
+  // "capitalize" only affects the first letter of the whole string, so the raw enum value would
+  // render as "Awaiting_analytics" — spell it out instead.
+  return (
+    <Badge status={label} data-testid="clip-status">
+      {label === "awaiting_analytics" ? "Awaiting analytics" : undefined}
+    </Badge>
+  );
 }
 
 export function Thumb({ clip }: { clip: ClipRow }) {

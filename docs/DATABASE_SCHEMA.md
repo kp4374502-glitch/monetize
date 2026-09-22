@@ -72,7 +72,8 @@ Every table holding campaign-specific data carries a `campaign_id` — this is t
   see PRODUCT_SPEC.md "Manual view entry"), `manual_views_set_by` (fk users, nullable),
   `manual_views_set_at` (nullable). Wins over `views` everywhere views matter for payout/display; a
   refresh never touches these three columns.
-- `status` (pending | approved | rejected)
+- `status` (pending | approved | rejected | awaiting_analytics — the last is Task 5 Part 3's pre-review
+  gate, not a terminal status; see PRODUCT_SPEC.md "Tier 1 audience verification")
 - `rejection_reason` (nullable, shown to the creator)
 - `qualifying_audience_pct` (nullable, entered by Admin/Mod)
 - `qualifying_pct_set_by` (fk users)
@@ -87,13 +88,20 @@ Every table holding campaign-specific data carries a `campaign_id` — this is t
 - `deleted_at` (nullable), `deleted_by` (fk users, nullable) — soft delete, Owner/Admin only, any
   status. Excluded from every list/query app-wide; never a hard `DELETE` (see PRODUCT_SPEC.md
   "Clip deletion"). Payout/audit data on the row itself is untouched.
+- `posted_at` (nullable; Task 5 Part 3) — the post's own real publish date, captured from
+  ScrapeCreators at submission (filled in later on a refresh if it was missing then); never
+  overwritten once set. `posted_at_set_by` (fk users, nullable) — non-null only if a Mod/Admin/Owner
+  set it manually because ScrapeCreators never returned one (see `setPostedAt`; a null `posted_at`
+  never counts as "7 days have passed" either way).
+- `analytics_unlock_notified_at` (nullable) — cron dedup for the "you can now submit proof"
+  notification, fired at most once per clip.
 
 ## clip\_review\_events
 
 - `id` (pk)
 - `clip_id` (fk clips)
 - `actor_user_id` (fk users)
-- `action` (approve | reject | delete)
+- `action` (approve | reject | delete | set_posted_at)
 - `reason` (nullable; for a delete, records the clip's prior status)
 - `created_at`
 
@@ -104,7 +112,7 @@ Supports multi-round review (a clip can be approved, later reverted, re-approved
 - `id` (pk)
 - `user_id` (fk users, recipient)
 - `campaign_id`, `clip_id` (nullable)
-- `type` (clip\_approved | clip\_rejected | payout\_paid | proof\_reminder | budget\_low)
+- `type` (clip\_approved | clip\_rejected | payout\_paid | proof\_reminder | budget\_low | analytics\_unlocked)
 - `message`
 - `read` (boolean)
 - `created_at`

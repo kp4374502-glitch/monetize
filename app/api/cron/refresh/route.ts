@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
-import { refreshAllClips } from "@/lib/clips/service";
+import { refreshAllClips, runAnalyticsGateSweep } from "@/lib/clips/service";
 import { sendProofReminders } from "@/lib/notifications";
 
 export const maxDuration = 300;
@@ -14,7 +14,11 @@ function authorized(req: Request): boolean {
   return given.length === expected.length && timingSafeEqual(given, expected);
 }
 
-/** Vercel Cron sends `Authorization: Bearer $CRON_SECRET`. Daily: refresh view counts + proof reminders. */
+/**
+ * Vercel Cron sends `Authorization: Bearer $CRON_SECRET`. Daily: refresh view counts, proof
+ * reminders, and the Task 5 Part 3 analytics-gate sweep (unlock notifications + silently moving a
+ * clip that already has proof into "pending" once its 7-day window clears).
+ */
 export async function GET(req: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET is not configured" }, { status: 500 });
@@ -23,5 +27,6 @@ export async function GET(req: Request) {
 
   const refresh = await refreshAllClips();
   const remindersSent = await sendProofReminders();
-  return NextResponse.json({ refresh, remindersSent });
+  const analyticsGate = await runAnalyticsGateSweep();
+  return NextResponse.json({ refresh, remindersSent, analyticsGate });
 }

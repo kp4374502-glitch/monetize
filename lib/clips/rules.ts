@@ -116,3 +116,31 @@ export const effectiveViews = (c: { views: number; manualViews: number | null })
  */
 export const canSetManualViews = (c: { platform: string; isVideo: boolean | null }): boolean =>
   c.platform === "instagram" && c.isVideo === false;
+
+/**
+ * Task 5 Part 3: a creator can't submit Analytics proof until 7 days have passed since the POST's
+ * own publish date (posted_at) — not since it was submitted to Monetize. Only relevant while a clip
+ * is still "awaiting_analytics"; once proof has been attached the clip has moved to "pending" and
+ * this no longer applies (proof can always be replaced there, unaffected).
+ *
+ * A null posted_at NEVER counts as "7 days have passed" either way — it stays locked until a
+ * Mod/Admin/Owner manually confirms the date (setPostedAt). Guessing or defaulting here would risk
+ * unlocking (or permanently blocking) a clip based on data that was never actually confirmed.
+ */
+export const ANALYTICS_GATE_DAYS = 7;
+
+export type AnalyticsGateState =
+  | { locked: false }
+  | { locked: true; reason: "unknown_posted_at"; unlocksAt: null }
+  | { locked: true; reason: "not_yet_7_days"; unlocksAt: Date };
+
+export function analyticsGateState(
+  clip: { status: string; postedAt: Date | null },
+  now: Date = new Date(),
+): AnalyticsGateState {
+  if (clip.status !== "awaiting_analytics") return { locked: false };
+  if (clip.postedAt === null) return { locked: true, reason: "unknown_posted_at", unlocksAt: null };
+  const unlocksAt = new Date(clip.postedAt.getTime() + ANALYTICS_GATE_DAYS * 24 * 60 * 60 * 1000);
+  if (now < unlocksAt) return { locked: true, reason: "not_yet_7_days", unlocksAt };
+  return { locked: false };
+}

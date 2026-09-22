@@ -36,6 +36,10 @@ export const PROOF_REMINDER_AFTER_DAYS = 7;
  * Reviewer reminder: a non-rejected clip in an active campaign still has no analytics proof 7 days
  * after submission. Recipients are that campaign's Mods plus its owner (Admins are platform-wide,
  * so they are not pinged per clip). Each clip is reminded once (video_proof_reminder_sent_at).
+ *
+ * Excludes "awaiting_analytics" clips (Task 5 Part 3): those can never have proof yet by
+ * construction (attaching proof is what moves a clip OUT of that status), so reminding a reviewer
+ * about one would be pure noise, not a real gap — runAnalyticsGateSweep handles that bucket instead.
  */
 export async function sendProofReminders(now: Date = new Date()): Promise<number> {
   const cutoff = new Date(now.getTime() - PROOF_REMINDER_AFTER_DAYS * 24 * 60 * 60 * 1000);
@@ -50,6 +54,7 @@ export async function sendProofReminders(now: Date = new Date()): Promise<number
         isNull(clips.videoProofReminderSentAt),
         isNull(clips.deletedAt),
         ne(clips.status, "rejected"),
+        ne(clips.status, "awaiting_analytics"),
         eq(campaigns.status, "active"),
         lte(clips.submittedAt, cutoff),
       ),
