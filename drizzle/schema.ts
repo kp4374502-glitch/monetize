@@ -213,11 +213,12 @@ export const clips = pgTable(
     deletedBy: text("deleted_by").references(() => users.id),
   },
   (t) => ({
-    // Partial (not table-level unique): a deleted clip's URL frees up for resubmission, since it's
-    // no longer "in" the campaign for any practical purpose — see lib/clips/service.ts deleteClip.
+    // Partial (not table-level unique): a deleted clip's URL frees up for resubmission — EXCEPT a
+    // clip that was ever paid, which keeps its URL permanently blocked even after deletion, so a
+    // paid-then-deleted clip can never be resubmitted and re-earned. See lib/clips/service.ts deleteClip.
     noDuplicateUrlPerCampaign: uniqueIndex("clips_campaign_url_unique")
       .on(t.campaignId, t.url)
-      .where(sql`${t.deletedAt} is null`),
+      .where(sql`${t.deletedAt} is null or ${t.paidStatus} = 'paid'`),
     reviewQueueIdx: index("clips_campaign_status_idx").on(t.campaignId, t.status),
     dailyLimitIdx: index("clips_campaign_creator_submitted_idx").on(
       t.campaignId,

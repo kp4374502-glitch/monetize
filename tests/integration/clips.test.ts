@@ -599,7 +599,7 @@ describe("deleteClip (soft delete — Owner/Admin only)", () => {
     expect(c1After.earned).toBe("0.00"); // every clip (including the paid one) is now deleted, so nothing is left to count
   });
 
-  it("frees the clip's URL up for resubmission — by the same creator, or a different one", async () => {
+  it("frees a PENDING (never-paid) clip's URL up for resubmission — by the same creator, or a different one", async () => {
     const campX = await freshCampaign("Delete frees URL");
     const url = tiktok();
     const original = (await svc.submitClip("c1", campX, url, opts())).clip;
@@ -610,6 +610,30 @@ describe("deleteClip (soft delete — Owner/Admin only)", () => {
     await svc.deleteClip("owner", campX, resubmitted.clip.id);
     const byOther = await svc.submitClip("c2", campX, url, opts()); // different creator, after a second delete
     expect(byOther.clip.deletedAt).toBeNull();
+  });
+
+  it("keeps a PAID-then-deleted clip's URL permanently blocked — it can never be resubmitted and re-earned", async () => {
+    const campX = await freshCampaign("Delete keeps paid URL blocked");
+    const url = tiktok();
+    const { clip: submitted } = await svc.submitClip("c1", campX, url, opts(4000));
+    await svc.attachVideoProof("c1", campX, submitted.id, "https://youtu.be/aaaaaaaaaaa");
+    await svc.setQualifyingAudiencePct("owner", campX, submitted.id, 60);
+    await svc.reviewClip("owner", campX, submitted.id, { action: "approve" });
+    await svc.markPaid("owner", campX, submitted.id);
+    await svc.deleteClip("owner", campX, submitted.id);
+
+    // same creator, exact same link — blocked, and correctly attributed as their own
+    await expect(svc.submitClip("c1", campX, url, opts())).rejects.toThrow(
+      "You've already submitted this link to this campaign.",
+    );
+    // a different creator trying the same link — blocked, and never reveals who it belongs to
+    const other = await svc.submitClip("c2", campX, url, opts()).catch((e: Error) => e.message);
+    expect(other).toBe("This link has already been submitted to this campaign by another creator and can't be added again.");
+    expect(other).not.toMatch(/c1/);
+
+    // the deleted, paid clip itself is untouched by any of these attempts
+    const [row] = await db.select().from(clips).where(eq(clips.id, submitted.id));
+    expect(row).toMatchObject({ paidStatus: "paid", deletedAt: expect.anything() });
   });
 
   it("deleting an already-deleted clip, or one from another campaign, is refused as \"not found\"", async () => {

@@ -150,11 +150,13 @@ export async function submitClip(actorId: string, campaignId: string, rawUrl: st
     return { clip: row, statsAvailable: meta.ok };
   } catch (e) {
     if (String((e as { cause?: { code?: string }; code?: string })?.cause?.code ?? (e as { code?: string })?.code) === "23505") {
-      // Lost a race with another insert of the same URL: work out whose it was so the wording is accurate.
+      // Lost a race with another insert of the same URL (or it's blocked by a paid-then-deleted
+      // clip — the partial index still catches those): work out whose it was, deleted or not, so
+      // the wording is accurate.
       const [existing] = await db
         .select({ creatorUserId: clips.creatorUserId })
         .from(clips)
-        .where(and(eq(clips.campaignId, campaignId), eq(clips.url, parsed.url), isNull(clips.deletedAt)))
+        .where(and(eq(clips.campaignId, campaignId), eq(clips.url, parsed.url)))
         .limit(1);
       throw new Error(existing?.creatorUserId === actorId ? OWN_DUPLICATE_MESSAGE : OTHER_DUPLICATE_MESSAGE);
     }

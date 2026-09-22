@@ -61,8 +61,9 @@ Every table holding campaign-specific data carries a `campaign_id` — this is t
 - `campaign_id` (fk campaigns)
 - `creator_user_id` (fk users)
 - `platform` (tiktok | instagram | youtube)
-- `url`, partial `unique(campaign_id, url) where deleted_at is null` — blocks exact-duplicate
-  submission by the same creator, but frees up once the clip is soft-deleted (see below)
+- `url`, partial `unique(campaign_id, url) where deleted_at is null or paid_status = 'paid'` — blocks
+  exact-duplicate submission by the same creator; frees up once the clip is soft-deleted, UNLESS it
+  was ever paid, in which case the URL stays blocked forever (see below)
 - `thumbnail_url`, `caption`
 - `views`, `likes`, `last_refreshed_at` (kept in sync via ScrapeCreators)
 - `is_video` (nullable bool; ScrapeCreators' own confirmation, Instagram-specific — `false` means a

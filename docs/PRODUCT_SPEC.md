@@ -291,7 +291,9 @@ the attempt regardless. Works on a clip in **any** status: pending, approved-unp
 - A `clip_review_events` row is logged for the deletion (actor, timestamp, and the clip's prior status),
   same as an approve/reject decision.
 - **The deleted clip's URL frees up** for resubmission — by the same creator or a different one — since
-  the uniqueness check on `(campaign_id, url)` only applies to non-deleted rows.
+  the uniqueness check on `(campaign_id, url)` only applies to non-deleted rows. **Exception:** a clip
+  that was ever **paid** keeps its URL permanently blocked even after deletion, so it can never be
+  resubmitted and re-earned a second time.
 - The frontend confirms before submitting a delete; there's no "undo" once it's confirmed.
 
 ## Notifications
