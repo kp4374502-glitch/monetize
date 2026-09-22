@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
+import { eq } from "drizzle-orm";
 import { createTestDb, validCampaign } from "./helpers";
 import { users, campaignMods, campaignCreators, clips } from "../../drizzle/schema";
 
@@ -30,7 +31,6 @@ vi.mock("@/lib/clips/proof-store", () => ({
 }));
 
 import * as campaignSvc from "@/lib/campaigns/service";
-import * as svc from "@/lib/clips/service";
 import { GET } from "@/app/api/proof/[campaignId]/[clipId]/route";
 
 const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 9, 8, 7, 6, 5, 4, 3, 2]);
@@ -68,7 +68,12 @@ beforeAll(async () => {
     .insert(clips)
     .values({ campaignId: camp, creatorUserId: "c1", platform: "tiktok", url: "https://www.tiktok.com/@u/video/1", views: 500 })
     .returning({ id: clips.id });
-  await svc.attachAnalyticsScreenshot("c1", camp, clipId, { bytes: PNG });
+  // Task 5 Part 2 removed screenshot submission, but existing screenshots must keep serving — seed
+  // one directly (as if it had been accepted before the removal) instead of through the removed
+  // svc.attachAnalyticsScreenshot.
+  const pathname = `analytics-proof/${camp}/${clipId}/seed.png`;
+  holder.blobs.set(pathname, { bytes: PNG, contentType: "image/png" });
+  await db.update(clips).set({ analyticsScreenshotPathname: pathname }).where(eq(clips.id, clipId));
 });
 
 describe("GET /api/proof/[campaignId]/[clipId]", () => {

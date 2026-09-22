@@ -1,6 +1,5 @@
 import { and, asc, desc, eq, inArray, isNull, like, sql, gte, lte, count, ne, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { db } from "../db/client";
 import { campaigns, campaignCreators, clipReviewEvents, clips, users } from "../../drizzle/schema";
@@ -8,12 +7,9 @@ import { getRoleForCampaign, requireRole } from "../auth/roles";
 import { fetchClipMetadata, type FetchOptions } from "../scrapecreators";
 import { notify } from "../notifications";
 import { isValidProofUrl, parseClipUrl } from "./url";
-import { validateScreenshot } from "./image";
 import { vercelBlobStore, type ProofImageStore } from "./proof-store";
 import {
-  SCREENSHOT_VIEWS_LIMIT,
   canSetManualViews,
-  canSubmitScreenshot,
   effectiveViews,
   hasAnalyticsProof,
   computeEconomics,
@@ -206,67 +202,12 @@ export async function attachVideoProof(
 }
 
 /**
- * Creator-only, own clips: submit an analytics SCREENSHOT as proof instead of a video link.
- *
- * The rule (docs/PRODUCT_SPEC.md -> "Tier 1 audience verification"): only while the clip has FEWER than
- * 10,000 views. At 10,000 or more the creator must use a video link. This is checked here, at submission
- * time, against the clip's stored view count — and it is the ONLY place the limit is enforced. An accepted
- * screenshot is never re-checked, so it stays valid when the clip's views later pass 10,000. The view count
- * at submission is recorded as evidence.
- */
-export async function attachAnalyticsScreenshot(
-  actorId: string,
-  campaignId: string,
-  clipId: string,
-  file: { bytes: Uint8Array },
-  store: ProofImageStore = vercelBlobStore,
-) {
-  const [clip] = await db
-    .select()
-    .from(clips)
-    .where(and(eq(clips.id, clipId), eq(clips.campaignId, campaignId), eq(clips.creatorUserId, actorId), isNull(clips.deletedAt)))
-    .limit(1);
-  if (!clip) throw new Error("Clip not found.");
-  if (clip.paidStatus === "paid") throw new Error("This clip has already been paid.");
-  const views = effectiveViews(clip);
-  if (!canSubmitScreenshot(views)) {
-    throw new Error(
-      `Screenshots are only accepted for clips with fewer than ${SCREENSHOT_VIEWS_LIMIT.toLocaleString("en-US")} views. This clip has ${views.toLocaleString("en-US")}, so please submit a video link instead.`,
-    );
-  }
-  const kind = validateScreenshot(file.bytes);
-
-  const campaign = await loadCampaign(campaignId);
-  // Random UUID in the path: unguessable, and a re-upload never overwrites the previous one.
-  const pathname = `analytics-proof/${campaignId}/${clipId}/${randomUUID()}.${kind.ext}`;
-  await store.put(pathname, file.bytes, kind.contentType);
-
-  const next = { ...clip, videoProofUrl: null, analyticsScreenshotPathname: pathname };
-  let row: typeof clips.$inferSelect;
-  try {
-    [row] = await db
-      .update(clips)
-      .set({
-        analyticsScreenshotPathname: pathname,
-        analyticsScreenshotSubmittedAt: new Date(),
-        analyticsScreenshotViewsAtSubmit: views,
-        videoProofUrl: null,
-        videoProofSubmittedAt: null,
-        ...economicsColumns(next, campaign),
-      })
-      .where(and(eq(clips.id, clipId), eq(clips.campaignId, campaignId)))
-      .returning();
-  } catch (e) {
-    await store.del(pathname).catch(() => {}); // don't leave an orphaned upload behind
-    throw e;
-  }
-  if (clip.analyticsScreenshotPathname) await store.del(clip.analyticsScreenshotPathname).catch(() => {});
-  return row;
-}
-
-/**
  * Stream a clip's screenshot to someone allowed to see it: the creator who owns the clip, or a Mod/Admin/
  * Owner of THIS campaign. Anyone else gets "not found" (indistinguishable from a clip with no screenshot).
+ *
+ * Task 5 Part 2: NEW screenshot submission has been removed — a video link is now the only proof method
+ * going forward. This read path (and the underlying Blob storage) stays, so an already-accepted
+ * screenshot on an existing clip keeps working and displaying exactly as before; nothing invalidates it.
  */
 export async function getProofImage(
   actorId: string,

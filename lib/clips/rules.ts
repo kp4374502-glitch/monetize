@@ -89,17 +89,12 @@ export function startOfUtcDay(now: Date): Date {
 }
 
 /**
- * Analytics-proof screenshots are only ACCEPTED for clips with FEWER than this many views (docs/PRODUCT_SPEC.md
- * -> "Tier 1 audience verification"). At or above it, only a video link may be submitted. This governs new
- * submissions only: a screenshot accepted while the clip was under the limit stays valid forever, even after
- * the clip's views grow past it. Deliberately a platform-wide constant, not a per-campaign setting.
+ * A clip has analytics proof if it carries a video link OR an accepted screenshot.
+ *
+ * Task 5 Part 2: new screenshot submission has been removed — a video link is now the only proof
+ * method going forward. An already-accepted screenshot on an existing clip still counts here and
+ * stays valid as-is; this is why the check remains "either", not just the video link.
  */
-export const SCREENSHOT_VIEWS_LIMIT = 10_000;
-
-/** May the creator submit a screenshot for a clip that currently has this many views? Strictly fewer than 10,000. */
-export const canSubmitScreenshot = (views: number): boolean => views < SCREENSHOT_VIEWS_LIMIT;
-
-/** A clip has analytics proof if it carries a video link OR an accepted screenshot. */
 export const hasAnalyticsProof = (c: {
   videoProofUrl: string | null;
   analyticsScreenshotPathname?: string | null;

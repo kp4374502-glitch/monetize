@@ -387,14 +387,6 @@ describe("setManualViews (Instagram photo/carousel posts)", () => {
     expect(row).toMatchObject({ views: 0, manualViews: 10000 });
   });
 
-  it("a manual view count also governs screenshot-proof eligibility (the 10,000-view threshold), same as an auto-fetched count", async () => {
-    const c = await igCampaign();
-    const clip = await igClip(c, false);
-    await svc.setManualViews("owner", c, clip.id, "10000");
-    await expect(
-      svc.attachAnalyticsScreenshot("c1", c, clip.id, { bytes: Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]) }),
-    ).rejects.toThrow(/fewer than 10,000/);
-  });
 });
 
 describe("reviewClip", () => {
@@ -836,6 +828,45 @@ describe("cron helpers", () => {
 
     await sendProofReminders(); // idempotent
     expect((await db.select().from(notifications).where(eq(notifications.clipId, old.id))).length).toBe(2);
+  });
+
+  it("does not remind about an old clip that already has an existing screenshot on file (Task 5 Part 2: submission is removed, but an existing one still counts as proof)", async () => {
+    const c = await campaignSvc.createCampaign("owner", { ...validCampaign, name: "Reminders (screenshot)" });
+    await db.insert(campaignCreators).values({ campaignId: c.id, userId: "c1" });
+    const old = await makeClip("c1", c.id);
+    await db
+      .update(clips)
+      .set({
+        submittedAt: new Date(Date.now() - 8 * 86_400_000),
+        analyticsScreenshotPathname: "analytics-proof/seed/existing.png", // seeded directly: submission is gone, but old data must still be honored
+      })
+      .where(eq(clips.id, old.id));
+
+    await sendProofReminders();
+    expect((await db.select().from(notifications).where(eq(notifications.clipId, old.id))).length).toBe(0);
+  });
+});
+
+describe("an existing screenshot proof (seeded directly — Task 5 Part 2 removed new submission, but an already-accepted one keeps working end to end)", () => {
+  it("still counts as proof, can be approved, and can be paid, even after its views grow well past 10,000", async () => {
+    const clip = await makeClip("c1", camp, 9000);
+    await db
+      .update(clips)
+      .set({
+        analyticsScreenshotPathname: "analytics-proof/seed/legacy.png",
+        analyticsScreenshotSubmittedAt: new Date(),
+        analyticsScreenshotViewsAtSubmit: 9000,
+      })
+      .where(eq(clips.id, clip.id));
+    expect(await svc.getReviewQueue("owner", camp).then((q) => q.pending.some((r) => r.clip.id === clip.id))).toBe(true);
+
+    await svc.setQualifyingAudiencePct("owner", camp, clip.id, 50); // proof already present -> allowed
+    await svc.refreshViews("owner", camp, clip.id, opts(500_000)); // views explode well past 10,000
+    await svc.reviewClip("owner", camp, clip.id, { action: "approve" });
+    await svc.markPaid("owner", camp, clip.id);
+
+    const [row] = await db.select().from(clips).where(eq(clips.id, clip.id));
+    expect(row).toMatchObject({ paidStatus: "paid", analyticsScreenshotPathname: "analytics-proof/seed/legacy.png" });
   });
 });
 

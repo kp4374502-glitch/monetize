@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { ZodError } from "zod";
 import { requireUserId } from "@/lib/auth/ensure-user";
 import * as svc from "@/lib/clips/service";
-import { MAX_SCREENSHOT_BYTES } from "@/lib/clips/image";
 import type { ActionState } from "@/components/action-form";
 
 /**
@@ -34,17 +33,9 @@ export const submitClipAction = async (campaignId: string, _p: ActionState, fd: 
 export const attachProofAction = async (campaignId: string, clipId: string, _p: ActionState, fd: FormData) =>
   run(campaignId, (u) => svc.attachVideoProof(u, campaignId, clipId, text(fd, "proofUrl")));
 
-/**
- * Upload an analytics screenshot (accepted only while the clip has fewer than 10,000 views — enforced in
- * the service, which re-checks everything; the size check here just fails fast before reading the file).
- */
-export const attachScreenshotAction = async (campaignId: string, clipId: string, _p: ActionState, fd: FormData) =>
-  run(campaignId, async (u) => {
-    const file = fd.get("screenshot");
-    if (!(file instanceof File) || file.size === 0) throw new Error("Please choose a screenshot image first.");
-    if (file.size > MAX_SCREENSHOT_BYTES) throw new Error("That image is too large (4 MB maximum). Try a smaller screenshot.");
-    await svc.attachAnalyticsScreenshot(u, campaignId, clipId, { bytes: new Uint8Array(await file.arrayBuffer()) });
-  });
+// Task 5 Part 2: attachScreenshotAction (new screenshot upload) has been removed — a video link
+// (attachProofAction, above) is now the only proof method going forward. An already-accepted
+// screenshot on an existing clip still displays and counts as valid; see hasAnalyticsProof.
 
 export const refreshViewsAction = async (campaignId: string, clipId: string, _p: ActionState, _fd: FormData) =>
   run(campaignId, (u) => svc.refreshViews(u, campaignId, clipId));

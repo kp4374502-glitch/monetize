@@ -224,15 +224,11 @@ their proof video — instead of relying on the (nonexistent) automatic number. 
 
 TikTok does not expose per-video audience-demographic data to anyone but the account owner, so this step is manual and human-reviewed — the following proof is **required** for every clip before it can earn anything:
 
-1. **Analytics proof, 7 days later** — filed 7 days after the clip was posted, in one of two forms depending on the clip's current view count:
-   - **Video link (always available):** an unlisted YouTube or Drive video link of their TikTok analytics. Recording must start from the home screen of the creator's phone or computer, show 2–3 seconds of the post itself playing, then navigate into that post's analytics and show all analytics data before ending.
-   - **Screenshot upload (only while the clip has fewer than 10,000 views):** a real image file (PNG, JPEG or WebP, up to 4 MB) of the full audience analytics, stored privately in Vercel Blob.
+1. **Analytics proof, 7 days later** — filed 7 days after the clip was posted:
+   - **Video link (the only way to submit NEW proof):** an unlisted YouTube or Drive video link of their TikTok analytics. Recording must start from the home screen of the creator's phone or computer, show 2–3 seconds of the post itself playing, then navigate into that post's analytics and show all analytics data before ending.
+   - **Screenshot upload has been removed** (Task 5 Part 2) — a creator can no longer submit a new screenshot, regardless of the clip's view count. **Existing clips that already have an accepted screenshot on file are unaffected:** it stays valid proof exactly as before (no resubmission required, no expiry), the reviewer can still enter a Qualifying Audience % against it, and the clip can still be approved and paid. Reviewers still see it **inline** in the review queue (private: only the clip's own creator and the Mod/Admin/Owner of that campaign can view it), served from Vercel Blob, which stays in place purely to keep serving these — nothing writes to it anymore.
 
-   **The 10,000-view rule.** A clip with **fewer than 10,000** views may use either option. A clip with **10,000 or more** views may use the video link only — screenshot uploads are refused. The check uses the clip's stored view count at the moment of upload (exactly 10,000 is *not* eligible).
-
-   **Not retroactive.** A screenshot validly accepted while the clip was under 10,000 views **stays valid** if the clip's views later pass 10,000: it still counts as proof, the reviewer can still enter a Qualifying Audience %, and the clip can still be approved and paid. The threshold only governs what a creator may submit going forward. Once over 10,000 views, a creator can no longer upload a new or replacement screenshot — replacing the proof then requires a video link. The views-at-submission and time are recorded on the clip as evidence.
-
-   A clip holds one proof at a time: submitting a video link removes a previous screenshot, and uploading a screenshot replaces a previous link. Reviewers see a submitted screenshot **inline** in the review queue (with a click-through to full size), not just a link. Screenshots are private: only the clip's own creator and the Mod/Admin/Owner of that campaign can view them.
+   A clip holds one proof at a time: submitting a video link on a clip that still has an old screenshot removes it. There is no way to go the other direction (screenshot replacing a video link) any more.
 
 An Admin or Mod reads the proof and manually enters the **Qualifying Audience %** on the clip — this is never self-reported by the creator directly into a number field. Until the proof is attached and a % is entered, the clip shows a blocking warning and earns $0, even if it has cleared the view minimum.
 

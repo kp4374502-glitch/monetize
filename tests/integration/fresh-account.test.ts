@@ -117,7 +117,6 @@ describe("a brand-new account (users row with no roles) and one that never logge
       // creator-only actions need a campaign_creators row they don't have
       await denied(clipSvc.submitClip(who, camp, "https://www.tiktok.com/@u/video/222"));
       await denied(clipSvc.attachVideoProof(who, camp, clipId, "https://youtu.be/aaaaaaaaaaa"));
-      await denied(clipSvc.attachAnalyticsScreenshot(who, camp, clipId, { bytes: new Uint8Array(64) }));
       await denied(clipSvc.getProofImage(who, camp, clipId));
       // platform-Owner-only brand queue
       await denied(brand.listBrandRequests(who));

@@ -4,8 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Callout, Card, SectionHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { attachProofAction, refreshViewsAction, submitClipAction } from "@/app/campaigns/clip-actions";
-import { SCREENSHOT_VIEWS_LIMIT, canSubmitScreenshot, effectiveViews, hasAnalyticsProof } from "@/lib/clips/rules";
-import { ScreenshotUpload } from "./screenshot-upload";
+import { hasAnalyticsProof } from "@/lib/clips/rules";
 import { StatusBadge, Stats, Thumb, money, type ClipRow } from "./clip-parts";
 
 /** Creator view: add a clip, and see ONLY their own clips. No payout formula or budget shown. */
@@ -125,29 +124,8 @@ export function CreatorClips({ campaignId, clips, viewMinimum }: { campaignId: s
                         <Button type="submit" variant="ghost" size="sm">Refresh views now</Button>
                       </ActionForm>
                     </div>
-
-                    {c.paidStatus === "unpaid" && (
-                      <div data-testid="screenshot-option" className="space-y-1.5 border-t border-subtle pt-2.5">
-                        {canSubmitScreenshot(effectiveViews(c)) ? (
-                          <>
-                            <p className="text-xs text-text-secondary">
-                              Or, since this clip has under {SCREENSHOT_VIEWS_LIMIT.toLocaleString("en-US")} views, you can upload a screenshot
-                              of your full audience analytics instead of a video.
-                            </p>
-                            <ScreenshotUpload campaignId={campaignId} clipId={c.id} replacing={!!c.analyticsScreenshotPathname} />
-                          </>
-                        ) : c.analyticsScreenshotPathname ? (
-                          <p className="text-xs text-text-secondary">
-                            Your screenshot was accepted while this clip was under {SCREENSHOT_VIEWS_LIMIT.toLocaleString("en-US")} views and
-                            stays valid. To replace it, submit a video link above.
-                          </p>
-                        ) : (
-                          <p className="text-xs text-text-secondary">
-                            This clip has {SCREENSHOT_VIEWS_LIMIT.toLocaleString("en-US")}+ views, so analytics proof must be a video link.
-                          </p>
-                        )}
-                      </div>
-                    )}
+                    {/* Task 5 Part 2: screenshot upload removed — a video link is the only new-proof method now.
+                       An existing screenshot (rendered above via hasAnalyticsProof) still counts and stays valid. */}
                   </div>
                 </div>
               </Card>
