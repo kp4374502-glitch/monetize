@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, like, sql, gte, count, ne } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, like, sql, gte, lte, count, ne, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -624,6 +624,90 @@ export async function getClipHistory(actorId: string, campaignId: string) {
     rejected: rejectedRows.map((r) => ({ ...r, rejectedBy: rejecters.get(r.clip.id) ?? null })),
     totals: { paid: Number(totals.paid).toFixed(2), owed: Number(totals.owed).toFixed(2) },
   };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Filterable clip history (Mod/Admin/Owner and creator's own) — a broader, filtered view over the
+// same clips rows getReviewQueue/getClipHistory already read, not a separate data model.
+// ---------------------------------------------------------------------------------------------
+
+export type ClipHistoryStatusFilter = "all" | "pending" | "approved" | "rejected" | "paid";
+export interface ClipHistoryFilters {
+  status?: ClipHistoryStatusFilter;
+  from?: Date;
+  to?: Date;
+}
+const CLIP_HISTORY_LIMIT = 500;
+
+function clipHistoryStatusCondition(status: ClipHistoryStatusFilter | undefined) {
+  switch (status) {
+    case "pending":
+      return eq(clips.status, "pending");
+    case "approved":
+      return eq(clips.status, "approved");
+    case "rejected":
+      return eq(clips.status, "rejected");
+    case "paid":
+      // Only an approved clip can be paid, but this filters on paid_status directly (not status)
+      // so it reads naturally as its own tab, same as the others.
+      return eq(clips.paidStatus, "paid");
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Shared core: `scope` is the caller's already-checked tenant/creator condition. The summary counts
+ * are for the DATE RANGE alone (every status at once), so switching the status tab narrows the list
+ * below without the summary bar itself jumping around; the list applies both the range and the tab.
+ */
+async function filteredClipHistory(scope: SQL, filters: ClipHistoryFilters) {
+  const rangeParts = [scope];
+  if (filters.from) rangeParts.push(gte(clips.submittedAt, filters.from));
+  if (filters.to) rangeParts.push(lte(clips.submittedAt, filters.to));
+  const dateScope = rangeParts.length > 1 ? and(...rangeParts) : scope;
+
+  const [summaryRow] = await db
+    .select({
+      total: count(),
+      pending: sql<number>`count(*) filter (where ${clips.status} = 'pending')`,
+      approved: sql<number>`count(*) filter (where ${clips.status} = 'approved')`,
+      rejected: sql<number>`count(*) filter (where ${clips.status} = 'rejected')`,
+      paid: sql<number>`count(*) filter (where ${clips.paidStatus} = 'paid')`,
+    })
+    .from(clips)
+    .where(dateScope);
+
+  const statusCondition = clipHistoryStatusCondition(filters.status);
+  const rows = await db
+    .select({ clip: clips, creatorUsername: users.username })
+    .from(clips)
+    .innerJoin(users, eq(users.id, clips.creatorUserId))
+    .where(statusCondition ? and(dateScope, statusCondition) : dateScope)
+    .orderBy(desc(clips.submittedAt))
+    .limit(CLIP_HISTORY_LIMIT);
+
+  return {
+    summary: {
+      total: Number(summaryRow.total),
+      pending: Number(summaryRow.pending),
+      approved: Number(summaryRow.approved),
+      rejected: Number(summaryRow.rejected),
+      paid: Number(summaryRow.paid),
+    },
+    rows,
+  };
+}
+
+/** Every clip ever submitted to THIS campaign, filtered — Mod/Admin/Owner only. */
+export async function getReviewerClipHistory(actorId: string, campaignId: string, filters: ClipHistoryFilters = {}) {
+  await requireRole(actorId, campaignId, "mod");
+  return filteredClipHistory(eq(clips.campaignId, campaignId), filters);
+}
+
+/** A creator's own submissions to THIS campaign, filtered — never anyone else's (same scoping as getCreatorClips). */
+export async function getMyClipHistory(actorId: string, campaignId: string, filters: ClipHistoryFilters = {}) {
+  return filteredClipHistory(and(eq(clips.campaignId, campaignId), eq(clips.creatorUserId, actorId))!, filters);
 }
 
 const ROSTER_LIMIT = 500;

@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUserId } from "@/lib/auth/ensure-user";
 import { getCampaignForUser, getRoleForCampaign } from "@/lib/auth/roles";
@@ -19,7 +20,7 @@ import {
 import { refreshCampaignViewsAction } from "../clip-actions";
 import { ActionForm } from "@/components/action-form";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, SectionHeader, StatCard } from "@/components/ui/card";
 
 /** Campaign dashboard: creators see their own clips; Mods/Admins/Owner see the review queue. */
@@ -57,20 +58,25 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
           </p>
         </div>
 
-        {isAdmin && (
-          <div className="flex flex-wrap items-center gap-2">
-            {(["pause", "close", "archive", "reopen"] as const).map((a) => (
-              <form key={a} action={setLifecycleAction.bind(null, id, a)}>
-                <Button variant="outline" size="sm" type="submit" className="capitalize">{a}</Button>
-              </form>
-            ))}
-            {role === "owner" && (
-              <form action={deleteCampaignAction.bind(null, id)}>
-                <Button variant="danger" size="sm" type="submit">Delete</Button>
-              </form>
-            )}
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href={`/campaigns/${id}/history`} className={buttonVariants({ variant: "outline", size: "sm" })}>
+            History
+          </Link>
+          {isAdmin && (
+            <>
+              {(["pause", "close", "archive", "reopen"] as const).map((a) => (
+                <form key={a} action={setLifecycleAction.bind(null, id, a)}>
+                  <Button variant="outline" size="sm" type="submit" className="capitalize">{a}</Button>
+                </form>
+              ))}
+              {role === "owner" && (
+                <form action={deleteCampaignAction.bind(null, id)}>
+                  <Button variant="danger" size="sm" type="submit">Delete</Button>
+                </form>
+              )}
+            </>
+          )}
+        </div>
       </header>
 
       {role === "creator" ? (

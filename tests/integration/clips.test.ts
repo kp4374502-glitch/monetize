@@ -606,6 +606,80 @@ describe('refreshCampaignClips (dashboard "Refresh all views now")', () => {
   });
 });
 
+describe("filterable clip history (getReviewerClipHistory / getMyClipHistory)", () => {
+  async function freshCampaign(name: string) {
+    const c = (await campaignSvc.createCampaign("owner", { ...validCampaign, name })).id;
+    await db.insert(campaignCreators).values([{ campaignId: c, userId: "c1" }, { campaignId: c, userId: "c2" }]);
+    return c;
+  }
+
+  it("scopes the reviewer view to THIS campaign only, and covers every status including pending/approved-unpaid/paid", async () => {
+    const campX = await freshCampaign("History scope A");
+    const campY = await freshCampaign("History scope B");
+    const pending = await makeClip("c1", campX, 1000);
+    const rejected = await makeClip("c1", campX, 1000);
+    await svc.reviewClip("owner", campX, rejected.id, { action: "reject", reason: "spam" });
+    const approvedUnpaid = await approvedWithPayout(campX, "c1", 60, 4000);
+    const paid = await approvedWithPayout(campX, "c1", 60, 4000);
+    await svc.markPaid("owner", campX, paid.id);
+    await makeClip("c1", campY, 1000); // a different campaign — must never appear
+
+    const { summary, rows } = await svc.getReviewerClipHistory("owner", campX);
+    expect(summary).toMatchObject({ total: 4, pending: 1, approved: 2, rejected: 1, paid: 1 });
+    const ids = rows.map((r) => r.clip.id);
+    expect(ids).toEqual(expect.arrayContaining([pending.id, rejected.id, approvedUnpaid.id, paid.id]));
+    expect(ids).toHaveLength(4);
+  });
+
+  it("the status filter narrows the list but the summary counts stay the full-range breakdown", async () => {
+    const campX = await freshCampaign("History filter tabs");
+    const pending = await makeClip("c1", campX, 1000);
+    const rejected = await makeClip("c1", campX, 1000);
+    await svc.reviewClip("owner", campX, rejected.id, { action: "reject", reason: "spam" });
+    const paid = await approvedWithPayout(campX, "c1", 60, 4000);
+    await svc.markPaid("owner", campX, paid.id);
+
+    const forRejected = await svc.getReviewerClipHistory("owner", campX, { status: "rejected" });
+    expect(forRejected.rows.map((r) => r.clip.id)).toEqual([rejected.id]);
+    expect(forRejected.summary).toMatchObject({ total: 3, pending: 1, approved: 1, rejected: 1, paid: 1 }); // unchanged by the tab
+
+    const forPending = await svc.getReviewerClipHistory("owner", campX, { status: "pending" });
+    expect(forPending.rows.map((r) => r.clip.id)).toEqual([pending.id]);
+
+    const forPaid = await svc.getReviewerClipHistory("owner", campX, { status: "paid" });
+    expect(forPaid.rows.map((r) => r.clip.id)).toEqual([paid.id]);
+  });
+
+  it("the date range narrows both the list and the summary counts", async () => {
+    const campX = await freshCampaign("History date range");
+    const old = await makeClip("c1", campX, 1000);
+    await db.update(clips).set({ submittedAt: new Date("2020-01-01T00:00:00Z") }).where(eq(clips.id, old.id));
+    const recent = await makeClip("c1", campX, 1000);
+
+    const r = await svc.getReviewerClipHistory("owner", campX, { from: new Date("2020-06-01T00:00:00Z") });
+    expect(r.rows.map((x) => x.clip.id)).toEqual([recent.id]);
+    expect(r.summary.total).toBe(1);
+  });
+
+  it("getReviewerClipHistory is Mod/Admin/Owner only — a creator and an outsider are denied", async () => {
+    const campX = await freshCampaign("History access");
+    await expect(svc.getReviewerClipHistory("c1", campX)).rejects.toThrow(/Access denied/);
+    await expect(svc.getReviewerClipHistory("outsider", campX)).rejects.toThrow(/Access denied/);
+  });
+
+  it("getMyClipHistory scopes a creator to only their own clips on this campaign, never another creator's or another campaign's", async () => {
+    const campX = await freshCampaign("History mine A");
+    const campY = await freshCampaign("History mine B");
+    const mine = await makeClip("c1", campX, 1000);
+    await makeClip("c2", campX, 1000); // another creator, same campaign — must never appear
+    await makeClip("c1", campY, 1000); // same creator, different campaign — must never appear
+
+    const { summary, rows } = await svc.getMyClipHistory("c1", campX);
+    expect(rows.map((r) => r.clip.id)).toEqual([mine.id]);
+    expect(summary.total).toBe(1);
+  });
+});
+
 describe("cron helpers", () => {
   it("refreshAllClips refreshes unpaid, non-rejected clips in active campaigns", async () => {
     const clip = await makeClip("c1", camp, 1000);
