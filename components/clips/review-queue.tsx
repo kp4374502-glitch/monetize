@@ -179,6 +179,9 @@ export function ReviewQueue({
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                     <StatusBadge clip={c} />
                     <span className="font-bold">{creatorUsername}</span>
+                    <a href={c.url} target="_blank" rel="noreferrer" className="truncate text-text-secondary underline-offset-2 hover:text-gold-light hover:underline">
+                      {c.url}
+                    </a>
                     <Stats clip={c} />
                     <span className="text-base font-extrabold text-gold-light" data-testid="payment-amount">{money(c.payout)}</span>
                   </div>
