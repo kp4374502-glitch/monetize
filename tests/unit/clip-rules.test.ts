@@ -103,6 +103,14 @@ describe("clip URL parsing", () => {
       postId: "C1aBcDeFgH",
     });
   });
+  it("keeps the real Instagram post type in the stored URL — a photo/carousel or IGTV link is never rewritten to look like a Reel", () => {
+    // /reels/ (plural) is just a spelling variant of /reel/ — same content, normalised.
+    expect(parseClipUrl("https://www.instagram.com/reels/C1aBcDeFgH/")).toMatchObject({ url: "https://www.instagram.com/reel/C1aBcDeFgH" });
+    expect(parseClipUrl("https://www.instagram.com/reel/C1aBcDeFgH/")).toMatchObject({ url: "https://www.instagram.com/reel/C1aBcDeFgH" });
+    // /p/ (photo/carousel) and /tv/ (IGTV) are a different post type and must stay distinguishable.
+    expect(parseClipUrl("https://www.instagram.com/p/C1aBcDeFgH/")).toMatchObject({ url: "https://www.instagram.com/p/C1aBcDeFgH" });
+    expect(parseClipUrl("https://www.instagram.com/tv/C1aBcDeFgH/")).toMatchObject({ url: "https://www.instagram.com/tv/C1aBcDeFgH" });
+  });
   it("rejects non-post and non-supported URLs", () => {
     for (const u of ["https://example.com/x", "not a url", "https://www.tiktok.com/@u", "javascript:alert(1)", "https://youtube.com/watch"]) {
       expect(parseClipUrl(u)).toBeNull();

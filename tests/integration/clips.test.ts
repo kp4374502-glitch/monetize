@@ -142,6 +142,26 @@ describe("submitClip", () => {
     await expect(svc.submitClip("c1", camp, "https://www.instagram.com/reel/C1aBcDeFgH/", opts())).rejects.toThrow(/not eligible/);
   });
 
+  it("stores the real Instagram post type (photo vs Reel) instead of rewriting everything to /reel/, while still catching the same post resubmitted under a different URL spelling", async () => {
+    const igCamp = (await campaignSvc.createCampaign("owner", { ...validCampaign, name: "IG", eligiblePlatforms: ["instagram"] })).id;
+    await db.insert(campaignCreators).values([{ campaignId: igCamp, userId: "c1" }, { campaignId: igCamp, userId: "c2" }]);
+
+    const { clip: photo } = await svc.submitClip("c1", igCamp, "https://www.instagram.com/p/Cabcdefghi/?igsh=x", opts());
+    expect(photo.url).toBe("https://www.instagram.com/p/Cabcdefghi");
+    const { clip: tv } = await svc.submitClip("c1", igCamp, "https://www.instagram.com/tv/Cjklmnopqr/", opts());
+    expect(tv.url).toBe("https://www.instagram.com/tv/Cjklmnopqr");
+
+    // Duplicate detection is by postId, not by this exact path, so it still recognises the same
+    // post under a different URL form: the same creator resubmitting it is hard-blocked...
+    await expect(svc.submitClip("c1", igCamp, "https://instagram.com/reel/Cabcdefghi/", opts())).rejects.toThrow(
+      "You've already submitted this link to this campaign.",
+    );
+    // ...and a DIFFERENT creator resubmitting it under yet another spelling is (as for any platform) a soft flag, not a block.
+    const { clip: flagged } = await svc.submitClip("c2", igCamp, "https://instagram.com/reel/Cabcdefghi/", opts());
+    expect(flagged.flaggedDuplicate).toBe(true);
+    expect(flagged.flaggedReason).toMatch(/another creator/);
+  });
+
   it("rejects garbage links", async () => {
     await expect(svc.submitClip("c1", camp, "https://example.com/video", opts())).rejects.toThrow(/doesn't look like/);
   });

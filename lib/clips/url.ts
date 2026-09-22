@@ -34,8 +34,16 @@ export function parseClipUrl(raw: string): ParsedClipUrl | null {
   }
 
   if (h === "instagram.com") {
-    const m = path.match(/^(?:\/[\w.]+)?\/(?:p|reel|reels|tv)\/([\w-]+)$/);
-    if (m) return { platform: "instagram", postId: m[1], url: `https://www.instagram.com/reel/${m[1]}` };
+    // Keep the real post type in the stored URL — /p/ is a photo/carousel, /tv/ is IGTV, and only
+    // /reel/ or /reels/ is an actual video Reel. Only "reels" -> "reel" gets normalised (same
+    // content, two spellings); rewriting everything to /reel/ made photo carousels look like Reels
+    // in the dashboard. Dedup across a post's different URL spellings still works: submitClip
+    // matches by postId, not by this exact path.
+    const m = path.match(/^(?:\/[\w.]+)?\/(p|reel|reels|tv)\/([\w-]+)$/);
+    if (m) {
+      const type = m[1] === "reels" ? "reel" : m[1];
+      return { platform: "instagram", postId: m[2], url: `https://www.instagram.com/${type}/${m[2]}` };
+    }
     return null;
   }
 
