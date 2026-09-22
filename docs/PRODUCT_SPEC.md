@@ -242,10 +242,15 @@ Each campaign sets its own three parameters; the formula shape is fixed platform
 The Owner can edit a campaign's Base Rate, Divisor, and Max Pay Per Post at any time; changes apply only to clips reviewed/paid going forward and are not applied retroactively to already-earned amounts.
 
 ```
-CPM     = (Qualifying Audience % ÷ Divisor) × Base Rate
+CPM      = min(Qualifying Audience % ÷ Divisor, 1) × Base Rate
 Earnings = CPM × (Views ÷ 1000)
 Payout   = min(Earnings, Max Pay Per Post)
 ```
+
+**Base Rate is a ceiling on CPM, not just a multiplier.** The Divisor is the qualifying threshold: below
+it, CPM scales proportionally as usual. At or above it, CPM stays flat at Base Rate — a clip can't earn
+a higher CPM by clearing the threshold with room to spare. (78% qualifying with a 50 Divisor is *not*
+worth $1.56 CPM at a $1.00 Base Rate; it's worth $1.00, same as exactly 50% or a full 100%.)
 
 | Parameter | Set by | Default |
 | --- | --- | --- |

@@ -53,6 +53,26 @@ describe("calculatePayout", () => {
     }
   });
 
+  it("caps CPM at the Base Rate once qualifying audience % reaches the Divisor — it never scales past it", () => {
+    // Real bug: 78% with a 50 Divisor used to give CPM = (78/50)*$1.00 = $1.56, above the $1.00 Base Rate.
+    const over = calculatePayout({ qualifyingAudiencePct: 78, divisor: 50, baseRate: 1.0, views: 1000, maxPayPerPost: 999999 });
+    expect(over.cpm).toBeCloseTo(1.0, 4);
+    expect(over.earnings).toBeCloseTo(1.0, 2);
+
+    // Exactly at the threshold: still the uncapped case, CPM == Base Rate either way.
+    const at = calculatePayout({ qualifyingAudiencePct: 50, divisor: 50, baseRate: 1.0, views: 1000, maxPayPerPost: 999999 });
+    expect(at.cpm).toBeCloseTo(1.0, 4);
+
+    // Fully qualifying (100%) pays no more than a bare pass of the threshold.
+    const full = calculatePayout({ qualifyingAudiencePct: 100, divisor: 50, baseRate: 1.0, views: 1000, maxPayPerPost: 999999 });
+    expect(full.cpm).toBeCloseTo(1.0, 4);
+  });
+
+  it("below the threshold is unaffected by the cap — proportional scaling stays exactly as before", () => {
+    const { cpm } = calculatePayout({ qualifyingAudiencePct: 49, divisor: 50, baseRate: 1.0, views: 1000, maxPayPerPost: 999999 });
+    expect(cpm).toBeCloseTo(0.98, 4);
+  });
+
   it("rejects a zero divisor rather than dividing by zero", () => {
     expect(() =>
       calculatePayout({
