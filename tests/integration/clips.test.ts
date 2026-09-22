@@ -405,6 +405,64 @@ describe("refreshViews", () => {
   });
 });
 
+describe('refreshCampaignClips (dashboard "Refresh all views now")', () => {
+  // Fresh campaigns per test — `camp` already carries dozens of clips from earlier describe blocks,
+  // which would fight with the oldest-refreshed-first cap below. The platform Owner ("owner") has
+  // implicit access to every campaign, so these don't need a dedicated Mod assignment (a Mod can
+  // only be on one campaign at a time — see campaign_mods' unique constraint on user_id).
+  async function freshCampaign(name: string, creators = ["c1"]) {
+    const c = await campaignSvc.createCampaign("owner", { ...validCampaign, name });
+    await db.insert(campaignCreators).values(creators.map((userId) => ({ campaignId: c.id, userId })));
+    return c.id;
+  }
+
+  it("refreshes every pending/approved-unpaid clip in THIS campaign only — never another campaign, a rejected clip, or a paid one", async () => {
+    const campX = await freshCampaign("Refresh scope A");
+    const campY = await freshCampaign("Refresh scope B");
+
+    const inCamp = await makeClip("c1", campX, 1000);
+    const otherCamp = await makeClip("c1", campY, 1000);
+
+    const rejected = await makeClip("c1", campX, 1000);
+    await svc.reviewClip("owner", campX, rejected.id, { action: "reject", reason: "spam" });
+
+    const paid = await makeClip("c1", campX, 10_000);
+    await svc.attachVideoProof("c1", campX, paid.id, "https://youtu.be/aaaaaaaaaaa");
+    await svc.setQualifyingAudiencePct("owner", campX, paid.id, 50);
+    await svc.reviewClip("owner", campX, paid.id, { action: "approve" });
+    await svc.markPaid("owner", campX, paid.id);
+
+    const r = await svc.refreshCampaignClips("owner", campX, opts(9999));
+    expect(r).toMatchObject({ attempted: 1, updated: 1 });
+
+    expect((await db.select().from(clips).where(eq(clips.id, inCamp.id)))[0].views).toBe(9999);
+    // untouched: different campaign, rejected, and frozen-paid
+    expect((await db.select().from(clips).where(eq(clips.id, otherCamp.id)))[0].views).toBe(1000);
+    expect((await db.select().from(clips).where(eq(clips.id, rejected.id)))[0].views).toBe(1000);
+    expect((await db.select().from(clips).where(eq(clips.id, paid.id)))[0].views).toBe(10_000);
+  });
+
+  it("is Mod/Admin/Owner only — a creator is denied", async () => {
+    const campX = await freshCampaign("Refresh access");
+    await makeClip("c1", campX, 1000);
+    await expect(svc.refreshCampaignClips("c1", campX, opts())).rejects.toThrow(/Access denied/);
+    await expect(svc.refreshCampaignClips("outsider", campX, opts())).rejects.toThrow(/Access denied/);
+  });
+
+  it("a mod from a different campaign can't trigger it here", async () => {
+    const campX = await freshCampaign("Refresh cross-mod");
+    await makeClip("c1", campX, 1000);
+    await expect(svc.refreshCampaignClips("modOther", campX, opts())).rejects.toThrow(/Access denied/);
+  });
+
+  it("caps how many it refreshes per click, oldest-refreshed first", async () => {
+    const campX = await freshCampaign("Refresh cap");
+    for (let i = 0; i < 3; i++) await makeClip("c1", campX, 1000);
+    const r = await svc.refreshCampaignClips("owner", campX, opts(5000), 2);
+    expect(r).toMatchObject({ attempted: 2, updated: 2 });
+  });
+});
+
 describe("cron helpers", () => {
   it("refreshAllClips refreshes unpaid, non-rejected clips in active campaigns", async () => {
     const clip = await makeClip("c1", camp, 1000);

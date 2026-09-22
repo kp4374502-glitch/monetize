@@ -310,6 +310,32 @@ export async function refreshViews(actorId: string, campaignId: string, clipId: 
   return refreshClipRow(clip, await loadCampaign(campaignId), opts);
 }
 
+/**
+ * Manual "Refresh all views now" on the campaign dashboard: Mod/Admin/Owner only. Refreshes every
+ * pending or approved-unpaid clip in THIS campaign (never touches other campaigns — see CLAUDE.md's
+ * non-negotiable rule). Sequential, one ScrapeCreators call per clip, so it's capped per click to
+ * bound how long the request runs; anything past the cap still gets picked up by the daily cron.
+ */
+export async function refreshCampaignClips(actorId: string, campaignId: string, opts: FetchOptions = {}, limit = 40) {
+  await requireRole(actorId, campaignId, "mod");
+  const campaign = await loadCampaign(campaignId);
+  const due = await db
+    .select()
+    .from(clips)
+    .where(and(eq(clips.campaignId, campaignId), ne(clips.status, "rejected"), eq(clips.paidStatus, "unpaid")))
+    .orderBy(sql`${clips.lastRefreshedAt} asc nulls first`)
+    .limit(limit);
+
+  let updated = 0;
+  let failed = 0;
+  for (const clip of due) {
+    const r = await refreshClipRow(clip, campaign, opts);
+    if (r.updated) updated++;
+    else failed++;
+  }
+  return { attempted: due.length, updated, failed };
+}
+
 /** Cron entry point: oldest-refreshed first, capped per run to bound ScrapeCreators credit spend. */
 export async function refreshAllClips(opts: FetchOptions = {}, limit = 200) {
   const due = await db

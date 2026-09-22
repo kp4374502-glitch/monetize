@@ -15,6 +15,8 @@ import {
   revokeInviteLinkAction,
   setLifecycleAction,
 } from "../actions";
+import { refreshCampaignViewsAction } from "../clip-actions";
+import { ActionForm } from "@/components/action-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, SectionHeader, StatCard } from "@/components/ui/card";
@@ -90,7 +92,16 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
 
       {role === "creator" && <CreatorClips campaignId={id} clips={myClips} viewMinimum={campaign.viewMinimum} />}
       {roster && <CreatorRoster roster={roster} limit={CREATOR_ROSTER_LIMIT} />}
-      {queue && <ReviewQueue campaignId={id} pending={queue.pending} awaitingPayment={queue.awaitingPayment} />}
+      {queue && (
+        <>
+          <ActionForm action={refreshCampaignViewsAction.bind(null, id)} className="flex justify-end">
+            <Button type="submit" variant="outline" size="sm" data-testid="refresh-campaign-views">
+              Refresh all views now
+            </Button>
+          </ActionForm>
+          <ReviewQueue campaignId={id} pending={queue.pending} awaitingPayment={queue.awaitingPayment} />
+        </>
+      )}
       {history && <ClipHistory history={history} />}
 
       {canInvite && (

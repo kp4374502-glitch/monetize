@@ -7,16 +7,20 @@ import * as svc from "@/lib/clips/service";
 import { MAX_SCREENSHOT_BYTES } from "@/lib/clips/image";
 import type { ActionState } from "@/components/action-form";
 
-/** Turns thrown business-rule errors into a message the form can show. */
+/**
+ * Turns thrown business-rule errors into a message the form can show. If `fn` resolves with a
+ * string, it's shown as a success message (e.g. "Refreshed 12 of 14 clips.").
+ */
 async function run(campaignId: string, fn: (userId: string) => Promise<unknown>): Promise<ActionState> {
+  let result: unknown;
   try {
-    await fn(await requireUserId());
+    result = await fn(await requireUserId());
   } catch (e) {
     if (e instanceof ZodError) return { error: e.issues[0]?.message ?? "Invalid input." };
     return { error: e instanceof Error ? e.message : "Something went wrong." };
   }
   revalidatePath(`/campaigns/${campaignId}`);
-  return { ok: true };
+  return typeof result === "string" ? { ok: true, message: result } : { ok: true };
 }
 
 const text = (fd: FormData, k: string) => String(fd.get(k) ?? "");
@@ -43,6 +47,15 @@ export const attachScreenshotAction = async (campaignId: string, clipId: string,
 
 export const refreshViewsAction = async (campaignId: string, clipId: string, _p: ActionState, _fd: FormData) =>
   run(campaignId, (u) => svc.refreshViews(u, campaignId, clipId));
+
+/** Dashboard-wide "Refresh all views now" — Mod/Admin/Owner only, scoped to this one campaign. */
+export const refreshCampaignViewsAction = async (campaignId: string, _p: ActionState, _fd: FormData) =>
+  run(campaignId, async (u) => {
+    const r = await svc.refreshCampaignClips(u, campaignId);
+    if (r.attempted === 0) return "No pending or approved-unpaid clips to refresh.";
+    const failedNote = r.failed ? ` ${r.failed} could not be refreshed right now — ScrapeCreators may be rate-limited or low on credits.` : "";
+    return `Refreshed ${r.updated} of ${r.attempted} clip${r.attempted === 1 ? "" : "s"}.${failedNote}`;
+  });
 
 export const setPctAction = async (campaignId: string, clipId: string, _p: ActionState, fd: FormData) =>
   run(campaignId, (u) => svc.setQualifyingAudiencePct(u, campaignId, clipId, text(fd, "pct")));
