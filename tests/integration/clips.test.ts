@@ -949,6 +949,56 @@ describe("filterable clip history (getReviewerClipHistory / getMyClipHistory)", 
     expect(r.summary.total).toBe(1);
   });
 
+  it("Total Views sums effective views across every status; Approved Views only counts approved/paid clips", async () => {
+    const campX = await freshCampaign("History views aggregate");
+    const pending = await makeClip("c1", campX, 1000); // still awaiting_analytics -- counts toward Total Views regardless
+    const rejected = await makeClip("c1", campX, 2000);
+    await svc.reviewClip("owner", campX, rejected.id, { action: "reject", reason: "spam" });
+    const approvedUnpaid = await approvedWithPayout(campX, "c1", 60, 4000);
+    const paid = await approvedWithPayout(campX, "c1", 60, 3000);
+    await svc.markPaid("owner", campX, paid.id);
+
+    const totalView = await svc.getReviewerClipHistory("owner", campX, { status: "total_views" });
+    expect(totalView.summary.totalViews).toBe(1000 + 2000 + 4000 + 3000);
+    expect(totalView.summary.approvedViews).toBe(4000 + 3000);
+    // "total_views" behaves like "all" for the row list underneath -- unfiltered, every status included
+    expect(totalView.rows.map((r) => r.clip.id).sort()).toEqual([pending.id, rejected.id, approvedUnpaid.id, paid.id].sort());
+
+    const approvedView = await svc.getReviewerClipHistory("owner", campX, { status: "approved_views" });
+    expect(approvedView.summary.totalViews).toBe(1000 + 2000 + 4000 + 3000); // the aggregates themselves ignore the tab, like the other summary tiles
+    expect(approvedView.summary.approvedViews).toBe(4000 + 3000);
+    // "approved_views" narrows the list to the same rows "approved" already filters to (a paid clip's status is still "approved")
+    expect(approvedView.rows.map((r) => r.clip.id).sort()).toEqual([approvedUnpaid.id, paid.id].sort());
+  });
+
+  it("Total Views/Approved Views respect the date range filter, same as the other summary tiles", async () => {
+    const campX = await freshCampaign("History views date range");
+    const old = await makeClip("c1", campX, 5000);
+    await db.update(clips).set({ submittedAt: new Date("2020-01-01T00:00:00Z") }).where(eq(clips.id, old.id));
+    await makeClip("c1", campX, 1000);
+
+    const r = await svc.getReviewerClipHistory("owner", campX, { from: new Date("2020-06-01T00:00:00Z"), status: "total_views" });
+    expect(r.summary.totalViews).toBe(1000); // the old, out-of-range clip's views are excluded
+  });
+
+  it("the views sum uses manual_views over the auto-fetched views, same as effectiveViews()", async () => {
+    const campX = await freshCampaign("History views manual override");
+    const clip = await makeClip("c1", campX, 5000);
+    await db.update(clips).set({ manualViews: 42 }).where(eq(clips.id, clip.id));
+
+    const r = await svc.getReviewerClipHistory("owner", campX, { status: "total_views" });
+    expect(r.summary.totalViews).toBe(42);
+  });
+
+  it("getMyClipHistory's views aggregates are scoped to the creator's own clips only", async () => {
+    const campX = await freshCampaign("History views creator scope");
+    await makeClip("c1", campX, 1000);
+    await makeClip("c2", campX, 9000); // another creator's views must never leak into c1's aggregate
+
+    const mine = await svc.getMyClipHistory("c1", campX, { status: "total_views" });
+    expect(mine.summary.totalViews).toBe(1000);
+  });
+
   it("getReviewerClipHistory is Mod/Admin/Owner only — a creator and an outsider are denied", async () => {
     const campX = await freshCampaign("History access");
     await expect(svc.getReviewerClipHistory("c1", campX)).rejects.toThrow(/Access denied/);

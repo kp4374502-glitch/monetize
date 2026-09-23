@@ -18,6 +18,8 @@ const STATUS_OPTIONS: { value: ClipHistoryStatusFilter; label: string }[] = [
   { value: "approved", label: "Approved" },
   { value: "rejected", label: "Rejected" },
   { value: "paid", label: "Paid" },
+  { value: "total_views", label: "Total Views" },
+  { value: "approved_views", label: "Approved Views" },
 ];
 
 const onDate = (d: Date) => d.toISOString().slice(0, 10);
@@ -66,7 +68,16 @@ export function ClipHistoryBrowser({
   status: ClipHistoryStatusFilter;
   from: string;
   to: string;
-  summary: { total: number; awaitingAnalytics: number; pending: number; approved: number; rejected: number; paid: number };
+  summary: {
+    total: number;
+    awaitingAnalytics: number;
+    pending: number;
+    approved: number;
+    rejected: number;
+    paid: number;
+    totalViews: number;
+    approvedViews: number;
+  };
   rows: Row[];
   showCreator: boolean;
   /** Owner/Admin only — the server re-checks this regardless of what's rendered. */
@@ -119,6 +130,16 @@ export function ClipHistoryBrowser({
         <StatCard label="Rejected" value={summary.rejected.toLocaleString()} />
         <StatCard label="Paid" value={summary.paid.toLocaleString()} />
       </div>
+
+      {(status === "total_views" || status === "approved_views") && (
+        <StatCard
+          label={status === "total_views" ? "Total Views" : "Approved Views"}
+          value={(status === "total_views" ? summary.totalViews : summary.approvedViews).toLocaleString()}
+          hint={status === "total_views" ? "Every submitted clip, any status" : "Clips that passed review (approved or paid)"}
+          valueTestId="views-aggregate-value"
+          emphasis
+        />
+      )}
 
       {rows.length === 0 ? (
         <Card innerClassName="py-10 text-center text-sm text-text-secondary">No clips match this filter.</Card>

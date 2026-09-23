@@ -718,7 +718,18 @@ export async function getClipHistory(actorId: string, campaignId: string) {
 // same clips rows getReviewQueue/getClipHistory already read, not a separate data model.
 // ---------------------------------------------------------------------------------------------
 
-export type ClipHistoryStatusFilter = "all" | "awaiting_analytics" | "pending" | "approved" | "rejected" | "paid";
+export type ClipHistoryStatusFilter =
+  | "all"
+  | "awaiting_analytics"
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "paid"
+  // Not real clip statuses — view-count aggregates shown as a summary tile instead of narrowing
+  // the list to a status. "total_views" behaves like "all" for the list; "approved_views" narrows
+  // to the same rows "approved" already does (a paid clip's status is still "approved").
+  | "total_views"
+  | "approved_views";
 export interface ClipHistoryFilters {
   status?: ClipHistoryStatusFilter;
   from?: Date;
@@ -743,6 +754,9 @@ function clipHistoryStatusCondition(status: ClipHistoryStatusFilter | undefined)
       // Only an approved clip can be paid, but this filters on paid_status directly (not status)
       // so it reads naturally as its own tab, same as the others.
       return eq(clips.paidStatus, "paid");
+    case "approved_views":
+      return eq(clips.status, "approved");
+    case "total_views":
     default:
       return undefined;
   }
@@ -767,6 +781,10 @@ async function filteredClipHistory(scope: SQL, filters: ClipHistoryFilters) {
       approved: sql<number>`count(*) filter (where ${clips.status} = 'approved')`,
       rejected: sql<number>`count(*) filter (where ${clips.status} = 'rejected')`,
       paid: sql<number>`count(*) filter (where ${clips.paidStatus} = 'paid')`,
+      // Effective views (manual override wins, same as effectiveViews()) summed in SQL rather than
+      // over `rows`, which is capped at CLIP_HISTORY_LIMIT — this must total every matching clip.
+      totalViews: sql<string>`coalesce(sum(coalesce(${clips.manualViews}, ${clips.views})), 0)`,
+      approvedViews: sql<string>`coalesce(sum(coalesce(${clips.manualViews}, ${clips.views})) filter (where ${clips.status} = 'approved'), 0)`,
     })
     .from(clips)
     .where(dateScope);
@@ -788,6 +806,8 @@ async function filteredClipHistory(scope: SQL, filters: ClipHistoryFilters) {
       approved: Number(summaryRow.approved),
       rejected: Number(summaryRow.rejected),
       paid: Number(summaryRow.paid),
+      totalViews: Number(summaryRow.totalViews),
+      approvedViews: Number(summaryRow.approvedViews),
     },
     rows,
   };
