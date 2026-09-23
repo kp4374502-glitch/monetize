@@ -64,11 +64,26 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
           </Link>
           {isAdmin && (
             <>
-              {(["pause", "close", "archive", "reopen"] as const).map((a) => (
-                <form key={a} action={setLifecycleAction.bind(null, id, a)}>
-                  <Button variant="outline" size="sm" type="submit" className="capitalize">{a}</Button>
-                </form>
-              ))}
+              {(["pause", "close", "archive", "reopen"] as const).map((a) => {
+                // Each action's resulting status, so the button for the campaign's CURRENT status
+                // is the one visibly disabled/highlighted — otherwise all four look equally
+                // clickable and nothing here hints that e.g. "pause" already happened.
+                const resultStatus = { pause: "paused", close: "closed", archive: "archived", reopen: "active" }[a];
+                const isCurrent = campaign.status === resultStatus;
+                return (
+                  <form key={a} action={setLifecycleAction.bind(null, id, a)}>
+                    <Button
+                      variant={isCurrent ? "primary" : "outline"}
+                      size="sm"
+                      type="submit"
+                      className="capitalize"
+                      disabled={isCurrent}
+                    >
+                      {a}
+                    </Button>
+                  </form>
+                );
+              })}
               {role === "owner" && (
                 <form action={deleteCampaignAction.bind(null, id)}>
                   <Button variant="danger" size="sm" type="submit">Delete</Button>
