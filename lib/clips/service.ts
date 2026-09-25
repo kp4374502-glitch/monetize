@@ -425,6 +425,7 @@ export async function reviewClip(actorId: string, campaignId: string, clipId: st
   }
 
   if (decision.action === "approve") {
+    if (!hasAnalyticsProof(clip)) throw new Error("Analytics proof is missing — attach it before Analytics Approving.");
     const campaign = await loadCampaign(campaignId);
     if (wouldExceedBudget(campaign.budgetSpent, clip.payout ?? 0, campaign.totalBudget)) {
       throw new Error("This clip's payout would exceed the campaign's total budget.");
@@ -662,6 +663,11 @@ export async function getCreatorClips(actorId: string, campaignId: string) {
     .orderBy(desc(clips.submittedAt));
 }
 
+/**
+ * "Pending" here means "submitted, not yet Analytics Approved/Rejected" -- status `pending` OR
+ * `awaiting_analytics`, regardless of whether proof has been submitted yet. Proof (or its absence)
+ * is visible per-row; the queue itself is no longer split into two hidden buckets.
+ */
 export async function getReviewQueue(actorId: string, campaignId: string) {
   await requireRole(actorId, campaignId, "mod");
   const rows = (status: "pending" | "approved") =>
@@ -671,7 +677,7 @@ export async function getReviewQueue(actorId: string, campaignId: string) {
       .innerJoin(users, eq(users.id, clips.creatorUserId))
       .where(
         status === "pending"
-          ? and(eq(clips.campaignId, campaignId), eq(clips.status, "pending"), isNull(clips.deletedAt))
+          ? and(eq(clips.campaignId, campaignId), inArray(clips.status, ["pending", "awaiting_analytics"]), isNull(clips.deletedAt))
           : and(eq(clips.campaignId, campaignId), eq(clips.status, "approved"), eq(clips.paidStatus, "unpaid"), isNull(clips.deletedAt)),
       )
       .orderBy(asc(clips.submittedAt));
@@ -764,11 +770,14 @@ function clipHistoryStatusCondition(status: ClipHistoryStatusFilter | undefined)
   switch (status) {
     // "Waiting for Analytics" (Task 5 Part 3): covers a clip whether still locked (posted_at unknown,
     // or the 7 days haven't passed) or already unlocked but the creator hasn't submitted proof yet —
-    // both are the same status value, so this one condition covers the whole bucket.
+    // both are the same status value, so this one condition covers the whole bucket. A narrower
+    // sub-filter than "pending" below, for anyone who wants only the still-missing-proof clips.
     case "awaiting_analytics":
       return eq(clips.status, "awaiting_analytics");
+    // "Pending" = submitted but not yet Analytics Approved/Rejected -- pending OR awaiting_analytics,
+    // regardless of whether proof exists yet. Proof (or its absence) is visible per-row instead.
     case "pending":
-      return eq(clips.status, "pending");
+      return inArray(clips.status, ["pending", "awaiting_analytics"]);
     case "approved":
       return eq(clips.status, "approved");
     case "rejected":
@@ -799,7 +808,9 @@ async function filteredClipHistory(scope: SQL, filters: ClipHistoryFilters) {
     .select({
       total: count(),
       awaitingAnalytics: sql<number>`count(*) filter (where ${clips.status} = 'awaiting_analytics')`,
-      pending: sql<number>`count(*) filter (where ${clips.status} = 'pending')`,
+      // Every submitted, not-yet-Analytics-Approved/Rejected clip -- includes awaiting_analytics
+      // (the "Waiting" tile above is the narrower still-missing-proof sub-count, shown alongside it).
+      pending: sql<number>`count(*) filter (where ${clips.status} in ('pending', 'awaiting_analytics'))`,
       approved: sql<number>`count(*) filter (where ${clips.status} = 'approved')`,
       rejected: sql<number>`count(*) filter (where ${clips.status} = 'rejected')`,
       paid: sql<number>`count(*) filter (where ${clips.paidStatus} = 'paid')`,

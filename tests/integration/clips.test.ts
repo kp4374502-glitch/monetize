@@ -248,7 +248,7 @@ describe("Task 5 Part 3: 7-day analytics-proof gate", () => {
     return c;
   }
 
-  it("a post <7 days old: proof is refused, and the clip never appears in the reviewer's pending queue", async () => {
+  it("a post <7 days old: proof is refused, but the clip still shows up in the reviewer's Pending queue (submitted, not yet reviewed)", async () => {
     const campX = await freshCampaign("Gate: too young");
     const { clip } = await svc.submitClip("c1", campX, tiktok(), opts(1000, 3)); // posted 3 days ago
     expect(clip.status).toBe("awaiting_analytics");
@@ -257,7 +257,11 @@ describe("Task 5 Part 3: 7-day analytics-proof gate", () => {
     );
     const [row] = await db.select().from(clips).where(eq(clips.id, clip.id));
     expect(row).toMatchObject({ status: "awaiting_analytics", videoProofUrl: null });
-    expect((await svc.getReviewQueue("owner", campX)).pending.some((r) => r.clip.id === clip.id)).toBe(false);
+    // Pending now means "submitted, not yet Analytics Approved/Rejected" -- awaiting_analytics included,
+    // regardless of proof (see filteredClipHistory/getReviewQueue). Analytics Approve itself still can't
+    // run without proof (reviewClip's own guard), so nothing here changes what actually pays.
+    expect((await svc.getReviewQueue("owner", campX)).pending.some((r) => r.clip.id === clip.id)).toBe(true);
+    await expect(svc.reviewClip("owner", campX, clip.id, { action: "approve" })).rejects.toThrow(/proof is missing/);
   });
 
   it("a post >=7 days old: proof is accepted and the clip moves straight into the pending review queue", async () => {
@@ -391,7 +395,9 @@ describe("Task 5 Part 3: 7-day analytics-proof gate", () => {
     const { rows, summary } = await svc.getReviewerClipHistory("owner", campX, { status: "awaiting_analytics" });
     expect(rows.map((r) => r.clip.id).sort()).toEqual([locked.id, unknownDate.id, unlockedNoProof.id].sort());
     expect(summary.awaitingAnalytics).toBe(3);
-    expect(summary.pending).toBe(1);
+    // "Pending" now includes awaiting_analytics -- submitted but not yet Analytics Approved/Rejected,
+    // regardless of proof. All 4 clips here qualify (3 awaiting_analytics + 1 genuinely pending).
+    expect(summary.pending).toBe(4);
   });
 });
 
@@ -555,6 +561,7 @@ describe("setManualViews (Instagram photo/carousel posts)", () => {
 describe("reviewClip", () => {
   it("approve/reject write an audit event each time and notify the creator", async () => {
     const clip = await makeClip("c1");
+    await svc.attachVideoProof("c1", camp, clip.id, "https://youtu.be/aaaaaaaaaaa"); // Analytics Approve now requires proof to exist
     await expect(svc.reviewClip("modA", camp, clip.id, { action: "reject" })).rejects.toThrow(/reason/);
     await svc.reviewClip("modA", camp, clip.id, { action: "reject", reason: "bot-like spike" });
     const [rejected] = await db.select().from(clips).where(eq(clips.id, clip.id));
@@ -571,6 +578,7 @@ describe("reviewClip", () => {
 
   it("a Mod cannot override another Mod's decision; Admin and Owner can", async () => {
     const clip = await makeClip("c1");
+    await svc.attachVideoProof("c1", camp, clip.id, "https://youtu.be/aaaaaaaaaaa"); // Analytics Approve now requires proof to exist
     await svc.reviewClip("modA", camp, clip.id, { action: "approve" });
     await expect(svc.reviewClip("modB", camp, clip.id, { action: "reject", reason: "no" })).rejects.toThrow(/override/);
     await svc.reviewClip("admin", camp, clip.id, { action: "reject", reason: "admin says no" });

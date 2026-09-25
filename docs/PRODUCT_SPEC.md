@@ -257,7 +257,7 @@ TikTok does not expose per-video audience-demographic data to anyone but the acc
 - 7 days have passed since the post's own real publish date (`posted_at`, captured from ScrapeCreators at submission — confirmed live per platform: TikTok's `create_time`, Instagram's `taken_at_timestamp` [present even for a photo/carousel], YouTube's top-level `publishDate`), **and**
 - the creator has submitted the video-link proof.
 
-Only once both are true does the clip move into the normal `pending` review queue — before that, it's invisible to the reviewer's default queue (still visible via History → "Waiting for Analytics").
+Only once both are true does the `status` column itself move from `awaiting_analytics` to `pending`. The reviewer's Pending queue and the History "Pending" filter/tile, however, surface **both** statuses — Pending means "submitted, not yet Analytics Approved/Rejected," regardless of whether proof has landed yet. "Waiting for Analytics" stays available as a narrower sub-filter for just the still-missing-proof clips, and each row shows its own analytics-proof link (or its absence) directly, so a reviewer never has to guess.
 
 **A missing `posted_at` never silently counts as "7 days have passed."** If ScrapeCreators couldn't return a publish date (rate-limited, a later refresh usually fills it in), the clip stays locked indefinitely rather than guessing either way, until a Mod/Admin/Owner manually confirms the real date (a one-time action, refused if a date is already known).
 

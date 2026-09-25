@@ -183,7 +183,13 @@ describe("a brand-new account (users row with no roles) and one that never logge
 
     const [{ id: freshClipId }] = await db
       .insert(clips)
-      .values({ campaignId: camp, creatorUserId: "creator", platform: "tiktok", url: "https://www.tiktok.com/@u/video/999" })
+      .values({
+        campaignId: camp,
+        creatorUserId: "creator",
+        platform: "tiktok",
+        url: "https://www.tiktok.com/@u/video/999",
+        videoProofUrl: "https://youtu.be/aaaaaaaaaaa", // Analytics Approve requires proof to exist
+      })
       .returning({ id: clips.id });
     await clipSvc.reviewClip("mod", camp, freshClipId, { action: "approve" }); // does NOT throw -- matches today's real behavior
     const [row] = await db.select().from(clips).where(eq(clips.id, freshClipId));
