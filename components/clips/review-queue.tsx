@@ -1,4 +1,4 @@
-import { CheckCircle2, TriangleAlert } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 import { ActionForm } from "@/components/action-form";
 import { Button } from "@/components/ui/button";
 import { Callout, Card, SectionHeader } from "@/components/ui/card";
@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { clipApproveAction, markPaidAction, reviewAction, setManualViewsAction, setPctAction } from "@/app/campaigns/clip-actions";
 import { canSetManualViews, hasAnalyticsProof } from "@/lib/clips/rules";
 import { DeleteClipButton } from "./delete-clip-button";
-import { ClipApprovedBadge, Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
+import { AnalyticsProof, ClipApprovedBadge, Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
 
 function ClipApproveButton({ campaignId, clip }: { campaignId: string; clip: ClipRow }) {
   if (clip.clipApproved) return null;
@@ -21,43 +21,11 @@ function ClipApproveButton({ campaignId, clip }: { campaignId: string; clip: Cli
 
 type Row = { clip: ClipRow; creatorUsername: string };
 
+/** Adds the "proof missing" nudge on top of the shared AnalyticsProof display — only the active review queue needs it. */
 function ProofLine({ clip, campaignId, missingId }: { clip: ClipRow; campaignId: string; missingId?: string }) {
-  if (clip.analyticsScreenshotPathname) {
-    // Private image, served through the access-checked /api/proof route (never a direct storage URL).
-    const src = `/api/proof/${campaignId}/${clip.id}`;
-    return (
-      <div className="space-y-1.5" data-testid="proof-screenshot">
-        <p className="flex flex-wrap items-center gap-1.5 text-sm">
-          <CheckCircle2 className="h-4 w-4 shrink-0 text-green-400" />
-          <span className="text-text-secondary">Proof:</span>
-          <span>Analytics screenshot</span>
-          {clip.analyticsScreenshotViewsAtSubmit !== null && (
-            <span className="text-xs text-text-secondary">
-              (accepted at {clip.analyticsScreenshotViewsAtSubmit.toLocaleString("en-US")} views)
-            </span>
-          )}
-        </p>
-        <a href={src} target="_blank" rel="noreferrer" className="block" title="Open full size">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={src}
-            alt="Analytics screenshot submitted by the creator"
-            loading="lazy"
-            className="max-h-[28rem] w-full max-w-lg rounded-xl border border-subtle bg-black object-contain"
-          />
-        </a>
-      </div>
-    );
-  }
-  return clip.videoProofUrl ? (
-    <p className="flex items-center gap-1.5 text-sm">
-      <CheckCircle2 className="h-4 w-4 shrink-0 text-green-400" />
-      <span className="text-text-secondary">Proof:</span>
-      <a href={clip.videoProofUrl} target="_blank" rel="noreferrer" className="truncate underline-offset-2 hover:text-gold-light hover:underline">
-        {clip.videoProofUrl}
-      </a>
-    </p>
-  ) : (
+  const proof = AnalyticsProof({ clip, campaignId });
+  if (proof) return proof;
+  return (
     <Callout tone="warning" data-testid={missingId}>
       <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
       <span>Analytics proof missing — earns $0 until the creator attaches it.</span>

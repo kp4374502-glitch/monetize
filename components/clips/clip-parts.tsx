@@ -1,3 +1,4 @@
+import { CheckCircle2 } from "lucide-react";
 import { clips } from "@/drizzle/schema";
 import { Badge } from "@/components/ui/badge";
 import { effectiveViews } from "@/lib/clips/rules";
@@ -31,6 +32,59 @@ export function ClipApprovedBadge({ clip }: { clip: ClipRow }) {
       Clip Approved
     </Badge>
   );
+}
+
+/**
+ * The clip's analytics-proof link, if any has been submitted — a video link (current method), or a
+ * legacy accepted screenshot (Task 5 Part 2 removed new screenshot uploads, but an existing one on
+ * file stays valid and still displays exactly as before). Returns null when neither exists; callers
+ * that need a "proof missing" nudge (the active review queue) wrap this themselves.
+ */
+export function AnalyticsProof({ clip, campaignId }: { clip: ClipRow; campaignId: string }) {
+  if (clip.analyticsScreenshotPathname) {
+    // Private image, served through the access-checked /api/proof route (never a direct storage URL).
+    const src = `/api/proof/${campaignId}/${clip.id}`;
+    return (
+      <div className="space-y-1.5" data-testid="proof-screenshot">
+        <p className="flex flex-wrap items-center gap-1.5 text-sm">
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-green-400" />
+          <span className="text-text-secondary">Proof:</span>
+          <span>Analytics screenshot</span>
+          {clip.analyticsScreenshotViewsAtSubmit !== null && (
+            <span className="text-xs text-text-secondary">
+              (accepted at {clip.analyticsScreenshotViewsAtSubmit.toLocaleString("en-US")} views)
+            </span>
+          )}
+        </p>
+        <a href={src} target="_blank" rel="noreferrer" className="block" title="Open full size">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src}
+            alt="Analytics screenshot submitted by the creator"
+            loading="lazy"
+            className="max-h-[28rem] w-full max-w-lg rounded-xl border border-subtle bg-black object-contain"
+          />
+        </a>
+      </div>
+    );
+  }
+  if (clip.videoProofUrl) {
+    return (
+      <p className="flex items-center gap-1.5 text-sm" data-testid="proof-video-link">
+        <CheckCircle2 className="h-4 w-4 shrink-0 text-green-400" />
+        <span className="text-text-secondary">Proof:</span>
+        <a
+          href={clip.videoProofUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="truncate underline-offset-2 hover:text-gold-light hover:underline"
+        >
+          {clip.videoProofUrl}
+        </a>
+      </p>
+    );
+  }
+  return null;
 }
 
 export function Thumb({ clip }: { clip: ClipRow }) {

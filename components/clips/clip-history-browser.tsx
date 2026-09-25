@@ -7,7 +7,7 @@ import { analyticsGateState } from "@/lib/clips/rules";
 import type { ClipHistoryStatusFilter } from "@/lib/clips/service";
 import { AutoSubmitSelect } from "./auto-submit-select";
 import { DeleteClipButton } from "./delete-clip-button";
-import { ClipApprovedBadge, Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
+import { AnalyticsProof, ClipApprovedBadge, Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
 
 type Row = { clip: ClipRow; creatorUsername: string };
 
@@ -181,6 +181,9 @@ export function ClipHistoryBrowser({
                   </div>
                   <div className="mt-1">
                     <Stats clip={c} />
+                  </div>
+                  <div className="mt-1">
+                    <AnalyticsProof clip={c} campaignId={campaignId} />
                   </div>
                   <p className="mt-1 text-xs text-text-secondary">Submitted {submittedOn(c.submittedAt)}</p>
                   {c.status === "rejected" && c.rejectionReason && (
