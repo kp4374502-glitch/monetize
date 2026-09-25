@@ -63,3 +63,15 @@ export async function redeemInviteAction(code: string) {
   const campaign = await svc.redeemInvite(userId, code);
   redirect(`/campaigns/${campaign.id}`);
 }
+
+export async function addBrandAction(campaignId: string, fd: FormData) {
+  const userId = await requireUserId();
+  await svc.addBrand(userId, campaignId, String(fd.get("username") ?? "").trim());
+  revalidatePath(`/campaigns/${campaignId}`);
+}
+
+export async function removeBrandAction(campaignId: string, brandRowId: string) {
+  const userId = await requireUserId();
+  await svc.removeBrand(userId, campaignId, brandRowId);
+  revalidatePath(`/campaigns/${campaignId}`);
+}

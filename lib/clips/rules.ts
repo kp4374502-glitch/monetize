@@ -46,8 +46,8 @@ export function wouldExceedBudget(budgetSpent: number | string, payout: number |
   return toCents(budgetSpent) + toCents(payout) > toCents(totalBudget);
 }
 
-/** A Mod may mark paid only up to the threshold; Admin/Owner are unlimited. */
-export function roleCanMarkPaid(role: "owner" | "admin" | "mod" | "creator", payout: number | string, threshold: number | string) {
+/** A Mod may mark paid only up to the threshold; Admin/Owner are unlimited. Brand/Creator: never (requireRole("mod") already blocks them from reaching here). */
+export function roleCanMarkPaid(role: "owner" | "admin" | "mod" | "brand" | "creator", payout: number | string, threshold: number | string) {
   if (role === "owner" || role === "admin") return true;
   if (role === "mod") return toCents(payout) <= toCents(threshold);
   return false;
@@ -55,10 +55,10 @@ export function roleCanMarkPaid(role: "owner" | "admin" | "mod" | "creator", pay
 
 /**
  * A Mod may act on a clip's review/audience-% only if nobody else has (or they did it themselves).
- * Admin/Owner may always override anyone.
+ * Admin/Owner may always override anyone. Brand/Creator: never (requireRole("mod") already blocks them from reaching here).
  */
 export function roleCanOverride(
-  role: "owner" | "admin" | "mod" | "creator",
+  role: "owner" | "admin" | "mod" | "brand" | "creator",
   actorId: string,
   lastDecisionBy: string | null,
 ): boolean {

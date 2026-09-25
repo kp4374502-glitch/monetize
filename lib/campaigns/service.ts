@@ -3,12 +3,14 @@ import { randomBytes } from "node:crypto";
 import { db } from "../db/client";
 import {
   campaigns,
+  campaignBrands,
   campaignCreators,
   campaignMods,
   clipReviewEvents,
   clips,
   inviteLinks,
   notifications,
+  users,
 } from "../../drizzle/schema";
 import { getRoleForCampaign, isPlatformOwner, requireRole } from "../auth/roles";
 import { isApprovedBrand } from "../brand/service";
@@ -99,6 +101,7 @@ export async function deleteCampaign(actorId: string, campaignId: string) {
     await tx.delete(clips).where(eq(clips.campaignId, campaignId));
     await tx.delete(campaignCreators).where(eq(campaignCreators.campaignId, campaignId));
     await tx.delete(campaignMods).where(eq(campaignMods.campaignId, campaignId));
+    await tx.delete(campaignBrands).where(eq(campaignBrands.campaignId, campaignId));
     await tx.delete(inviteLinks).where(eq(inviteLinks.campaignId, campaignId));
     await tx.delete(campaigns).where(eq(campaigns.id, campaignId));
   });
@@ -129,6 +132,41 @@ export async function revokeInviteLink(actorId: string, campaignId: string, link
 export async function listInviteLinks(actorId: string, campaignId: string) {
   await requireRole(actorId, campaignId, "mod");
   return db.select().from(inviteLinks).where(eq(inviteLinks.campaignId, campaignId));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Brand (read-only per-campaign viewer) -- added directly by username like a Mod, not via invite
+// link, and Owner/Admin only (same authority spec gives for adding a Mod). One campaign at a time,
+// enforced by campaign_brands' unique(user_id), same shape as campaign_mods.
+// ---------------------------------------------------------------------------------------------
+
+export async function addBrand(actorId: string, campaignId: string, username: string) {
+  await requireRole(actorId, campaignId, "admin");
+  const [user] = await db.select({ id: users.id }).from(users).where(eq(users.username, username)).limit(1);
+  if (!user) throw new Error(`No user with username "${username}".`);
+  try {
+    const [row] = await db.insert(campaignBrands).values({ campaignId, userId: user.id, addedBy: actorId }).returning();
+    return row;
+  } catch (e) {
+    if (String((e as { cause?: { code?: string }; code?: string })?.cause?.code ?? (e as { code?: string })?.code) === "23505") {
+      throw new Error("That user is already the Brand viewer on another campaign (one campaign at a time).");
+    }
+    throw e;
+  }
+}
+
+export async function removeBrand(actorId: string, campaignId: string, brandRowId: string) {
+  await requireRole(actorId, campaignId, "admin");
+  await db.delete(campaignBrands).where(and(eq(campaignBrands.id, brandRowId), eq(campaignBrands.campaignId, campaignId)));
+}
+
+export async function listBrands(actorId: string, campaignId: string) {
+  await requireRole(actorId, campaignId, "admin");
+  return db
+    .select({ id: campaignBrands.id, username: users.username, createdAt: campaignBrands.createdAt })
+    .from(campaignBrands)
+    .innerJoin(users, eq(users.id, campaignBrands.userId))
+    .where(eq(campaignBrands.campaignId, campaignId));
 }
 
 export type InviteLookup =

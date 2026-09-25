@@ -18,6 +18,7 @@ const tones: Record<string, string> = {
   owner: "border-gold-border/60 bg-gold-light/15 text-gold-light",
   admin: "border-purple-400/50 bg-purple-400/10 text-purple-300",
   mod: "border-sky-400/50 bg-sky-400/10 text-sky-300",
+  brand: "border-purple-300/50 bg-purple-300/10 text-purple-200",
   creator: "border-zinc-500/50 bg-zinc-500/10 text-zinc-300",
 };
 

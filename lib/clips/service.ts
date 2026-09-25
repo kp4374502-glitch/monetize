@@ -239,7 +239,7 @@ export async function getProofImage(
   store: ProofImageStore = vercelBlobStore,
 ) {
   const role = await getRoleForCampaign(actorId, campaignId);
-  if (!role) throw new Error("Clip not found.");
+  if (!role || role === "brand") throw new Error("Clip not found."); // reviewer-only artifact -- not part of Brand's read-only feed
   const clip = await loadClip(campaignId, clipId);
   if (role === "creator" && clip.creatorUserId !== actorId) throw new Error("Clip not found.");
   if (!clip.analyticsScreenshotPathname) throw new Error("Clip not found.");
@@ -280,10 +280,10 @@ async function refreshClipRow(clip: Clip, campaign: Campaign, opts: FetchOptions
   return { updated: true, stale: false };
 }
 
-/** Manual "Refresh views now": the clip's creator, or Mod/Admin/Owner of the campaign. */
+/** Manual "Refresh views now": the clip's creator, or Mod/Admin/Owner of the campaign. Never Brand — read-only, no reviewer/admin action of any kind. */
 export async function refreshViews(actorId: string, campaignId: string, clipId: string, opts: FetchOptions = {}) {
   const role = await getRoleForCampaign(actorId, campaignId);
-  if (!role) throw new Error("Access denied.");
+  if (!role || role === "brand") throw new Error("Access denied.");
   const clip = await loadClip(campaignId, clipId);
   if (role === "creator" && clip.creatorUserId !== actorId) throw new Error("Clip not found.");
   return refreshClipRow(clip, await loadCampaign(campaignId), opts);
@@ -808,6 +808,43 @@ export async function getReviewerClipHistory(actorId: string, campaignId: string
 /** A creator's own submissions to THIS campaign, filtered — never anyone else's (same scoping as getCreatorClips). */
 export async function getMyClipHistory(actorId: string, campaignId: string, filters: ClipHistoryFilters = {}) {
   return filteredClipHistory(and(eq(clips.campaignId, campaignId), eq(clips.creatorUserId, actorId), isNull(clips.deletedAt))!, filters);
+}
+
+/**
+ * Read-only feed for the Brand role: every submitted clip on THIS campaign, any status, but never
+ * joined against `users` — creator identity (username, roster) must never reach a Brand actor, so
+ * it's excluded at the query level rather than merely hidden in the UI. `requireRole(..., "brand")`
+ * also passes for Mod/Admin/Owner (they outrank brand), which is harmless: they have their own
+ * richer, identity-including views elsewhere and have no reason to use this one.
+ */
+export async function getBrandClipFeed(actorId: string, campaignId: string) {
+  await requireRole(actorId, campaignId, "brand");
+  const rows = await db
+    .select({ clip: clips })
+    .from(clips)
+    .where(and(eq(clips.campaignId, campaignId), isNull(clips.deletedAt)))
+    .orderBy(desc(clips.submittedAt))
+    .limit(CLIP_HISTORY_LIMIT);
+
+  const [agg] = await db
+    .select({
+      totalClips: count(),
+      totalViews: sql<string>`coalesce(sum(coalesce(${clips.manualViews}, ${clips.views})), 0)`,
+      approvedViews: sql<string>`coalesce(sum(coalesce(${clips.manualViews}, ${clips.views})) filter (where ${clips.status} = 'approved'), 0)`,
+      paidSoFar: sql<string>`coalesce(sum(${clips.payout}) filter (where ${clips.paidStatus} = 'paid'), 0)`,
+    })
+    .from(clips)
+    .where(and(eq(clips.campaignId, campaignId), isNull(clips.deletedAt)));
+
+  return {
+    rows: rows.map((r) => r.clip),
+    stats: {
+      totalClips: Number(agg.totalClips),
+      totalViews: Number(agg.totalViews),
+      approvedViews: Number(agg.approvedViews),
+      paidSoFar: Number(agg.paidSoFar).toFixed(2),
+    },
+  };
 }
 
 const ROSTER_LIMIT = 500;

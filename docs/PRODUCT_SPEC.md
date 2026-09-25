@@ -22,14 +22,17 @@ Each brand runs its own **campaign** with its own payout formula, review team, a
 
 ## Roles & permissions
 
-Four roles exist, and each exists in two scopes — **platform-wide** (applies across every campaign) and **per-campaign** (applies only within one Owner's campaign). One person can hold multiple roles at once (e.g. a Campaign Owner who is also a Creator elsewhere).
+Five roles exist. Owner/Admin/Mod/Creator each exist in two scopes — **platform-wide** (applies across every campaign) and **per-campaign** (applies only within one Owner's campaign); Brand is per-campaign only. One person can hold multiple roles at once (e.g. a Campaign Owner who is also a Creator elsewhere).
 
 | Role | Platform-wide scope | Per-campaign scope |
 | --- | --- | --- |
 | Owner | Approves new brands onto the platform | Owns a campaign: sets payout formula, roster, review team |
 | Admin | Cross-campaign oversight/support | Full review powers within one campaign |
 | Mod | Cross-campaign moderation support | Reviews and approves/rejects clips within one campaign |
+| Brand | — | Read-only: every clip and aggregate stats, never creator identity |
 | Creator | — | Submits clips, uploads proof, views own stats only |
+
+**Note on naming:** this "Brand" role (a read-only per-campaign viewer, `campaign_brands` table) is unrelated to the "approved brand" concept elsewhere in this doc (a prospective campaign OWNER's platform-level approval status, granted via the brand-signup request flow — see `lib/brand/service.ts`). Same English word, two different things.
 
 **Data isolation:** creators cannot see any other creator's clips, views, or earnings — not even within the same campaign.
 
@@ -189,6 +192,23 @@ Unlike Admin, a Mod is **not** automatic across campaigns — they must be expli
 - Hitting the 100/day submission limit shows a clear "come back tomorrow"-style message, not a bare rejection.
 - A creator can be temporarily suspended from submitting (e.g. while under fraud review) without being fully banned.
 
+### Brand permissions (detailed)
+
+Read-only, per-campaign viewer for the brand whose campaign it is — not the same thing as the "approved brand" platform-onboarding concept elsewhere in this doc (see the naming note above). Added directly by username by the campaign's Owner or Admin, exactly like a Mod (no invite link) — and, like a Mod, a single Brand account works on only **one campaign at a time**.
+
+**Can**
+
+- View the full list of submitted clips across every status (pending, approved, rejected, paid, awaiting analytics) for that campaign.
+- Click into each clip's own post link to view the actual post.
+- View aggregate stats: Total Views, Approved Views, Paid so far, and Total Clips Posted (every submitted clip, any status).
+
+**Cannot**
+
+- Approve, reject, mark paid, delete, set manual views, set a clip's posted date, refresh a clip's views, or take any other reviewer/admin action — every one of those is refused server-side, the same as any other non-privileged actor.
+- Add or remove Mods, Brands, or invite links, change campaign settings, or manage people in any way.
+- See which creator submitted a given clip. Creator identity — username, creator roster, review history — is never exposed to Brand: the query behind Brand's feed never joins against `users`, so there is nothing to leak, not merely something hidden in the UI.
+- View a clip's private analytics-proof screenshot (a reviewer-facing artifact, not part of Brand's feed).
+
 ## Clip data layer — ScrapeCreators
 
 Views, likes, captions, and thumbnails are pulled automatically via the [ScrapeCreators API](https://scrapecreators.com/), covering TikTok, Instagram, and YouTube.
@@ -335,7 +355,7 @@ The sections below fill gaps between the business spec and an actually-buildable
 No public REST API is needed — this isn't consumed by external clients. Use **Next.js Server Actions**, colocated by domain, validated with `zod` schemas on every input:
 
 - **Campaigns:** `createCampaign`, `updateCampaignSettings`, `pauseCampaign`, `closeCampaign`, `reopenCampaign`, `transferCampaignOwnership`
-- **People:** `generateInviteLink`, `revokeInviteLink`, `addAdmin`, `addMod`, `removeMod`, `removeCreator`, `changeRole`
+- **People:** `generateInviteLink`, `revokeInviteLink`, `addAdmin`, `addMod`, `removeMod`, `addBrand`, `removeBrand`, `removeCreator`, `changeRole`
 - **Clips:** `submitClip`, `deleteClip` (delete-and-resubmit pattern), `refreshViews` (manual + a scheduled version for Vercel Cron)
 - **Review:** `reviewClip` (approve/reject with reason), `setQualifyingAudiencePct`, `attachVideoProof`, `markPaid`
 - **Notifications:** `listNotifications`, `markNotificationRead`

@@ -36,6 +36,16 @@ Every table holding campaign-specific data carries a `campaign_id` — this is t
 - `unique(user_id)` — enforces "one Mod account works on only one campaign as Mod at a time"
 - `added_by` (fk users), `created_at`
 
+## campaign\_brands
+
+Read-only per-campaign viewer role ("Brand" — unrelated to the `brand_requests` "approved brand" concept below). Added directly by username by Owner/Admin, same as a Mod, no invite link.
+
+- `id` (pk)
+- `campaign_id` (fk campaigns)
+- `user_id` (fk users)
+- `unique(user_id)` — enforces "one Brand account works on only one campaign at a time", same shape as campaign\_mods
+- `added_by` (fk users), `created_at`
+
 ## campaign\_creators
 
 - `id` (pk)
@@ -128,6 +138,7 @@ Supports multi-round review (a clip can be approved, later reverted, re-approved
 
 - One `platform_owner` (flag on `users`, not a separate table)
 - `users` —< `campaign_mods` >— `campaigns` (join table; unique(user\_id) keeps a Mod on exactly one campaign)
+- `users` —< `campaign_brands` >— `campaigns` (join table; unique(user\_id) keeps a Brand viewer on exactly one campaign, same as Mod)
 - `users` —< `campaign_creators` >— `campaigns` (join table; unlimited campaigns per creator)
 - `campaigns` 1—1 `owner_user_id`
 - `campaigns` 1—< `clips`

@@ -175,3 +175,52 @@ describe("a brand-new account (users row with no roles) and one that never logge
     expect(await isPlatformOwner("invitee")).toBe(false);
   });
 });
+
+describe("campaign_brands (read-only Brand role)", () => {
+  it("addBrand assigns the role; Brand is refused every reviewer/admin/people/creator action, but its own read-only feed succeeds and never carries creator identity", async () => {
+    await db.insert(users).values({ id: "brandviewer", username: "brandviewer" });
+    await campaignSvc.addBrand("owner", camp, "brandviewer");
+    expect(await getRoleForCampaign("brandviewer", camp)).toBe("brand");
+    await denied(requireRole("brandviewer", camp, "mod"));
+
+    // Reviewer/admin/people actions -- refused server-side, same as any other non-privileged actor.
+    await denied(clipSvc.reviewClip("brandviewer", camp, clipId, { action: "approve" }));
+    await denied(clipSvc.setQualifyingAudiencePct("brandviewer", camp, clipId, 50));
+    await denied(clipSvc.markPaid("brandviewer", camp, clipId));
+    await denied(clipSvc.deleteClip("brandviewer", camp, clipId));
+    await denied(clipSvc.setPostedAt("brandviewer", camp, clipId, "2020-01-01"));
+    await denied(clipSvc.getReviewQueue("brandviewer", camp));
+    await denied(clipSvc.getReviewerClipHistory("brandviewer", camp)); // includes creatorUsername -- brand must never reach it
+    await denied(clipSvc.getClipHistory("brandviewer", camp));
+    await denied(clipSvc.getCreatorRoster("brandviewer", camp));
+    await denied(clipSvc.refreshViews("brandviewer", camp, clipId));
+    await denied(clipSvc.getProofImage("brandviewer", camp, clipId));
+    await denied(campaignSvc.generateInviteLink("brandviewer", camp));
+    await denied(campaignSvc.revokeInviteLink("brandviewer", camp, linkId));
+    await denied(campaignSvc.listInviteLinks("brandviewer", camp));
+    await denied(campaignSvc.pauseCampaign("brandviewer", camp));
+    await denied(campaignSvc.updateCampaignSettings("brandviewer", camp, { ...validCampaign, baseRate: 999 }));
+    await denied(campaignSvc.addBrand("brandviewer", camp, "brandviewer")); // can't add other Brands either -- admin minimum
+    await denied(campaignSvc.removeBrand("brandviewer", camp, "00000000-0000-0000-0000-000000000000"));
+    // creator-only actions still refused -- brand outranks creator, but these are self-scoped by
+    // campaign_creators membership, not rank, and brandviewer has no such row.
+    await denied(clipSvc.submitClip("brandviewer", camp, "https://www.tiktok.com/@u/video/333"));
+    await denied(clipSvc.attachVideoProof("brandviewer", camp, clipId, "https://youtu.be/aaaaaaaaaaa"));
+
+    // Its own permitted read succeeds, sees every clip regardless of status, and carries no creator identity.
+    const feed = await clipSvc.getBrandClipFeed("brandviewer", camp);
+    expect(feed.rows.some((r) => r.id === clipId)).toBe(true);
+    for (const r of feed.rows) expect(r).not.toHaveProperty("creatorUsername");
+    expect(feed.stats.totalClips).toBeGreaterThan(0);
+  });
+
+  it("addBrand/removeBrand are Owner/Admin only, and enforce one campaign at a time like a Mod", async () => {
+    const campY = (await campaignSvc.createCampaign("owner", { ...validCampaign, name: "Brand scope B" })).id;
+    await db.insert(users).values({ id: "brandviewer2", username: "brandviewer2" });
+    await denied(campaignSvc.addBrand("mod", camp, "brandviewer2")); // Mod can't add a Brand
+    const row = await campaignSvc.addBrand("owner", camp, "brandviewer2");
+    await expect(campaignSvc.addBrand("admin", campY, "brandviewer2")).rejects.toThrow(/one campaign at a time/i);
+    await campaignSvc.removeBrand("admin", camp, row!.id);
+    expect(await getRoleForCampaign("brandviewer2", camp)).toBeNull();
+  });
+});

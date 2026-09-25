@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { requireUserId } from "@/lib/auth/ensure-user";
 import { getCampaignForUser, getRoleForCampaign } from "@/lib/auth/roles";
 import { getMyClipHistory, getReviewerClipHistory, type ClipHistoryStatusFilter } from "@/lib/clips/service";
@@ -31,6 +31,9 @@ export default async function ClipHistoryPage({
   const campaign = await getCampaignForUser(userId, id);
   if (!campaign) notFound(); // "not found" and "not yours" look identical
   const role = (await getRoleForCampaign(userId, id))!;
+  // Brand has its own read-only, creator-identity-free feed on the dashboard (getBrandClipFeed) --
+  // this page's reviewer branch is Mod-minimum and would otherwise throw for a Brand actor.
+  if (role === "brand") redirect(`/campaigns/${id}`);
 
   const status: ClipHistoryStatusFilter = (STATUS_VALUES as string[]).includes(sp.status ?? "")
     ? (sp.status as ClipHistoryStatusFilter)

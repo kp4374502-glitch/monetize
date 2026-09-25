@@ -1,6 +1,6 @@
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "../db/client";
-import { campaigns, campaignCreators, campaignMods, platformAdmins, users } from "../../drizzle/schema";
+import { campaigns, campaignBrands, campaignCreators, campaignMods, platformAdmins, users } from "../../drizzle/schema";
 
 /**
  * Every function in this file is the single choke point for "can this user see/do this in this
@@ -11,7 +11,10 @@ import { campaigns, campaignCreators, campaignMods, platformAdmins, users } from
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (v: string) => UUID_RE.test(v);
 
-export type Role = "owner" | "admin" | "mod" | "creator" | null;
+// "brand" here is the read-only per-campaign viewer role (campaign_brands) -- unrelated to
+// lib/brand/service.ts's "approved brand" concept (a platform-level flag on a prospective campaign
+// OWNER, granted via the brand-signup request flow). Same English word, two different things.
+export type Role = "owner" | "admin" | "mod" | "brand" | "creator" | null;
 
 export async function isPlatformOwner(userId: string): Promise<boolean> {
   const [row] = await db
@@ -37,6 +40,7 @@ export async function isPlatformAdmin(userId: string): Promise<boolean> {
  *   - campaign Owner (campaigns.owner_user_id) -> "owner"
  *   - platform_admins membership       -> "admin"  (implicit on every campaign, no row needed)
  *   - campaign_mods row for this campaign -> "mod"
+ *   - campaign_brands row for this campaign -> "brand" (read-only; never sees creator identity)
  *   - campaign_creators row for this campaign -> "creator"
  *   - none of the above                -> null (no access)
  */
@@ -60,6 +64,13 @@ export async function getRoleForCampaign(userId: string, campaignId: string): Pr
     .limit(1);
   if (modRow) return "mod";
 
+  const [brandRow] = await db
+    .select()
+    .from(campaignBrands)
+    .where(and(eq(campaignBrands.campaignId, campaignId), eq(campaignBrands.userId, userId)))
+    .limit(1);
+  if (brandRow) return "brand";
+
   const [creatorRow] = await db
     .select()
     .from(campaignCreators)
@@ -72,14 +83,18 @@ export async function getRoleForCampaign(userId: string, campaignId: string): Pr
 
 /**
  * Throws if `userId` does not hold at least `minimumRole` on `campaignId`.
- * Role ranking: owner > admin > mod > creator. Use this at the top of every Server Action.
+ * Role ranking: owner > admin > mod > brand > creator. Use this at the top of every Server Action.
+ * No code checks a "creator" minimum (creator-only actions are self-scoped by campaign_creators
+ * membership instead, e.g. submitClip), so brand outranking creator here never grants brand access
+ * to anything creator-specific.
  */
 const ROLE_RANK: Record<Exclude<Role, null>, number> = {
   owner: 3,
   admin: 3, // Admin is a strict superset of Mod but ranks alongside Owner for most checks;
   // actions that are literally Owner-only (create campaign, approve new brand) must check
   // `role === "owner"` explicitly rather than relying on rank alone.
-  mod: 1,
+  mod: 2,
+  brand: 1,
   creator: 0,
 };
 
@@ -137,6 +152,13 @@ export async function getCampaignsForUser(userId: string) {
     .innerJoin(campaigns, eq(campaigns.id, campaignMods.campaignId))
     .where(eq(campaignMods.userId, userId));
   for (const c of modded) if (!found.has(c.id)) found.set(c.id, { ...c, role: "mod" });
+
+  const branded = await db
+    .select(cols)
+    .from(campaignBrands)
+    .innerJoin(campaigns, eq(campaigns.id, campaignBrands.campaignId))
+    .where(eq(campaignBrands.userId, userId));
+  for (const c of branded) if (!found.has(c.id)) found.set(c.id, { ...c, role: "brand" });
 
   const joined = await db
     .select(cols)

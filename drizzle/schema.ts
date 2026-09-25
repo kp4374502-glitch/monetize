@@ -114,6 +114,32 @@ export const campaignMods = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// campaign_brands — unique(userId): a Brand account is scoped to one campaign at a time, same
+// shape as campaign_mods. Read-only: never grants review/admin authority, and creator identity is
+// never joined into a Brand query (see getBrandClipFeed) rather than merely hidden in the UI.
+// ---------------------------------------------------------------------------
+export const campaignBrands = pgTable(
+  "campaign_brands",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    campaignId: uuid("campaign_id")
+      .notNull()
+      .references(() => campaigns.id),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    addedBy: text("added_by")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    oneCampaignPerBrand: unique("campaign_brands_user_id_unique").on(t.userId),
+    campaignIdx: index("campaign_brands_campaign_id_idx").on(t.campaignId),
+  }),
+);
+
+// ---------------------------------------------------------------------------
 // campaign_creators
 // ---------------------------------------------------------------------------
 export const campaignCreators = pgTable(
