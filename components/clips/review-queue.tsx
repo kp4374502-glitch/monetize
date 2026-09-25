@@ -3,10 +3,21 @@ import { ActionForm } from "@/components/action-form";
 import { Button } from "@/components/ui/button";
 import { Callout, Card, SectionHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { markPaidAction, reviewAction, setManualViewsAction, setPctAction } from "@/app/campaigns/clip-actions";
+import { clipApproveAction, markPaidAction, reviewAction, setManualViewsAction, setPctAction } from "@/app/campaigns/clip-actions";
 import { canSetManualViews, hasAnalyticsProof } from "@/lib/clips/rules";
 import { DeleteClipButton } from "./delete-clip-button";
-import { Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
+import { ClipApprovedBadge, Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
+
+function ClipApproveButton({ campaignId, clip }: { campaignId: string; clip: ClipRow }) {
+  if (clip.clipApproved) return null;
+  return (
+    <ActionForm action={clipApproveAction.bind(null, campaignId, clip.id)}>
+      <Button type="submit" variant="outline" size="sm" data-testid="clip-approve">
+        Clip Approve
+      </Button>
+    </ActionForm>
+  );
+}
 
 type Row = { clip: ClipRow; creatorUsername: string };
 
@@ -115,12 +126,15 @@ export function ReviewQueue({
   pending,
   awaitingPayment,
   canDelete = false,
+  canClipApprove = false,
 }: {
   campaignId: string;
   pending: Row[];
   awaitingPayment: Row[];
   /** Owner/Admin only — the server re-checks this regardless of what's rendered. */
   canDelete?: boolean;
+  /** Admin/Owner only — gates the Clip Approve button. Mod keeps Analytics Approve and Reject, unchanged. */
+  canClipApprove?: boolean;
 }) {
   return (
     <>
@@ -142,6 +156,7 @@ export function ReviewQueue({
                   <div className="min-w-0 flex-1 space-y-2.5">
                     <div className="flex flex-wrap items-center gap-2">
                       <StatusBadge clip={c} />
+                      <ClipApprovedBadge clip={c} />
                       <span className="text-sm font-bold" data-testid="queue-creator">{creatorUsername}</span>
                       <a href={c.url} target="_blank" rel="noreferrer" className="truncate text-sm text-text-secondary underline-offset-2 hover:text-gold-light hover:underline">
                         {c.url}
@@ -158,9 +173,10 @@ export function ReviewQueue({
                     <PctForm campaignId={campaignId} clip={c} />
                     {canSetManualViews(c) && <ManualViewsForm campaignId={campaignId} clip={c} />}
                     <div className="flex flex-wrap items-center gap-2 border-t border-subtle pt-3">
+                      {canClipApprove && <ClipApproveButton campaignId={campaignId} clip={c} />}
                       <ActionForm action={reviewAction.bind(null, campaignId, c.id)} className="flex flex-1 flex-wrap items-center gap-2">
                         <Input name="reason" placeholder="Reason (required to reject)" className="min-w-56 flex-1" />
-                        <Button type="submit" name="intent" value="approve" formNoValidate size="sm">Approve</Button>
+                        <Button type="submit" name="intent" value="approve" formNoValidate size="sm">Analytics Approve</Button>
                         <Button type="submit" name="intent" value="reject" variant="danger" formNoValidate size="sm">Reject</Button>
                       </ActionForm>
                       {canDelete && <DeleteClipButton campaignId={campaignId} clipId={c.id} />}
@@ -185,6 +201,7 @@ export function ReviewQueue({
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                     <StatusBadge clip={c} />
+                    <ClipApprovedBadge clip={c} />
                     <span className="font-bold">{creatorUsername}</span>
                     <a href={c.url} target="_blank" rel="noreferrer" className="truncate text-text-secondary underline-offset-2 hover:text-gold-light hover:underline">
                       {c.url}
@@ -193,6 +210,7 @@ export function ReviewQueue({
                     <span className="text-base font-extrabold text-gold-light" data-testid="payment-amount">{money(c.payout)}</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    {canClipApprove && <ClipApproveButton campaignId={campaignId} clip={c} />}
                     <ActionForm action={markPaidAction.bind(null, campaignId, c.id)}>
                       <Button type="submit" size="sm" disabled={c.payout === null}>Mark paid</Button>
                     </ActionForm>

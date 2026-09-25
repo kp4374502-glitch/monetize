@@ -5,7 +5,7 @@ import { Callout, Card, SectionHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { attachProofAction, refreshViewsAction, submitClipAction } from "@/app/campaigns/clip-actions";
 import { analyticsGateState, hasAnalyticsProof } from "@/lib/clips/rules";
-import { StatusBadge, Stats, Thumb, money, type ClipRow } from "./clip-parts";
+import { ClipApprovedBadge, StatusBadge, Stats, Thumb, money, type ClipRow } from "./clip-parts";
 
 const onDate = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -41,6 +41,13 @@ export function CreatorClips({ campaignId, clips, viewMinimum }: { campaignId: s
                 <div className="flex gap-4">
                   <Thumb clip={c} />
                   <div className="min-w-0 flex-1 space-y-2">
+                    {/* Clip Approved is purely informational -- shown above the real status, which still
+                        reads "Awaiting analytics" through the whole pre-proof/pre-7-day period unchanged. */}
+                    {c.clipApproved && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <ClipApprovedBadge clip={c} />
+                      </div>
+                    )}
                     <div className="flex flex-wrap items-center gap-2">
                       <StatusBadge clip={c} />
                       <a href={c.url} target="_blank" rel="noreferrer" className="truncate text-sm text-text-secondary underline-offset-2 hover:text-gold-light hover:underline">

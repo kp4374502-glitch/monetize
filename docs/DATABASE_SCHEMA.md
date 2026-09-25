@@ -105,13 +105,20 @@ Read-only per-campaign viewer role ("Brand" — unrelated to the `brand_requests
   never counts as "7 days have passed" either way).
 - `analytics_unlock_notified_at` (nullable) — cron dedup for the "you can now submit proof"
   notification, fired at most once per clip.
+- `clip_approved` (boolean, default false) — two-step approval: a pure content/eligibility check
+  (guidelines, brand integration, CTA), fully independent of `status` and the 7-day gate, and never
+  a payout signal — payout is only ever set via the Analytics Approve flow. Settable any time,
+  including while still `awaiting_analytics` and before proof exists. Admin/Owner only. Never reset
+  by a later Analytics-stage reject, so a clip can be `clip_approved = true` and `status = 'rejected'`
+  at the same time — see PRODUCT_SPEC.md "Two-step approval". `clip_approved_at`/`clip_approved_by`
+  (fk users, nullable) record when and by whom.
 
 ## clip\_review\_events
 
 - `id` (pk)
 - `clip_id` (fk clips)
 - `actor_user_id` (fk users)
-- `action` (approve | reject | delete | set_posted_at)
+- `action` (approve | reject | delete | set_posted_at | clip_approve)
 - `reason` (nullable; for a delete, records the clip's prior status)
 - `created_at`
 

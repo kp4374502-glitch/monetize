@@ -107,6 +107,7 @@ describe("a brand-new account (users row with no roles) and one that never logge
       await denied(campaignSvc.listInviteLinks(who, camp));
       // review, money and every campaign read the review team has
       await denied(clipSvc.reviewClip(who, camp, clipId, { action: "approve" }));
+      await denied(clipSvc.clipApprove(who, camp, clipId)); // Admin/Owner only, per the two-step approval task
       await denied(clipSvc.setQualifyingAudiencePct(who, camp, clipId, 50));
       await denied(clipSvc.markPaid(who, camp, clipId));
       await denied(clipSvc.getReviewQueue(who, camp));
@@ -167,12 +168,26 @@ describe("a brand-new account (users row with no roles) and one that never logge
     expect(await getRoleForCampaign("invitee", camp)).toBe("creator");
     await denied(requireRole("invitee", camp, "mod"));
     await denied(clipSvc.reviewClip("invitee", camp, clipId, { action: "approve" }));
+    await denied(clipSvc.clipApprove("invitee", camp, clipId));
     await denied(clipSvc.markPaid("invitee", camp, clipId));
     await denied(clipSvc.getReviewQueue("invitee", camp));
     await denied(clipSvc.getCreatorRoster("invitee", camp));
     await denied(campaignSvc.generateInviteLink("invitee", camp));
     await denied(campaignSvc.pauseCampaign("invitee", camp));
     expect(await isPlatformOwner("invitee")).toBe(false);
+  });
+
+  it("a legitimately-assigned Mod on THIS campaign can still Analytics Approve (unchanged), but cannot Clip Approve (Admin/Owner only)", async () => {
+    expect(await getRoleForCampaign("mod", camp)).toBe("mod"); // a real Mod, not a stranger
+    await denied(clipSvc.clipApprove("mod", camp, clipId));
+
+    const [{ id: freshClipId }] = await db
+      .insert(clips)
+      .values({ campaignId: camp, creatorUserId: "creator", platform: "tiktok", url: "https://www.tiktok.com/@u/video/999" })
+      .returning({ id: clips.id });
+    await clipSvc.reviewClip("mod", camp, freshClipId, { action: "approve" }); // does NOT throw -- matches today's real behavior
+    const [row] = await db.select().from(clips).where(eq(clips.id, freshClipId));
+    expect(row.status).toBe("approved");
   });
 });
 
@@ -185,6 +200,7 @@ describe("campaign_brands (read-only Brand role)", () => {
 
     // Reviewer/admin/people actions -- refused server-side, same as any other non-privileged actor.
     await denied(clipSvc.reviewClip("brandviewer", camp, clipId, { action: "approve" }));
+    await denied(clipSvc.clipApprove("brandviewer", camp, clipId));
     await denied(clipSvc.setQualifyingAudiencePct("brandviewer", camp, clipId, 50));
     await denied(clipSvc.markPaid("brandviewer", camp, clipId));
     await denied(clipSvc.deleteClip("brandviewer", camp, clipId));

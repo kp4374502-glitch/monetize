@@ -20,6 +20,19 @@ export function StatusBadge({ clip }: { clip: ClipRow }) {
   );
 }
 
+/**
+ * Two-step approval: a pure content/eligibility check, independent of `status` and never a payout
+ * signal — see clips.clip_approved. Shown additively alongside StatusBadge, never instead of it.
+ */
+export function ClipApprovedBadge({ clip }: { clip: ClipRow }) {
+  if (!clip.clipApproved) return null;
+  return (
+    <Badge status="approved" data-testid="clip-approved-badge">
+      Clip Approved
+    </Badge>
+  );
+}
+
 export function Thumb({ clip }: { clip: ClipRow }) {
   return clip.thumbnailUrl ? (
     // eslint-disable-next-line @next/next/no-img-element

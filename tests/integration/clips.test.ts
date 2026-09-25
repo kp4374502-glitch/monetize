@@ -559,7 +559,7 @@ describe("reviewClip", () => {
     await svc.reviewClip("modA", camp, clip.id, { action: "reject", reason: "bot-like spike" });
     const [rejected] = await db.select().from(clips).where(eq(clips.id, clip.id));
     expect(rejected).toMatchObject({ status: "rejected", rejectionReason: "bot-like spike" });
-    await svc.reviewClip("modA", camp, clip.id, { action: "approve" }); // Mod changes own decision
+    await svc.reviewClip("modA", camp, clip.id, { action: "approve" }); // Mod changes own decision -- Analytics Approve stays Mod/Admin/Owner
     const [approved] = await db.select().from(clips).where(eq(clips.id, clip.id));
     expect(approved).toMatchObject({ status: "approved", rejectionReason: null });
 
@@ -596,6 +596,67 @@ describe("reviewClip", () => {
     await svc.attachVideoProof("c1", small, clip.id, "https://youtu.be/aaaaaaaaaaa");
     await svc.setQualifyingAudiencePct("admin", small, clip.id, 25); // payout $500 > budget $300
     await expect(svc.reviewClip("admin", small, clip.id, { action: "approve" })).rejects.toThrow(/exceed/);
+  });
+});
+
+describe("clipApprove (two-step approval, Task: Clip Approved / Analytics Approved)", () => {
+  it("is settable while still locked behind the 7-day gate, before any proof exists -- independent of status and the gate", async () => {
+    const { clip } = await svc.submitClip("c1", camp, tiktok(), opts(1000, 2)); // posted 2 days ago -> still locked
+    expect(clip.status).toBe("awaiting_analytics");
+    expect(clip.videoProofUrl).toBeNull();
+
+    const before = await db.select().from(clips).where(eq(clips.id, clip.id));
+    expect(before[0].clipApproved).toBe(false);
+
+    await svc.clipApprove("admin", camp, clip.id);
+    const [after] = await db.select().from(clips).where(eq(clips.id, clip.id));
+    expect(after).toMatchObject({ clipApproved: true, clipApprovedBy: "admin", status: "awaiting_analytics" }); // status/gate untouched
+    expect(after.clipApprovedAt).not.toBeNull();
+
+    const events = await db.select().from(clipReviewEvents).where(eq(clipReviewEvents.clipId, clip.id));
+    expect(events.map((e) => e.action)).toEqual(["clip_approve"]);
+  });
+
+  it("has no effect on payout math whatsoever until Analytics Approve actually runs", async () => {
+    const clip = await makeClip("c1", camp, 5000);
+    await svc.clipApprove("admin", camp, clip.id);
+    let [row] = await db.select().from(clips).where(eq(clips.id, clip.id));
+    expect(row).toMatchObject({ clipApproved: true, cpm: null, earnings: null, payout: null, status: "awaiting_analytics" });
+
+    await svc.attachVideoProof("c1", camp, clip.id, "https://youtu.be/aaaaaaaaaaa");
+    [row] = await db.select().from(clips).where(eq(clips.id, clip.id));
+    expect(row).toMatchObject({ clipApproved: true, payout: null, status: "pending" }); // proof alone still doesn't pay
+
+    await svc.setQualifyingAudiencePct("admin", camp, clip.id, 50);
+    [row] = await db.select().from(clips).where(eq(clips.id, clip.id));
+    expect(row.payout).not.toBeNull(); // computed once %, is set...
+    const payoutBeforeAnalyticsApprove = row.payout;
+    expect(row.status).toBe("pending"); // ...but the STATUS (what actually pays) hasn't moved to "approved" yet
+
+    await svc.reviewClip("admin", camp, clip.id, { action: "approve" });
+    [row] = await db.select().from(clips).where(eq(clips.id, clip.id));
+    expect(row).toMatchObject({ status: "approved", payout: payoutBeforeAnalyticsApprove }); // unchanged by clipApprove having run first
+  });
+
+  it("Clip Approved, then Analytics-Rejected -- the final outcome is a full reject with zero payout, regardless of the earlier Clip Approved state", async () => {
+    const clip = await makeClip("c1", camp, 5000);
+    await svc.attachVideoProof("c1", camp, clip.id, "https://youtu.be/aaaaaaaaaaa");
+    await svc.setQualifyingAudiencePct("admin", camp, clip.id, 50);
+    await svc.clipApprove("admin", camp, clip.id);
+
+    await svc.reviewClip("admin", camp, clip.id, { action: "reject", reason: "bad proof" });
+    const [row] = await db.select().from(clips).where(eq(clips.id, clip.id));
+    expect(row).toMatchObject({ clipApproved: true, status: "rejected", rejectionReason: "bad proof" }); // flag stands, but it never guaranteed payment
+    expect(row.paidStatus).toBe("unpaid");
+    await expect(svc.markPaid("admin", camp, clip.id)).rejects.toThrow(); // no path to payout from here
+  });
+
+  it("is idempotent-guarded (can't Clip Approve twice) and Admin/Owner only", async () => {
+    const clip = await makeClip("c1", camp, 1000);
+    await expect(svc.clipApprove("modA", camp, clip.id)).rejects.toThrow(/Access denied/);
+    await expect(svc.clipApprove("c1", camp, clip.id)).rejects.toThrow(/Access denied/);
+    await svc.clipApprove("admin", camp, clip.id);
+    await expect(svc.clipApprove("owner", camp, clip.id)).rejects.toThrow(/already been Clip Approved/);
   });
 });
 

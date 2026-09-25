@@ -2,12 +2,12 @@ import { ActionForm } from "@/components/action-form";
 import { Button } from "@/components/ui/button";
 import { Callout, Card, SectionHeader, StatCard } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/input";
-import { setPostedAtAction } from "@/app/campaigns/clip-actions";
+import { clipApproveAction, setPostedAtAction } from "@/app/campaigns/clip-actions";
 import { analyticsGateState } from "@/lib/clips/rules";
 import type { ClipHistoryStatusFilter } from "@/lib/clips/service";
 import { AutoSubmitSelect } from "./auto-submit-select";
 import { DeleteClipButton } from "./delete-clip-button";
-import { Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
+import { ClipApprovedBadge, Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
 
 type Row = { clip: ClipRow; creatorUsername: string };
 
@@ -18,6 +18,7 @@ const STATUS_OPTIONS: { value: ClipHistoryStatusFilter; label: string }[] = [
   { value: "approved", label: "Approved" },
   { value: "rejected", label: "Rejected" },
   { value: "paid", label: "Paid" },
+  { value: "clip_approved", label: "Clip Approved" },
 ];
 
 const onDate = (d: Date) => d.toISOString().slice(0, 10);
@@ -60,6 +61,7 @@ export function ClipHistoryBrowser({
   showCreator,
   canDelete = false,
   canReview = false,
+  canClipApprove = false,
 }: {
   campaignId: string;
   basePath: string;
@@ -75,6 +77,8 @@ export function ClipHistoryBrowser({
     paid: number;
     totalViews: number;
     approvedViews: number;
+    clipApprovedAwaitingAnalytics: number;
+    clipApprovedAnalyticsApproved: number;
   };
   rows: Row[];
   showCreator: boolean;
@@ -82,6 +86,8 @@ export function ClipHistoryBrowser({
   canDelete?: boolean;
   /** Mod/Admin/Owner — gates the manual post-date-confirmation form. Server re-checks regardless. */
   canReview?: boolean;
+  /** Admin/Owner only — gates the Clip Approve button. Server re-checks regardless. */
+  canClipApprove?: boolean;
 }) {
   const filtered = status !== "all" || !!from || !!to;
   return (
@@ -136,6 +142,24 @@ export function ClipHistoryBrowser({
         />
       </div>
 
+      {status === "clip_approved" && (
+        <div className="grid grid-cols-2 gap-3" data-testid="clip-approved-breakdown">
+          <StatCard
+            label="Still awaiting analytics"
+            value={summary.clipApprovedAwaitingAnalytics.toLocaleString()}
+            valueTestId="clip-approved-awaiting"
+            hint="Clip Approved, not yet through analytics review"
+          />
+          <StatCard
+            label="Analytics Approved"
+            value={summary.clipApprovedAnalyticsApproved.toLocaleString()}
+            valueTestId="clip-approved-full"
+            emphasis
+            hint="Made it all the way through"
+          />
+        </div>
+      )}
+
       {rows.length === 0 ? (
         <Card innerClassName="py-10 text-center text-sm text-text-secondary">No clips match this filter.</Card>
       ) : (
@@ -149,6 +173,7 @@ export function ClipHistoryBrowser({
                 <div className="min-w-0 flex-1 text-sm">
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusBadge clip={c} />
+                    <ClipApprovedBadge clip={c} />
                     {showCreator && <span className="font-bold" data-testid="history-creator">{creatorUsername}</span>}
                     <a href={c.url} target="_blank" rel="noreferrer" className="min-w-0 truncate text-text-secondary underline-offset-2 hover:text-gold-light hover:underline">
                       {c.url}
@@ -168,6 +193,13 @@ export function ClipHistoryBrowser({
                   )}
                   {canReview && gate.locked && gate.reason === "unknown_posted_at" && (
                     <SetPostedAtForm campaignId={campaignId} clipId={c.id} />
+                  )}
+                  {canClipApprove && !c.clipApproved && (
+                    <ActionForm action={clipApproveAction.bind(null, campaignId, c.id)} className="mt-1.5">
+                      <Button type="submit" variant="outline" size="sm" data-testid="clip-approve">
+                        Clip Approve
+                      </Button>
+                    </ActionForm>
                   )}
                 </div>
                 <span className="text-base font-extrabold text-gold-light" data-testid="history-payout">

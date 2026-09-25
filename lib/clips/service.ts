@@ -400,6 +400,11 @@ const reviewSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("reject"), reason: z.string().trim().min(1, "A reason is required to reject a clip") }),
 ]);
 
+/**
+ * "Analytics Approve"/Reject in the UI (relabeled; mechanics AND permissions unchanged) — this is
+ * what actually determines and locks in payout. Mod/Admin/Owner, exactly as before Clip Approve
+ * existed; only the brand-new clipApprove() below is Admin/Owner-only.
+ */
 export async function reviewClip(actorId: string, campaignId: string, clipId: string, input: unknown) {
   const role = await requireRole(actorId, campaignId, "mod");
   const decision = reviewSchema.parse(input);
@@ -446,8 +451,28 @@ export async function reviewClip(actorId: string, campaignId: string, clipId: st
       clipId,
       type: decision.action === "approve" ? "clip_approved" : "clip_rejected",
       message:
-        decision.action === "approve" ? "Your clip was approved." : `Your clip was rejected: ${decision.reason}`,
+        decision.action === "approve" ? "Your clip's analytics were approved." : `Your clip was rejected: ${decision.reason}`,
     });
+  });
+}
+
+/**
+ * "Clip Approve" in the UI — a pure content/eligibility check (guidelines, brand integration, CTA),
+ * independent of `status` and the 7-day gate. Admin/Owner only. Never a payout signal by itself:
+ * payout is only ever set by reviewClip's approve path. Idempotent-guarded, not reversible here —
+ * there's no "un-approve"; a bad call is caught downstream by an Analytics-stage Reject instead.
+ */
+export async function clipApprove(actorId: string, campaignId: string, clipId: string) {
+  await requireRole(actorId, campaignId, "admin");
+  const clip = await loadClip(campaignId, clipId);
+  if (clip.clipApproved) throw new Error("This clip has already been Clip Approved.");
+
+  await db.transaction(async (tx) => {
+    await tx.insert(clipReviewEvents).values({ clipId, actorUserId: actorId, action: "clip_approve" });
+    await tx
+      .update(clips)
+      .set({ clipApproved: true, clipApprovedAt: new Date(), clipApprovedBy: actorId })
+      .where(and(eq(clips.id, clipId), eq(clips.campaignId, campaignId)));
   });
 }
 
@@ -718,7 +743,16 @@ export async function getClipHistory(actorId: string, campaignId: string) {
 // same clips rows getReviewQueue/getClipHistory already read, not a separate data model.
 // ---------------------------------------------------------------------------------------------
 
-export type ClipHistoryStatusFilter = "all" | "awaiting_analytics" | "pending" | "approved" | "rejected" | "paid";
+export type ClipHistoryStatusFilter =
+  | "all"
+  | "awaiting_analytics"
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "paid"
+  // Not a clip status -- narrows to clip_approved = true (any underlying status) and pairs with a
+  // breakdown tile (still awaiting analytics vs. fully Analytics Approved); see filteredClipHistory.
+  | "clip_approved";
 export interface ClipHistoryFilters {
   status?: ClipHistoryStatusFilter;
   from?: Date;
@@ -743,6 +777,8 @@ function clipHistoryStatusCondition(status: ClipHistoryStatusFilter | undefined)
       // Only an approved clip can be paid, but this filters on paid_status directly (not status)
       // so it reads naturally as its own tab, same as the others.
       return eq(clips.paidStatus, "paid");
+    case "clip_approved":
+      return eq(clips.clipApproved, true);
     default:
       return undefined;
   }
@@ -771,6 +807,12 @@ async function filteredClipHistory(scope: SQL, filters: ClipHistoryFilters) {
       // over `rows`, which is capped at CLIP_HISTORY_LIMIT — this must total every matching clip.
       totalViews: sql<string>`coalesce(sum(coalesce(${clips.manualViews}, ${clips.views})), 0)`,
       approvedViews: sql<string>`coalesce(sum(coalesce(${clips.manualViews}, ${clips.views})) filter (where ${clips.status} = 'approved'), 0)`,
+      // Clip Approved breakdown: of the clips that passed the content/eligibility check, how many
+      // are still working through analytics review vs. how many made it all the way to Analytics
+      // Approved. A clip_approved clip that was later Analytics-Rejected falls into neither bucket
+      // (it's neither "still awaiting" nor "approved") -- it shows up in the existing Rejected tile.
+      clipApprovedAwaitingAnalytics: sql<number>`count(*) filter (where ${clips.clipApproved} and ${clips.status} in ('awaiting_analytics', 'pending'))`,
+      clipApprovedAnalyticsApproved: sql<number>`count(*) filter (where ${clips.clipApproved} and ${clips.status} = 'approved')`,
     })
     .from(clips)
     .where(dateScope);
@@ -794,6 +836,8 @@ async function filteredClipHistory(scope: SQL, filters: ClipHistoryFilters) {
       paid: Number(summaryRow.paid),
       totalViews: Number(summaryRow.totalViews),
       approvedViews: Number(summaryRow.approvedViews),
+      clipApprovedAwaitingAnalytics: Number(summaryRow.clipApprovedAwaitingAnalytics),
+      clipApprovedAnalyticsApproved: Number(summaryRow.clipApprovedAnalyticsApproved),
     },
     rows,
   };

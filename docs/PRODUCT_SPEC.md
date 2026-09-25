@@ -57,6 +57,7 @@ A platform-wide **Admin is a strict superset of Mod** — anything a Mod can do,
 
 **Clip review**
 
+- Can Clip Approve (see "Two-step approval" below) — a Mod cannot. (Analytics Approve stays Mod/Admin/Owner, unchanged.)
 - Can override a Mod's decision (re-approve something rejected, or reverse an approval).
 - Can edit a Qualifying Audience % that a Mod already entered.
 - Can delete a clip in any status (pending, approved, rejected, or paid) — see "Clip deletion" below. A Mod cannot.
@@ -90,9 +91,11 @@ Unlike Admin, a Mod is **not** automatic across campaigns — they must be expli
 
 **Clip review**
 
-- Cannot override another Mod's approve/reject decision on the same clip.
+- **Cannot Clip Approve — Admin/Owner only** (see "Two-step approval" below). Can still Analytics Approve and Reject, exactly as before.
+- Can Reject at any stage, including a clip that's already been Clip Approved (Clip Approved is never a payout guarantee) — subject to the override rule below.
+- Cannot override another reviewer's prior decision on the same clip (approve or reject).
 - Cannot edit a Qualifying Audience % that a different Mod already entered.
-- A Mod's approve/reject decision is final on its own — but an Admin can review and change it afterward.
+- A Mod's reject decision is final on its own — but an Admin can review and change it afterward.
 - Cannot delete a clip in any status — that's Owner/Admin-only.
 
 **Campaign & money**
@@ -133,7 +136,7 @@ Unlike Admin, a Mod is **not** automatic across campaigns — they must be expli
 
 **Clip review**
 
-- Same review powers as Admin: can override a Mod's decision and edit a Qualifying Audience % already entered.
+- Same review powers as Admin: can Clip Approve, Analytics Approve, override a Mod's decision, and edit a Qualifying Audience % already entered.
 - Can see everyone's individual review speed/activity, same as Admin.
 - Can delete a clip in any status, same as Admin — see "Clip deletion" below.
 
@@ -265,6 +268,28 @@ Only once both are true does the clip move into the normal `pending` review queu
 An Admin or Mod reads the proof and manually enters the **Qualifying Audience %** on the clip — this is never self-reported by the creator directly into a number field. Until the proof is attached and a % is entered, the clip shows a blocking warning and earns $0, even if it has cleared the view minimum.
 
 If a creator never submits the analytics proof once unlocked, there's no automatic rejection or expiry — the clip just stays blocked, and the assigned reviewer gets an in-app notification reminding them to chase it up (this older per-campaign reminder is separate from the unlock notification above, and no longer fires for a clip still gated — it would always be a false alarm, since a gated clip can't have proof yet by construction).
+
+## Two-step approval: Clip Approved vs. Analytics Approved
+
+Solves a retention problem: creators were dropping off while waiting the full 7-day analytics cycle for their only feedback signal. **Clip Approved** gives them fast content-validity feedback without touching payout at all.
+
+**Clip Approved** (`clips.clip_approved`/`clip_approved_at`/`clip_approved_by`) is a pure content/eligibility check — do the post/clip itself follow every campaign guideline, brand-integration requirement, and CTA requirement (required brand slide present, caption hashtags, bio link, no violations)? It never involves audience %, views, or CPM — those are set later, only at Analytics Approved.
+
+- **Independent of `status` and of the 7-day analytics gate.** Settable any time, including while a clip is still `awaiting_analytics` and before any proof exists — that's the whole point: a reviewer can give the fast content signal well before the 7-day/proof cycle finishes.
+- **Admin/Owner only** — a Mod cannot Clip Approve (see the Mod/Admin/Owner permissions above).
+- **Never a payout signal.** It has zero effect on `cpm`/`earnings`/`payout` and zero effect on the campaign budget. Only Analytics Approve (below) ever sets those.
+- **Never reset.** If a clip was Clip Approved and is later Analytics-Rejected (bad proof, disqualifying audience, a mismatch caught late, etc.), the final outcome is a full Reject — no payout, regardless of the earlier Clip Approved state. A clip can be `clip_approved = true` and `status = 'rejected'` at the same time; Clip Approved is never a guarantee of payment.
+- **One-way in the UI.** There's no "un-approve" — a bad Clip Approve call is caught downstream by an Analytics-stage Reject instead.
+
+**Analytics Approved** is the existing full-approval flow (proof + Qualifying Audience % → CPM/payout) — same mechanics *and* same permissions as always, just labeled "Analytics Approve" in the UI to distinguish it from Clip Approve. This is what actually determines and locks in payout, and stays **Mod/Admin/Owner**, unchanged. Only Clip Approve (above) is the new Admin/Owner-only action; Reject also stays Mod/Admin/Owner.
+
+**Reviewer UI** shows four actions per clip: Clip Approve, Analytics Approve, Reject, Delete (Owner/Admin only, unchanged from Task 5).
+
+**Creator-facing display:** a green "Clip Approved" badge appears as soon as it's set, shown additively alongside — never instead of — the clip's real status. A clip can show "Clip Approved" plus "Awaiting analytics" at the same time; Clip Approved has no bearing on when the proof-submission field unlocks, which is still strictly the 7-day rule.
+
+**History filter** has a "Clip Approved" option showing a breakdown: how many Clip Approved clips are still working through analytics review vs. how many made it all the way to Analytics Approved.
+
+**Backfill (existing clips, applied once on deploy):** clips already `approved` or `paid` → `clip_approved = true` retroactively (they already passed full review, so they clearly passed the content bar too). Clips `rejected` → left `false` (a past rejection stands; not implied to have been content-approved). Clips `pending`/`awaiting_analytics` → left `false` — genuinely not yet Clip Approved; reviewers work through them going forward with the new button.
 
 ## Payout formula
 

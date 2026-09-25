@@ -32,7 +32,7 @@ export const clipStatusEnum = pgEnum("clip_status", ["pending", "approved", "rej
 
 export const paidStatusEnum = pgEnum("paid_status", ["unpaid", "paid"]);
 
-export const reviewActionEnum = pgEnum("review_action", ["approve", "reject", "delete", "set_posted_at"]);
+export const reviewActionEnum = pgEnum("review_action", ["approve", "reject", "delete", "set_posted_at", "clip_approve"]);
 
 export const notificationTypeEnum = pgEnum("notification_type", [
   "clip_approved",
@@ -249,6 +249,15 @@ export const clips = pgTable(
     postedAtSetBy: text("posted_at_set_by").references(() => users.id), // non-null only if a reviewer set it manually
     // Cron dedup: the "you can now submit your analytics proof" notification fires at most once.
     analyticsUnlockNotifiedAt: timestamp("analytics_unlock_notified_at", { withTimezone: true }),
+    // Two-step approval: a pure content/eligibility check (guidelines, brand integration, CTA) —
+    // independent of `status`, the 7-day analytics gate, and payout math. Settable any time,
+    // including while still `awaiting_analytics` and before any proof exists. Never reset by a
+    // later Analytics-stage reject — it records that the content passed, not the final outcome; a
+    // clip can be `clip_approved = true` and `status = 'rejected'` at the same time (no payout
+    // either way; see setQualifyingAudiencePct / reviewClip for the actual payout-determining step).
+    clipApproved: boolean("clip_approved").notNull().default(false),
+    clipApprovedAt: timestamp("clip_approved_at", { withTimezone: true }),
+    clipApprovedBy: text("clip_approved_by").references(() => users.id),
   },
   (t) => ({
     // Partial (not table-level unique): a deleted clip's URL frees up for resubmission — EXCEPT a
