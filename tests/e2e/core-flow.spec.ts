@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { setupClerkTestingToken } from "@clerk/testing/playwright";
+import postgres from "postgres";
 import { signInAs } from "./clerk";
 
 /**
@@ -15,7 +16,26 @@ import { signInAs } from "./clerk";
  * The Owner is signed in via a Clerk sign-in ticket (skips password + Client Trust email code). The
  * creator signs up through the REAL invite-link UI using a Clerk test email (+clerk_test), whose
  * verification code is always 424242 on dev instances.
+ *
+ * Task 5 Part 3: a fresh clip starts "awaiting_analytics" and can't receive proof until 7 days have
+ * passed since the POST'S OWN publish date (posted_at) — not since submission, and not something a
+ * real run can wait out. This spec writes directly to DATABASE_URL (already required above) to
+ * force posted_at to a specific age, the same way integration tests seed data directly rather than
+ * waiting on real time — see backdatePostedAt below.
  */
+async function backdatePostedAt(sql: postgres.Sql, creatorUsername: string, daysAgo: number) {
+  const postedAt = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
+  await sql`
+    update clips set posted_at = ${postedAt}
+    where id = (
+      select id from clips
+      where creator_user_id = (select id from users where username = ${creatorUsername})
+      order by submitted_at desc
+      limit 1
+    )
+  `;
+}
+
 test.describe("core flow", () => {
   test("Owner creates campaign -> invite link -> new user joins and lands inside it", async ({ browser }) => {
     // Cold dev-server page compiles, two Clerk flows and a real ScrapeCreators call. The full flow
@@ -70,13 +90,31 @@ test.describe("core flow", () => {
     await expect(creator.getByTestId("campaign-name")).toHaveText(name);
     await expect(creator.getByTestId("role")).toHaveText("creator");
 
-    // ---- Task 3: creator submits -> proof -> reviewer sets % and approves -> mark paid ----
+    // ---- Task 3/5: creator submits -> gated 7 days -> proof -> reviewer sets % and approves -> mark paid ----
     await creator.getByPlaceholder(/paste a tiktok/i).fill(process.env.E2E_CLIP_URL!);
     await creator.getByRole("button", { name: "Submit", exact: true }).click();
     await expect(creator.getByTestId("my-clip").first()).toBeVisible();
+
+    // Task 5 Part 3: freshly submitted, so it's "awaiting_analytics" regardless of how old
+    // E2E_CLIP_URL's real post actually is — force a definitely-too-young date so the locked state
+    // is deterministic rather than an accident of which public link happens to be configured.
+    const sql = postgres(process.env.DATABASE_URL!);
+    await backdatePostedAt(sql, username, 2); // 2 days old -> still locked
+    await creator.reload();
+    await expect(creator.getByTestId("clip-status").first()).toHaveText("Awaiting analytics");
+    await expect(creator.getByTestId("analytics-gate-locked")).toBeVisible();
+    await expect(creator.getByPlaceholder(/analytics proof link/i)).toHaveCount(0); // the field doesn't render at all while locked
+
+    // Now simulate the 7-day window having cleared, the same way — a real run can't wait 7 real days.
+    await backdatePostedAt(sql, username, 8); // 8 days old -> unlocked
+    await sql.end();
+    await creator.reload();
+    await expect(creator.getByPlaceholder(/analytics proof link/i).first()).toBeVisible();
     await creator.getByPlaceholder(/analytics proof link/i).first().fill("https://youtu.be/dQw4w9WgXcQ");
     await creator.getByRole("button", { name: "Submit proof" }).click();
     await expect(creator.getByText("Proof submitted")).toBeVisible();
+    // Badge's "capitalize" is a CSS class (visual only) -- the actual DOM text is the raw lowercase status.
+    await expect(creator.getByTestId("clip-status").first()).toHaveText("pending"); // moved out of awaiting_analytics
 
     await owner.reload();
     const row = owner.getByTestId("queue-row").first();
@@ -84,7 +122,9 @@ test.describe("core flow", () => {
     await row.getByPlaceholder(/qualifying audience/i).fill("25");
     await row.getByRole("button", { name: "Save %" }).click();
     await expect(row.getByTestId("queue-payout")).not.toContainText("—");
-    await row.getByRole("button", { name: "Approve" }).click();
+    // "Approve" alone would match both "Clip Approve" and "Analytics Approve" (Playwright's name
+    // match is substring-based) -- exact text picks the one that actually determines payout.
+    await row.getByRole("button", { name: "Analytics Approve", exact: true }).click();
     await expect(owner.getByTestId("payment-row").first()).toBeVisible();
     await owner.getByRole("button", { name: "Mark paid" }).first().click();
 

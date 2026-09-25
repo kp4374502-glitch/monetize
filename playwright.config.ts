@@ -1,8 +1,22 @@
 import { defineConfig } from "@playwright/test";
 import { loadEnvConfig } from "@next/env";
 
-// Playwright doesn't read .env.local; global setup and the sign-in helper need the Clerk keys.
+// Playwright doesn't read .env.local on its own — global setup and the sign-in helper need
+// DATABASE_URL, the Clerk keys, and E2E_OWNER_USER from it. @next/env's loadEnvConfig() skips
+// .env.local entirely whenever NODE_ENV=="test", and Playwright sets NODE_ENV=test on ITS OWN
+// process before this file even runs — confirmed directly: E2E_OWNER_USER reads correctly with
+// NODE_ENV unset, and reads as undefined with NODE_ENV=test. The webServer.env override below only
+// fixes this for the SPAWNED dev server; it doesn't touch Playwright's own process, which is where
+// this call actually runs. So: clear NODE_ENV just for this call, then restore it, rather than
+// leaving Playwright's own process in an unintended state for the rest of the run.
+// @types/node marks NODE_ENV readonly (to stop accidental writes elsewhere) — this is the one
+// deliberate, temporary exception, so cast just for these four lines.
+const mutableEnv = process.env as Record<string, string | undefined>;
+const nodeEnvBeforeLoad = mutableEnv.NODE_ENV;
+delete mutableEnv.NODE_ENV;
 loadEnvConfig(process.cwd(), true);
+if (nodeEnvBeforeLoad === undefined) delete mutableEnv.NODE_ENV;
+else mutableEnv.NODE_ENV = nodeEnvBeforeLoad;
 
 export default defineConfig({
   testDir: "./tests/e2e",
