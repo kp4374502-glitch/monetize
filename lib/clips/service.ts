@@ -718,18 +718,7 @@ export async function getClipHistory(actorId: string, campaignId: string) {
 // same clips rows getReviewQueue/getClipHistory already read, not a separate data model.
 // ---------------------------------------------------------------------------------------------
 
-export type ClipHistoryStatusFilter =
-  | "all"
-  | "awaiting_analytics"
-  | "pending"
-  | "approved"
-  | "rejected"
-  | "paid"
-  // Not real clip statuses — view-count aggregates shown as a summary tile instead of narrowing
-  // the list to a status. "total_views" behaves like "all" for the list; "approved_views" narrows
-  // to the same rows "approved" already does (a paid clip's status is still "approved").
-  | "total_views"
-  | "approved_views";
+export type ClipHistoryStatusFilter = "all" | "awaiting_analytics" | "pending" | "approved" | "rejected" | "paid";
 export interface ClipHistoryFilters {
   status?: ClipHistoryStatusFilter;
   from?: Date;
@@ -754,9 +743,6 @@ function clipHistoryStatusCondition(status: ClipHistoryStatusFilter | undefined)
       // Only an approved clip can be paid, but this filters on paid_status directly (not status)
       // so it reads naturally as its own tab, same as the others.
       return eq(clips.paidStatus, "paid");
-    case "approved_views":
-      return eq(clips.status, "approved");
-    case "total_views":
     default:
       return undefined;
   }

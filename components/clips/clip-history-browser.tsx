@@ -2,10 +2,10 @@ import { ActionForm } from "@/components/action-form";
 import { Button } from "@/components/ui/button";
 import { Callout, Card, SectionHeader, StatCard } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { setPostedAtAction } from "@/app/campaigns/clip-actions";
 import { analyticsGateState } from "@/lib/clips/rules";
 import type { ClipHistoryStatusFilter } from "@/lib/clips/service";
+import { AutoSubmitSelect } from "./auto-submit-select";
 import { DeleteClipButton } from "./delete-clip-button";
 import { Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
 
@@ -18,8 +18,6 @@ const STATUS_OPTIONS: { value: ClipHistoryStatusFilter; label: string }[] = [
   { value: "approved", label: "Approved" },
   { value: "rejected", label: "Rejected" },
   { value: "paid", label: "Paid" },
-  { value: "total_views", label: "Total Views" },
-  { value: "approved_views", label: "Approved Views" },
 ];
 
 const onDate = (d: Date) => d.toISOString().slice(0, 10);
@@ -96,13 +94,13 @@ export function ClipHistoryBrowser({
       <Card innerClassName="p-4">
         <form method="get" action={basePath} className="flex flex-wrap items-end gap-3">
           <Field label="Status" className="w-full sm:w-56">
-            <Select name="status" defaultValue={status}>
+            <AutoSubmitSelect name="status" defaultValue={status}>
               {STATUS_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
               ))}
-            </Select>
+            </AutoSubmitSelect>
           </Field>
           <Field label="From">
             <Input type="date" name="from" defaultValue={from} className="w-40" />
@@ -122,24 +120,21 @@ export function ClipHistoryBrowser({
       </Card>
 
       {/* The date range narrows this too, but the status tab never does — so it stays a stable overview while the list below is filtered by both. */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-6" data-testid="history-summary">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="history-summary">
         <StatCard label="Submitted" value={summary.total.toLocaleString()} valueTestId="history-total" emphasis />
         <StatCard label="Waiting" value={summary.awaitingAnalytics.toLocaleString()} hint="for analytics" />
         <StatCard label="Pending" value={summary.pending.toLocaleString()} />
         <StatCard label="Approved" value={summary.approved.toLocaleString()} />
         <StatCard label="Rejected" value={summary.rejected.toLocaleString()} />
         <StatCard label="Paid" value={summary.paid.toLocaleString()} />
-      </div>
-
-      {(status === "total_views" || status === "approved_views") && (
+        <StatCard label="Total Views" value={summary.totalViews.toLocaleString()} valueTestId="history-total-views" hint="Every submitted clip, any status" />
         <StatCard
-          label={status === "total_views" ? "Total Views" : "Approved Views"}
-          value={(status === "total_views" ? summary.totalViews : summary.approvedViews).toLocaleString()}
-          hint={status === "total_views" ? "Every submitted clip, any status" : "Clips that passed review (approved or paid)"}
-          valueTestId="views-aggregate-value"
-          emphasis
+          label="Approved Views"
+          value={summary.approvedViews.toLocaleString()}
+          valueTestId="history-approved-views"
+          hint="Clips that passed review (approved or paid)"
         />
-      )}
+      </div>
 
       {rows.length === 0 ? (
         <Card innerClassName="py-10 text-center text-sm text-text-secondary">No clips match this filter.</Card>

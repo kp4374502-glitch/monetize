@@ -5,16 +5,7 @@ import { getMyClipHistory, getReviewerClipHistory, type ClipHistoryStatusFilter 
 import { ClipHistoryBrowser } from "@/components/clips/clip-history-browser";
 import { Badge } from "@/components/ui/badge";
 
-const STATUS_VALUES: readonly ClipHistoryStatusFilter[] = [
-  "all",
-  "awaiting_analytics",
-  "pending",
-  "approved",
-  "rejected",
-  "paid",
-  "total_views",
-  "approved_views",
-];
+const STATUS_VALUES: readonly ClipHistoryStatusFilter[] = ["all", "awaiting_analytics", "pending", "approved", "rejected", "paid"];
 
 function parseDate(v: string | undefined, endOfDay: boolean): Date | undefined {
   if (!v) return undefined;
