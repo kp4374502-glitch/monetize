@@ -19,5 +19,10 @@ next-env.d.ts
 # scratch files that may hold secrets
 temp.txt
 
+# Clerk user-migration output (usernames + Clerk IDs)
+scripts/clerk-migration-mapping.jsonl
+scripts/clerk-migration-errors.jsonl
+scripts/pre-remap-users-snapshot.json
+
 # Windows folder metadata
 desktop.ini
