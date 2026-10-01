@@ -135,10 +135,13 @@ export type AnalyticsGateState =
   | { locked: true; reason: "not_yet_7_days"; unlocksAt: Date };
 
 export function analyticsGateState(
-  clip: { status: string; postedAt: Date | null },
+  clip: { status: string; postedAt: Date | null; analyticsUnlockedEarlyAt: Date | null },
   now: Date = new Date(),
 ): AnalyticsGateState {
   if (clip.status !== "awaiting_analytics") return { locked: false };
+  // Explicit override (unlockAnalyticsEarly) always wins, including over an unknown posted_at --
+  // it never touches posted_at itself, so the 7-day math below stays accurate for every other clip.
+  if (clip.analyticsUnlockedEarlyAt !== null) return { locked: false };
   if (clip.postedAt === null) return { locked: true, reason: "unknown_posted_at", unlocksAt: null };
   const unlocksAt = new Date(clip.postedAt.getTime() + ANALYTICS_GATE_DAYS * 24 * 60 * 60 * 1000);
   if (now < unlocksAt) return { locked: true, reason: "not_yet_7_days", unlocksAt };

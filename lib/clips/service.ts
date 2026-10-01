@@ -574,6 +574,39 @@ export async function setPostedAt(actorId: string, campaignId: string, clipId: s
   return row;
 }
 
+/**
+ * Mod/Admin/Owner: lets one still-gate-locked clip submit Analytics proof immediately, regardless
+ * of posted_at or the 7-day math (including an unknown posted_at) -- an explicit override, distinct
+ * from posted_at itself, which this never touches. Fires the same "you can now submit your
+ * Analytics proof" notification the daily cron sends on a natural unlock. Refuses if the clip isn't
+ * actually gate-locked, or was already unlocked early, to avoid redundant notifications/no-op audit
+ * events.
+ */
+export async function unlockAnalyticsEarly(actorId: string, campaignId: string, clipId: string) {
+  await requireRole(actorId, campaignId, "mod");
+  const clip = await loadClip(campaignId, clipId);
+  if (clip.analyticsUnlockedEarlyAt !== null) throw new Error("This clip has already been unlocked early.");
+  if (!analyticsGateState(clip).locked) throw new Error("This clip isn't currently gate-locked.");
+
+  const [row] = await db.transaction(async (tx) => {
+    await tx.insert(clipReviewEvents).values({ clipId, actorUserId: actorId, action: "unlock_analytics_early" });
+    const updated = await tx
+      .update(clips)
+      .set({ analyticsUnlockedEarlyAt: new Date(), analyticsUnlockedEarlyBy: actorId })
+      .where(and(eq(clips.id, clipId), eq(clips.campaignId, campaignId)))
+      .returning();
+    await notify(tx, {
+      userId: clip.creatorUserId,
+      campaignId,
+      clipId,
+      type: "analytics_unlocked",
+      message: `Your post (${clip.url}) has been live for ${ANALYTICS_GATE_DAYS} days — you can now submit your Analytics proof.`,
+    });
+    return updated;
+  });
+  return row;
+}
+
 // ---------------------------------------------------------------------------------------------
 // Money
 // ---------------------------------------------------------------------------------------------

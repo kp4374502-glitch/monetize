@@ -112,13 +112,19 @@ Read-only per-campaign viewer role ("Brand" — unrelated to the `brand_requests
   by a later Analytics-stage reject, so a clip can be `clip_approved = true` and `status = 'rejected'`
   at the same time — see PRODUCT_SPEC.md "Two-step approval". `clip_approved_at`/`clip_approved_by`
   (fk users, nullable) record when and by whom.
+- `analytics_unlocked_early_at` (nullable) — explicit per-clip override that lets a still-gate-locked
+  clip submit proof immediately, regardless of `posted_at` or the 7-day math (including an unknown
+  `posted_at`). Distinct from `posted_at` — set via `unlockAnalyticsEarly` and never backdates or
+  otherwise touches it, so real post-age data stays accurate. Mod/Admin/Owner only; not inherited by
+  future clips. `analytics_unlocked_early_by` (fk users, nullable) records who granted it — see
+  PRODUCT_SPEC.md "7-day gate" → "Early-unlock override".
 
 ## clip\_review\_events
 
 - `id` (pk)
 - `clip_id` (fk clips)
 - `actor_user_id` (fk users)
-- `action` (approve | reject | delete | set_posted_at | clip_approve)
+- `action` (approve | reject | delete | set_posted_at | clip_approve | unlock_analytics_early)
 - `reason` (nullable; for a delete, records the clip's prior status)
 - `created_at`
 

@@ -326,6 +326,73 @@ describe("Task 5 Part 3: 7-day analytics-proof gate", () => {
     await expect(svc.setPostedAt("owner", campX, clip.id, future)).rejects.toThrow(/future/);
   });
 
+  describe("unlockAnalyticsEarly (one-time-per-clip override, distinct from posted_at)", () => {
+    it("Mod/Admin/Owner only", async () => {
+      const campX = await freshCampaign("Unlock: access");
+      const { clip } = await svc.submitClip("c1", campX, tiktok(), opts(1000, 2)); // 2 days old -> locked
+      await expect(svc.unlockAnalyticsEarly("c1", campX, clip.id)).rejects.toThrow(/Access denied/);
+    });
+
+    it("lets proof through on a clip still well within the 7-day window, without ever touching posted_at", async () => {
+      const campX = await freshCampaign("Unlock: not yet 7 days");
+      const { clip } = await svc.submitClip("c1", campX, tiktok(), opts(1000, 2)); // 2 days old -> locked
+      const postedAtBefore = clip.postedAt;
+      await expect(svc.attachVideoProof("c1", campX, clip.id, "https://youtu.be/aaaaaaaaaaa")).rejects.toThrow(
+        /can't be submitted until 7 days/,
+      );
+
+      const unlocked = await svc.unlockAnalyticsEarly("owner", campX, clip.id);
+      expect(unlocked.analyticsUnlockedEarlyAt).not.toBeNull();
+      expect(unlocked.analyticsUnlockedEarlyBy).toBe("owner");
+      expect(unlocked.postedAt).toEqual(postedAtBefore); // never backdated or otherwise touched
+      expect(unlocked.status).toBe("awaiting_analytics"); // the override alone doesn't move status -- proof still has to land
+
+      const row = await svc.attachVideoProof("c1", campX, clip.id, "https://youtu.be/aaaaaaaaaaa");
+      expect(row.status).toBe("pending"); // now accepted
+    });
+
+    it("also unlocks a clip whose posted_at is unknown", async () => {
+      const campX = await freshCampaign("Unlock: unknown posted_at");
+      const { clip } = await svc.submitClip("c1", campX, tiktok(), { fetchImpl: failFetch, sleep });
+      expect(clip.postedAt).toBeNull();
+      await expect(svc.attachVideoProof("c1", campX, clip.id, "https://youtu.be/aaaaaaaaaaa")).rejects.toThrow(
+        /post date isn't available/,
+      );
+
+      await svc.unlockAnalyticsEarly("admin", campX, clip.id);
+      const row = await svc.attachVideoProof("c1", campX, clip.id, "https://youtu.be/aaaaaaaaaaa");
+      expect(row.status).toBe("pending");
+      const [afterProof] = await db.select().from(clips).where(eq(clips.id, clip.id));
+      expect(afterProof.postedAt).toBeNull(); // still never guessed or backfilled
+    });
+
+    it("fires exactly one analytics_unlocked notification and logs the audit event", async () => {
+      const campX = await freshCampaign("Unlock: notification + audit");
+      const { clip } = await svc.submitClip("c1", campX, tiktok(), opts(1000, 1));
+      await svc.unlockAnalyticsEarly("owner", campX, clip.id);
+
+      const notes = await db.select().from(notifications).where(and(eq(notifications.clipId, clip.id), eq(notifications.type, "analytics_unlocked")));
+      expect(notes).toHaveLength(1);
+      expect(notes[0].userId).toBe("c1");
+
+      const [event] = await db
+        .select()
+        .from(clipReviewEvents)
+        .where(and(eq(clipReviewEvents.clipId, clip.id), eq(clipReviewEvents.action, "unlock_analytics_early")));
+      expect(event).toMatchObject({ actorUserId: "owner" });
+    });
+
+    it("refuses to unlock twice, and refuses a clip that isn't actually gate-locked", async () => {
+      const campX = await freshCampaign("Unlock: guards");
+      const { clip: locked } = await svc.submitClip("c1", campX, tiktok(), opts(1000, 1));
+      await svc.unlockAnalyticsEarly("owner", campX, locked.id);
+      await expect(svc.unlockAnalyticsEarly("owner", campX, locked.id)).rejects.toThrow(/already been unlocked early/);
+
+      const { clip: alreadyOpen } = await svc.submitClip("c1", campX, tiktok(), opts(1000, 8)); // already past 7 days -> not locked
+      await expect(svc.unlockAnalyticsEarly("owner", campX, alreadyOpen.id)).rejects.toThrow(/isn't currently gate-locked/);
+    });
+  });
+
   describe("runAnalyticsGateSweep", () => {
     it("silently unlocks a clip that already has proof once its window clears — no notification", async () => {
       const campX = await freshCampaign("Sweep: silent unlock");

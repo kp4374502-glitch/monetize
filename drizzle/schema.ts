@@ -32,7 +32,14 @@ export const clipStatusEnum = pgEnum("clip_status", ["pending", "approved", "rej
 
 export const paidStatusEnum = pgEnum("paid_status", ["unpaid", "paid"]);
 
-export const reviewActionEnum = pgEnum("review_action", ["approve", "reject", "delete", "set_posted_at", "clip_approve"]);
+export const reviewActionEnum = pgEnum("review_action", [
+  "approve",
+  "reject",
+  "delete",
+  "set_posted_at",
+  "clip_approve",
+  "unlock_analytics_early",
+]);
 
 export const notificationTypeEnum = pgEnum("notification_type", [
   "clip_approved",
@@ -249,6 +256,12 @@ export const clips = pgTable(
     postedAtSetBy: text("posted_at_set_by").references(() => users.id), // non-null only if a reviewer set it manually
     // Cron dedup: the "you can now submit your analytics proof" notification fires at most once.
     analyticsUnlockNotifiedAt: timestamp("analytics_unlock_notified_at", { withTimezone: true }),
+    // Explicit per-clip override: lets a still-gate-locked clip submit proof immediately, regardless
+    // of posted_at or the 7-day math (including an unknown posted_at). Distinct from posted_at --
+    // never backdates or otherwise touches it, so real post-age data used elsewhere stays accurate.
+    // Non-null only if a reviewer (or a one-time ops action) explicitly granted an early unlock.
+    analyticsUnlockedEarlyAt: timestamp("analytics_unlocked_early_at", { withTimezone: true }),
+    analyticsUnlockedEarlyBy: text("analytics_unlocked_early_by").references(() => users.id),
     // Two-step approval: a pure content/eligibility check (guidelines, brand integration, CTA) —
     // independent of `status`, the 7-day analytics gate, and payout math. Settable any time,
     // including while still `awaiting_analytics` and before any proof exists. Never reset by a

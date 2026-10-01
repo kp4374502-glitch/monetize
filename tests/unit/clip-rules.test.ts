@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  analyticsGateState,
   canSetManualViews,
   computeEconomics,
   duplicateFlag,
@@ -84,6 +85,35 @@ describe("computeEconomics gating", () => {
 describe("UTC day boundary", () => {
   it("resets at midnight UTC", () => {
     expect(startOfUtcDay(new Date("2026-09-19T23:59:59Z")).toISOString()).toBe("2026-09-19T00:00:00.000Z");
+  });
+});
+
+describe("analyticsGateState early-unlock override", () => {
+  const now = new Date("2026-09-20T00:00:00Z");
+
+  it("stays locked (not_yet_7_days) with no override, 2 days after posting", () => {
+    const clip = { status: "awaiting_analytics", postedAt: new Date("2026-09-18T00:00:00Z"), analyticsUnlockedEarlyAt: null };
+    expect(analyticsGateState(clip, now)).toMatchObject({ locked: true, reason: "not_yet_7_days" });
+  });
+
+  it("stays locked (unknown_posted_at) with no override and no posted_at", () => {
+    const clip = { status: "awaiting_analytics", postedAt: null, analyticsUnlockedEarlyAt: null };
+    expect(analyticsGateState(clip, now)).toEqual({ locked: true, reason: "unknown_posted_at", unlocksAt: null });
+  });
+
+  it("the override unlocks a clip still well within the 7-day window, without touching postedAt math", () => {
+    const clip = { status: "awaiting_analytics", postedAt: new Date("2026-09-19T00:00:00Z"), analyticsUnlockedEarlyAt: new Date("2026-09-20T00:00:00Z") };
+    expect(analyticsGateState(clip, now)).toEqual({ locked: false });
+  });
+
+  it("the override also unlocks a clip whose posted_at is unknown", () => {
+    const clip = { status: "awaiting_analytics", postedAt: null, analyticsUnlockedEarlyAt: new Date("2026-09-20T00:00:00Z") };
+    expect(analyticsGateState(clip, now)).toEqual({ locked: false });
+  });
+
+  it("is irrelevant once the clip has moved past awaiting_analytics", () => {
+    const clip = { status: "pending", postedAt: null, analyticsUnlockedEarlyAt: null };
+    expect(analyticsGateState(clip, now)).toEqual({ locked: false });
   });
 });
 

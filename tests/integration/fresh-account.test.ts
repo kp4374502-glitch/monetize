@@ -117,6 +117,7 @@ describe("a brand-new account (users row with no roles) and one that never logge
       await denied(clipSvc.refreshViews(who, camp, clipId));
       await denied(clipSvc.deleteClip(who, camp, clipId)); // Owner/Admin only, per Task 5
       await denied(clipSvc.setPostedAt(who, camp, clipId, "2020-01-01")); // Mod/Admin/Owner only, per Task 5 Part 3
+      await denied(clipSvc.unlockAnalyticsEarly(who, camp, clipId)); // Mod/Admin/Owner only
       // creator-only actions need a campaign_creators row they don't have
       await denied(clipSvc.submitClip(who, camp, "https://www.tiktok.com/@u/video/222"));
       await denied(clipSvc.attachVideoProof(who, camp, clipId, "https://youtu.be/aaaaaaaaaaa"));
@@ -211,6 +212,7 @@ describe("campaign_brands (read-only Brand role)", () => {
     await denied(clipSvc.markPaid("brandviewer", camp, clipId));
     await denied(clipSvc.deleteClip("brandviewer", camp, clipId));
     await denied(clipSvc.setPostedAt("brandviewer", camp, clipId, "2020-01-01"));
+    await denied(clipSvc.unlockAnalyticsEarly("brandviewer", camp, clipId));
     await denied(clipSvc.getReviewQueue("brandviewer", camp));
     await denied(clipSvc.getReviewerClipHistory("brandviewer", camp)); // includes creatorUsername -- brand must never reach it
     await denied(clipSvc.getClipHistory("brandviewer", camp));
