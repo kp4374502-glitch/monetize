@@ -108,16 +108,30 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
         </div>
       )}
 
-      {role === "creator" && <CreatorClips campaignId={id} clips={myClips} viewMinimum={campaign.viewMinimum} />}
+      {role === "creator" && <CreatorClips campaignId={id} clips={myClips} viewMinimum={campaign.viewMinimum} campaignStatus={campaign.status} />}
       {brandFeed && <BrandFeed rows={brandFeed.rows} stats={brandFeed.stats} />}
       {roster && <CreatorRoster roster={roster} limit={CREATOR_ROSTER_LIMIT} />}
       {queue && (
         <>
-          <ActionForm action={refreshCampaignViewsAction.bind(null, id)} className="flex justify-end">
-            <Button type="submit" variant="outline" size="sm" data-testid="refresh-campaign-views">
-              Refresh all views now
-            </Button>
-          </ActionForm>
+          <div className="flex flex-col items-end gap-1">
+            <ActionForm action={refreshCampaignViewsAction.bind(null, id)}>
+              <Button
+                type="submit"
+                variant="outline"
+                size="sm"
+                data-testid="refresh-campaign-views"
+                disabled={campaign.status === "paused"}
+                title={campaign.status === "paused" ? "Views don't update while this campaign is paused." : undefined}
+              >
+                Refresh all views now
+              </Button>
+            </ActionForm>
+            {campaign.status === "paused" && (
+              <p className="text-xs text-text-secondary" data-testid="refresh-paused-note">
+                Views don't update while this campaign is paused.
+              </p>
+            )}
+          </div>
           <ReviewQueue campaignId={id} pending={queue.pending} awaitingPayment={queue.awaitingPayment} canDelete={isAdmin} canClipApprove={isAdmin} />
         </>
       )}

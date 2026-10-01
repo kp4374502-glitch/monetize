@@ -10,7 +10,18 @@ import { ClipApprovedBadge, StatusBadge, Stats, Thumb, money, type ClipRow } fro
 const onDate = (d: Date) => d.toISOString().slice(0, 10);
 
 /** Creator view: add a clip, and see ONLY their own clips. No payout formula or budget shown. */
-export function CreatorClips({ campaignId, clips, viewMinimum }: { campaignId: string; clips: ClipRow[]; viewMinimum: number }) {
+export function CreatorClips({
+  campaignId,
+  clips,
+  viewMinimum,
+  campaignStatus,
+}: {
+  campaignId: string;
+  clips: ClipRow[];
+  viewMinimum: number;
+  campaignStatus: string;
+}) {
+  const paused = campaignStatus === "paused";
   return (
     <>
       <Card>
@@ -148,9 +159,24 @@ export function CreatorClips({ campaignId, clips, viewMinimum }: { campaignId: s
                           <Button type="submit" variant="outline" size="sm">{hasAnalyticsProof(c) ? "Replace proof" : "Submit proof"}</Button>
                         </ActionForm>
                       )}
-                      <ActionForm action={refreshViewsAction.bind(null, campaignId, c.id)}>
-                        <Button type="submit" variant="ghost" size="sm">Refresh views now</Button>
-                      </ActionForm>
+                      <div className="flex flex-col items-start gap-1">
+                        <ActionForm action={refreshViewsAction.bind(null, campaignId, c.id)}>
+                          <Button
+                            type="submit"
+                            variant="ghost"
+                            size="sm"
+                            disabled={paused}
+                            title={paused ? "Views don't update while this campaign is paused." : undefined}
+                          >
+                            Refresh views now
+                          </Button>
+                        </ActionForm>
+                        {paused && (
+                          <p className="text-xs text-text-secondary" data-testid="refresh-paused-note">
+                            Views don't update while this campaign is paused.
+                          </p>
+                        )}
+                      </div>
                     </div>
                     {/* Task 5 Part 2: screenshot upload removed — a video link is the only new-proof method now.
                        An existing screenshot (rendered above via hasAnalyticsProof) still counts and stays valid. */}

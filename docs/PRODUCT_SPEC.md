@@ -220,6 +220,7 @@ Views, likes, captions, and thumbnails are pulled automatically via the [ScrapeC
 - Scope of use: **views, likes, and post metadata only.** It does not replace the audience-quality verification step (see next section).
 - It is a third-party scraping service, not an official platform API — no ToS-backed data guarantee from TikTok/Meta/Google. Worth monitoring for reliability as usage scales.
 - "Refresh views now" (manual trigger) and a scheduled background refresh (e.g. Vercel Cron) both call ScrapeCreators to update view/like counts on existing clips.
+- **A paused campaign never refreshes.** Both manual triggers — the creator's per-clip "Refresh views now" and the dashboard-wide "Refresh all views now" — are disabled (with a visible note explaining why, not a silent disappearance) while `campaign.status = 'paused'`, and the service functions behind them (`refreshViews`/`refreshCampaignClips`) refuse the same way server-side. The scheduled cron (`refreshAllClips`) already scopes to active campaigns only, so a paused campaign spends no ScrapeCreators credits in the background either. Reopening a campaign resumes all of this immediately — no catch-up logic, since it's just the campaign's current status being read each time.
 - **Instagram photo/carousel posts have no view data at all.** Instagram's public data only exposes a
   view/play count for video content (Reels); a multi-photo carousel post genuinely carries no such
   field, confirmed by ScrapeCreators' own `is_video: false`. This is a hard platform limitation, not a

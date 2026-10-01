@@ -968,6 +968,21 @@ describe("refreshViews", () => {
     await svc.refreshViews("admin", camp, clip.id, opts(99_999));
     expect((await db.select().from(clips).where(eq(clips.id, clip.id)))[0].payout).toBe("10.00");
   });
+
+  it("refuses for creator and reviewer alike while the campaign is paused, and resumes once reopened", async () => {
+    const campX = (await campaignSvc.createCampaign("owner", { ...validCampaign, name: "Refresh: paused" })).id;
+    await db.insert(campaignCreators).values({ campaignId: campX, userId: "c1" });
+    const clip = await makeClip("c1", campX, 1000);
+
+    await campaignSvc.pauseCampaign("owner", campX);
+    await expect(svc.refreshViews("c1", campX, clip.id, opts(2000))).rejects.toThrow(/paused/);
+    await expect(svc.refreshViews("owner", campX, clip.id, opts(2000))).rejects.toThrow(/paused/);
+    expect((await db.select().from(clips).where(eq(clips.id, clip.id)))[0].views).toBe(1000);
+
+    await campaignSvc.reopenCampaign("owner", campX);
+    await svc.refreshViews("c1", campX, clip.id, opts(2000));
+    expect((await db.select().from(clips).where(eq(clips.id, clip.id)))[0].views).toBe(2000);
+  });
 });
 
 describe('refreshCampaignClips (dashboard "Refresh all views now")', () => {
@@ -1025,6 +1040,19 @@ describe('refreshCampaignClips (dashboard "Refresh all views now")', () => {
     for (let i = 0; i < 3; i++) await makeClip("c1", campX, 1000);
     const r = await svc.refreshCampaignClips("owner", campX, opts(5000), 2);
     expect(r).toMatchObject({ attempted: 2, updated: 2 });
+  });
+
+  it("refuses while the campaign is paused, and resumes once reopened", async () => {
+    const campX = await freshCampaign("Refresh campaign: paused");
+    const clip = await makeClip("c1", campX, 1000);
+
+    await campaignSvc.pauseCampaign("owner", campX);
+    await expect(svc.refreshCampaignClips("owner", campX, opts(2000))).rejects.toThrow(/paused/);
+    expect((await db.select().from(clips).where(eq(clips.id, clip.id)))[0].views).toBe(1000);
+
+    await campaignSvc.reopenCampaign("owner", campX);
+    const r = await svc.refreshCampaignClips("owner", campX, opts(2000));
+    expect(r).toMatchObject({ attempted: 1, updated: 1 });
   });
 });
 
@@ -1160,6 +1188,20 @@ describe("cron helpers", () => {
     const r = await svc.refreshAllClips(opts(3000), 500);
     expect(r.attempted).toBeGreaterThan(0);
     expect((await db.select().from(clips).where(eq(clips.id, clip.id)))[0].views).toBe(3000);
+  });
+
+  it("refreshAllClips skips clips belonging to a paused campaign entirely, and picks them back up once reopened", async () => {
+    const campX = (await campaignSvc.createCampaign("owner", { ...validCampaign, name: "Cron: paused" })).id;
+    await db.insert(campaignCreators).values({ campaignId: campX, userId: "c1" });
+    const clip = await makeClip("c1", campX, 1000);
+
+    await campaignSvc.pauseCampaign("owner", campX);
+    await svc.refreshAllClips(opts(5000), 500);
+    expect((await db.select().from(clips).where(eq(clips.id, clip.id)))[0].views).toBe(1000);
+
+    await campaignSvc.reopenCampaign("owner", campX);
+    await svc.refreshAllClips(opts(5000), 500);
+    expect((await db.select().from(clips).where(eq(clips.id, clip.id)))[0].views).toBe(5000);
   });
 
   it("sends one proof reminder per clip (Mods + campaign owner) after 7 days without proof", async () => {

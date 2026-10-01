@@ -286,7 +286,10 @@ export async function refreshViews(actorId: string, campaignId: string, clipId: 
   if (!role || role === "brand") throw new Error("Access denied.");
   const clip = await loadClip(campaignId, clipId);
   if (role === "creator" && clip.creatorUserId !== actorId) throw new Error("Clip not found.");
-  return refreshClipRow(clip, await loadCampaign(campaignId), opts);
+  const campaign = await loadCampaign(campaignId);
+  // Mirrors the UI's disabled-button state; this is the defense-in-depth path for a direct POST.
+  if (campaign.status === "paused") throw new Error("This campaign is paused — views don't update until it's reopened.");
+  return refreshClipRow(clip, campaign, opts);
 }
 
 /**
@@ -298,6 +301,8 @@ export async function refreshViews(actorId: string, campaignId: string, clipId: 
 export async function refreshCampaignClips(actorId: string, campaignId: string, opts: FetchOptions = {}, limit = 40) {
   await requireRole(actorId, campaignId, "mod");
   const campaign = await loadCampaign(campaignId);
+  // Mirrors the UI's disabled-button state; this is the defense-in-depth path for a direct POST.
+  if (campaign.status === "paused") throw new Error("This campaign is paused — views don't update until it's reopened.");
   const due = await db
     .select()
     .from(clips)
@@ -315,7 +320,12 @@ export async function refreshCampaignClips(actorId: string, campaignId: string, 
   return { attempted: due.length, updated, failed };
 }
 
-/** Cron entry point: oldest-refreshed first, capped per run to bound ScrapeCreators credit spend. */
+/**
+ * Cron entry point: oldest-refreshed first, capped per run to bound ScrapeCreators credit spend.
+ * Already scoped to active campaigns only (paused/closed/archived are excluded via the join below),
+ * so a paused campaign never spends ScrapeCreators credits here — no separate opt-out needed, and
+ * reopening resumes it automatically since the filter is just the campaign's current status.
+ */
 export async function refreshAllClips(opts: FetchOptions = {}, limit = 200) {
   const due = await db
     .select({ clip: clips, campaign: campaigns })
