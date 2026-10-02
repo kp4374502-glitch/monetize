@@ -2,7 +2,7 @@ import { ActionForm } from "@/components/action-form";
 import { Button } from "@/components/ui/button";
 import { Callout, Card, SectionHeader, StatCard } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/input";
-import { clipApproveAction, setPostedAtAction } from "@/app/campaigns/clip-actions";
+import { clipApproveAction, reviewAction, setPostedAtAction } from "@/app/campaigns/clip-actions";
 import { analyticsGateState } from "@/lib/clips/rules";
 import type { ClipHistoryStatusFilter } from "@/lib/clips/service";
 import { AutoSubmitSelect } from "./auto-submit-select";
@@ -62,6 +62,7 @@ export function ClipHistoryBrowser({
   canDelete = false,
   canReview = false,
   canClipApprove = false,
+  canReverseRejection = false,
 }: {
   campaignId: string;
   basePath: string;
@@ -88,6 +89,8 @@ export function ClipHistoryBrowser({
   canReview?: boolean;
   /** Admin/Owner only — gates the Clip Approve button. Server re-checks regardless. */
   canClipApprove?: boolean;
+  /** Admin/Owner only — gates reversing a Rejected clip back to Approved. Server re-checks regardless. */
+  canReverseRejection?: boolean;
 }) {
   const filtered = status !== "all" || !!from || !!to;
   return (
@@ -188,6 +191,15 @@ export function ClipHistoryBrowser({
                   <p className="mt-1 text-xs text-text-secondary">Submitted {submittedOn(c.submittedAt)}</p>
                   {c.status === "rejected" && c.rejectionReason && (
                     <p className="mt-1 text-xs text-red-300">Rejected: {c.rejectionReason}</p>
+                  )}
+                  {c.status === "rejected" && canReverseRejection && (
+                    <ActionForm action={reviewAction.bind(null, campaignId, c.id)} className="mt-1.5 flex flex-wrap items-center gap-2">
+                      <input type="hidden" name="intent" value="approve" />
+                      <Button type="submit" variant="outline" size="sm" data-testid="reverse-rejection">
+                        Analytics Approve
+                      </Button>
+                      <span className="text-xs text-text-secondary">Reverses this rejection — Admin/Owner only.</span>
+                    </ActionForm>
                   )}
                   {gate.locked && (
                     <p className="mt-1 text-xs text-sky-300">

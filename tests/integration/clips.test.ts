@@ -633,7 +633,10 @@ describe("reviewClip", () => {
     await svc.reviewClip("modA", camp, clip.id, { action: "reject", reason: "bot-like spike" });
     const [rejected] = await db.select().from(clips).where(eq(clips.id, clip.id));
     expect(rejected).toMatchObject({ status: "rejected", rejectionReason: "bot-like spike" });
-    await svc.reviewClip("modA", camp, clip.id, { action: "approve" }); // Mod changes own decision -- Analytics Approve stays Mod/Admin/Owner
+    // Reversing a rejection is Admin/Owner only (see the dedicated describe block below) --
+    // modA (the rejecting Mod) can't do this even though roleCanOverride would otherwise let a Mod
+    // self-correct, so this uses "admin" rather than modA.
+    await svc.reviewClip("admin", camp, clip.id, { action: "approve" });
     const [approved] = await db.select().from(clips).where(eq(clips.id, clip.id));
     expect(approved).toMatchObject({ status: "approved", rejectionReason: null });
 
@@ -641,6 +644,53 @@ describe("reviewClip", () => {
     expect(notes.map((x) => x.type).sort()).toEqual(["clip_approved", "clip_rejected"]);
     expect(notes.find((x) => x.type === "clip_rejected")!.message).toMatch(/bot-like spike/);
     expect(notes.every((x) => x.userId === "c1")).toBe(true);
+  });
+
+  describe("reversing a rejection back to Approved (Admin/Owner only)", () => {
+    it("refuses a Mod even when they're reversing their own rejection; Admin/Owner can", async () => {
+      const clip = await makeClip("c1");
+      await svc.attachVideoProof("c1", camp, clip.id, "https://youtu.be/aaaaaaaaaaa");
+      await svc.reviewClip("modA", camp, clip.id, { action: "reject", reason: "looked fake" });
+      // roleCanOverride alone would allow this (modA made the last decision) -- the extra
+      // canReverseRejection gate blocks it anyway.
+      await expect(svc.reviewClip("modA", camp, clip.id, { action: "approve" })).rejects.toThrow(
+        /only an Admin or Owner can approve a previously rejected clip/,
+      );
+      await svc.reviewClip("admin", camp, clip.id, { action: "approve" });
+      const [c] = await db.select().from(clips).where(eq(clips.id, clip.id));
+      expect(c.status).toBe("approved");
+    });
+
+    it("the normal first-pass approve (never-rejected clip) stays Mod/Admin/Owner, unaffected", async () => {
+      const clip = await makeClip("c1");
+      await svc.attachVideoProof("c1", camp, clip.id, "https://youtu.be/aaaaaaaaaaa");
+      await svc.reviewClip("modA", camp, clip.id, { action: "approve" }); // never rejected -- Mod is fine
+      const [c] = await db.select().from(clips).where(eq(clips.id, clip.id));
+      expect(c.status).toBe("approved");
+    });
+
+    it("rejecting a previously-approved clip (the other direction) is unaffected -- still just roleCanOverride", async () => {
+      const clip = await makeClip("c1");
+      await svc.attachVideoProof("c1", camp, clip.id, "https://youtu.be/aaaaaaaaaaa");
+      await svc.reviewClip("modA", camp, clip.id, { action: "approve" });
+      await svc.reviewClip("modA", camp, clip.id, { action: "reject", reason: "changed my mind" }); // same Mod, own decision -- fine
+      const [c] = await db.select().from(clips).where(eq(clips.id, clip.id));
+      expect(c.status).toBe("rejected");
+    });
+
+    it("doesn't touch clip_approved either way, and the payout already on the row reappears once re-approved", async () => {
+      const clip = await makeClip("c1", camp, 10_000);
+      await svc.attachVideoProof("c1", camp, clip.id, "https://youtu.be/aaaaaaaaaaa");
+      await svc.setQualifyingAudiencePct("admin", camp, clip.id, 50); // $10 payout, computed up front
+      await svc.clipApprove("admin", camp, clip.id);
+      await svc.reviewClip("admin", camp, clip.id, { action: "reject", reason: "second thoughts" });
+      let [row] = await db.select().from(clips).where(eq(clips.id, clip.id));
+      expect(row).toMatchObject({ clipApproved: true, status: "rejected", payout: "10.00" }); // payout column untouched by reject
+
+      await svc.reviewClip("admin", camp, clip.id, { action: "approve" }); // reverse it
+      [row] = await db.select().from(clips).where(eq(clips.id, clip.id));
+      expect(row).toMatchObject({ clipApproved: true, status: "approved", payout: "10.00" }); // no re-trigger needed
+    });
   });
 
   it("a Mod cannot override another Mod's decision; Admin and Owner can", async () => {

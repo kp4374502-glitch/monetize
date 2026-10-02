@@ -1,4 +1,7 @@
 import type { getClipHistory } from "@/lib/clips/service";
+import { reviewAction } from "@/app/campaigns/clip-actions";
+import { ActionForm } from "@/components/action-form";
+import { Button } from "@/components/ui/button";
 import { Card, SectionHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DeleteClipButton } from "./delete-clip-button";
@@ -13,11 +16,14 @@ export function ClipHistory({
   history,
   campaignId,
   canDelete = false,
+  canReverseRejection = false,
 }: {
   history: History;
   campaignId: string;
   /** Owner/Admin only — the server re-checks this regardless of what's rendered. */
   canDelete?: boolean;
+  /** Admin/Owner only — gates reversing a Rejected clip back to Approved. Server re-checks regardless. */
+  canReverseRejection?: boolean;
 }) {
   return (
     <>
@@ -70,6 +76,15 @@ export function ClipHistory({
                   <p className="mt-1 text-xs text-red-300">
                     Rejected{rejectedBy ? ` by ${rejectedBy}` : ""}: {c.rejectionReason ?? "no reason recorded"}
                   </p>
+                  {canReverseRejection && (
+                    <ActionForm action={reviewAction.bind(null, campaignId, c.id)} className="mt-1.5 flex flex-wrap items-center gap-2">
+                      <input type="hidden" name="intent" value="approve" />
+                      <Button type="submit" variant="outline" size="sm" data-testid="reverse-rejection">
+                        Analytics Approve
+                      </Button>
+                      <span className="text-xs text-text-secondary">Reverses this rejection — Admin/Owner only.</span>
+                    </ActionForm>
+                  )}
                 </div>
                 {canDelete && <DeleteClipButton campaignId={campaignId} clipId={c.id} />}
               </Card>

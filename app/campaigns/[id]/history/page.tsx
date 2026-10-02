@@ -67,6 +67,7 @@ export default async function ClipHistoryPage({
         canDelete={role === "owner" || role === "admin"}
         canReview={!isCreator}
         canClipApprove={role === "owner" || role === "admin"}
+        canReverseRejection={role === "owner" || role === "admin"}
       />
     </main>
   );

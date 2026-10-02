@@ -11,6 +11,7 @@ import { vercelBlobStore, type ProofImageStore } from "./proof-store";
 import {
   ANALYTICS_GATE_DAYS,
   analyticsGateState,
+  canReverseRejection,
   canSetManualViews,
   effectiveViews,
   hasAnalyticsProof,
@@ -414,6 +415,16 @@ const reviewSchema = z.discriminatedUnion("action", [
  * "Analytics Approve"/Reject in the UI (relabeled; mechanics AND permissions unchanged) — this is
  * what actually determines and locks in payout. Mod/Admin/Owner, exactly as before Clip Approve
  * existed; only the brand-new clipApprove() below is Admin/Owner-only.
+ *
+ * Both directions of reversal are allowed (approving a rejected clip, rejecting an approved one —
+ * neither counts as "already X" against the guard above), gated by roleCanOverride same as any
+ * other decision, EXCEPT reversing a rejection back to approved specifically needs canReverseRejection
+ * (Admin/Owner) even when roleCanOverride alone would have let the rejecting Mod self-correct. No
+ * extra audit-trail shape for a reversal — it's just another clip_review_events row, like any review
+ * action. Doesn't touch clip_approved/clip_approved_at (the separate step-1 content check) either
+ * way. cpm/earnings/payout aren't recomputed here — they're already kept current by
+ * setQualifyingAudiencePct and refreshClipRow regardless of status — so a reversed-to-approved clip
+ * shows its correct payout immediately with no separate re-trigger needed.
  */
 export async function reviewClip(actorId: string, campaignId: string, clipId: string, input: unknown) {
   const role = await requireRole(actorId, campaignId, "mod");
@@ -432,6 +443,9 @@ export async function reviewClip(actorId: string, campaignId: string, clipId: st
     .limit(1);
   if (!roleCanOverride(role, actorId, last?.actorUserId ?? null)) {
     throw new Error("Access denied: only an Admin or Owner can override another reviewer's decision.");
+  }
+  if (decision.action === "approve" && clip.status === "rejected" && !canReverseRejection(role)) {
+    throw new Error("Access denied: only an Admin or Owner can approve a previously rejected clip.");
   }
 
   if (decision.action === "approve") {

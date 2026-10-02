@@ -68,6 +68,16 @@ export function roleCanOverride(
 }
 
 /**
+ * Reversing a prior Analytics Reject back to Approved is a judgment call, not a routine
+ * self-correction -- restricted to Admin/Owner even when roleCanOverride would otherwise let the
+ * rejecting Mod undo their own call. The other direction (rejecting a previously-approved clip)
+ * keeps using roleCanOverride unchanged -- undoing a payout back to not-earning needs no extra gate.
+ */
+export function canReverseRejection(role: "owner" | "admin" | "mod" | "brand" | "creator"): boolean {
+  return role === "owner" || role === "admin";
+}
+
+/**
  * Soft duplicate/stolen-link flag: the same underlying post already submitted by a DIFFERENT
  * creator in the same campaign. Returns a reason string (never names the other creator) or null.
  */

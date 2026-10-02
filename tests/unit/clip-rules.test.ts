@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   analyticsGateState,
+  canReverseRejection,
   canSetManualViews,
   computeEconomics,
   duplicateFlag,
@@ -48,6 +49,16 @@ describe("override rules", () => {
   it("Admin/Owner can override anyone", () => {
     expect(roleCanOverride("admin", "a", "m2")).toBe(true);
     expect(roleCanOverride("owner", "o", "m2")).toBe(true);
+  });
+});
+
+describe("canReverseRejection (reversing a rejection back to Approved)", () => {
+  it("is Admin/Owner only, even for the Mod who made the original rejection", () => {
+    expect(canReverseRejection("mod")).toBe(false);
+    expect(canReverseRejection("admin")).toBe(true);
+    expect(canReverseRejection("owner")).toBe(true);
+    expect(canReverseRejection("brand")).toBe(false);
+    expect(canReverseRejection("creator")).toBe(false);
   });
 });
 
