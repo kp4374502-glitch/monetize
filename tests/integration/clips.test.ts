@@ -1190,6 +1190,21 @@ describe("filterable clip history (getReviewerClipHistory / getMyClipHistory)", 
     expect(await idsFor("waiting_payment")).toEqual([needsPayment.id, needsPct.id].sort());
   });
 
+  it("a Waiting for Payment clip can be rejected with a reason, moving it out of that bucket into Rejected", async () => {
+    const campX = await freshCampaign("History: reject from waiting for payment");
+    const clip = await approvedWithPayout(campX, "c1", 60, 4000);
+    const idsFor = async (status: svc.ClipHistoryStatusFilter) =>
+      (await svc.getReviewerClipHistory("owner", campX, { status })).rows.map((r) => r.clip.id);
+    expect(await idsFor("waiting_payment")).toEqual([clip.id]);
+
+    await expect(svc.reviewClip("owner", campX, clip.id, { action: "reject" })).rejects.toThrow(/reason/); // the reason is required
+    await svc.reviewClip("owner", campX, clip.id, { action: "reject", reason: "fake views" });
+    expect(await idsFor("waiting_payment")).toEqual([]);
+    expect(await idsFor("rejected")).toEqual([clip.id]);
+    const [row] = await db.select().from(clips).where(eq(clips.id, clip.id));
+    expect(row).toMatchObject({ status: "rejected", rejectionReason: "fake views", paidStatus: "unpaid" });
+  });
+
   it("the date range narrows both the list and the summary counts", async () => {
     const campX = await freshCampaign("History date range");
     const old = await makeClip("c1", campX, 1000);

@@ -54,18 +54,16 @@ describe("override rules", () => {
 });
 
 describe("canRejectInline (which rows get the inline Reject control)", () => {
-  const row = (status: string, paidStatus: string, qualifyingAudiencePct: string | null) => ({ status, paidStatus, qualifyingAudiencePct });
+  const row = (status: string, paidStatus: string) => ({ status, paidStatus });
 
-  it("covers the not-yet-paid clips still waiting on a step, with or without a % pending", () => {
-    expect(canRejectInline(row("awaiting_analytics", "unpaid", null))).toBe(true); // waiting for Post/Analytics Approved
-    expect(canRejectInline(row("pending", "unpaid", null))).toBe(true);
-    expect(canRejectInline(row("approved", "unpaid", null))).toBe(true); // waiting for Audience %
+  it("covers every not-yet-paid clip still in play, including Waiting for Payment", () => {
+    expect(canRejectInline(row("awaiting_analytics", "unpaid"))).toBe(true); // waiting for Post/Analytics Approved
+    expect(canRejectInline(row("pending", "unpaid"))).toBe(true);
+    expect(canRejectInline(row("approved", "unpaid"))).toBe(true); // waiting for Audience % or for Payment
   });
-  it("excludes Waiting for Payment (approved with a % entered), already-rejected, and paid clips", () => {
-    expect(canRejectInline(row("approved", "unpaid", "60.00"))).toBe(false);
-    expect(canRejectInline(row("rejected", "unpaid", null))).toBe(false);
-    expect(canRejectInline(row("approved", "paid", "60.00"))).toBe(false);
-    expect(canRejectInline(row("approved", "paid", null))).toBe(false);
+  it("excludes already-rejected and paid clips", () => {
+    expect(canRejectInline(row("rejected", "unpaid"))).toBe(false);
+    expect(canRejectInline(row("approved", "paid"))).toBe(false);
   });
 });
 
