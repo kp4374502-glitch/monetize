@@ -2,7 +2,7 @@ import { ActionForm } from "@/components/action-form";
 import { Button } from "@/components/ui/button";
 import { Callout, Card, SectionHeader, StatCard } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/input";
-import { clipApproveAction, reviewAction, setPostedAtAction } from "@/app/campaigns/clip-actions";
+import { clipApproveAction, markPaidAction, reviewAction, setPostedAtAction } from "@/app/campaigns/clip-actions";
 import { analyticsGateState } from "@/lib/clips/rules";
 import type { ClipHistoryStatusFilter } from "@/lib/clips/service";
 import { AutoSubmitSelect } from "./auto-submit-select";
@@ -82,7 +82,7 @@ export function ClipHistoryBrowser({
   showCreator: boolean;
   /** Owner/Admin only — the server re-checks this regardless of what's rendered. */
   canDelete?: boolean;
-  /** Mod/Admin/Owner — gates the manual post-date-confirmation form. Server re-checks regardless. */
+  /** Mod/Admin/Owner — gates the manual post-date form and the Mark paid button. Server re-checks regardless (Mod threshold, budget cap). */
   canReview?: boolean;
   /** Admin/Owner only — gates the Post Approve button. Server re-checks regardless. */
   canClipApprove?: boolean;
@@ -192,6 +192,13 @@ export function ClipHistoryBrowser({
                     <ActionForm action={clipApproveAction.bind(null, campaignId, c.id)} className="mt-1.5">
                       <Button type="submit" variant="outline" size="sm" data-testid="clip-approve">
                         Post Approve
+                      </Button>
+                    </ActionForm>
+                  )}
+                  {canReview && c.status === "approved" && c.paidStatus !== "paid" && (
+                    <ActionForm action={markPaidAction.bind(null, campaignId, c.id)} className="mt-1.5">
+                      <Button type="submit" size="sm" disabled={c.payout === null} data-testid="history-mark-paid">
+                        Mark paid
                       </Button>
                     </ActionForm>
                   )}

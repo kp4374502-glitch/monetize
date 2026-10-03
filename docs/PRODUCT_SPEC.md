@@ -307,6 +307,8 @@ Solves a retention problem: creators were dropping off while waiting the full 7-
 
 A rejected clip is excluded from "Waiting for Post Approved" because it's a dead end, not waiting on anything. The two steps are independent, so a clip Analytics Approved without ever being Post Approved still shows under "Waiting for Post Approved" (step 1 genuinely wasn't done) as well as "Waiting for Payment". The summary tiles above the list (Submitted, Waiting, Pending, Approved, Rejected, Paid, Total Views, Approved Views) are separate from the dropdown and unchanged.
 
+**Mark paid from History.** Every approved, unpaid History row (most usefully under "Waiting for Payment") has a "Mark paid" button for Mod/Admin/Owner, the same `markPaid` action as the dashboard's "Approved — awaiting payment" list, so the Mod threshold, budget cap, and approved + unpaid + payout > 0 rules apply identically (enforced server-side). Once paid, the row moves from "Waiting for Payment" to "Paid" on the next load.
+
 **Backfill (existing clips, applied once on deploy):** clips already `approved` or `paid` → `clip_approved = true` retroactively (they already passed full review, so they clearly passed the content bar too). Clips `rejected` → left `false` (a past rejection stands; not implied to have been content-approved). Clips `pending`/`awaiting_analytics` → left `false` — genuinely not yet Post Approved; reviewers work through them going forward with the new button.
 
 ## Payout formula
