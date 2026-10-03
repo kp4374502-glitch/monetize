@@ -1,7 +1,11 @@
 import { CheckCircle2 } from "lucide-react";
 import { clips } from "@/drizzle/schema";
+import { ActionForm } from "@/components/action-form";
 import { Badge } from "@/components/ui/badge";
-import { effectiveViews } from "@/lib/clips/rules";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { setPctAction } from "@/app/campaigns/clip-actions";
+import { effectiveViews, hasAnalyticsProof } from "@/lib/clips/rules";
 
 export type ClipRow = typeof clips.$inferSelect;
 
@@ -115,5 +119,29 @@ export function Stats({ clip }: { clip: ClipRow }) {
       <span className="font-semibold text-text-primary">{clip.likes.toLocaleString()}</span> likes
       {stale && <span className="ml-2 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-300">{stale}</span>}
     </span>
+  );
+}
+
+/** Qualifying Audience % entry — shared by the dashboard review queue and the History rows. Disabled until analytics proof exists. */
+export function PctForm({ campaignId, clip }: { campaignId: string; clip: ClipRow }) {
+  return (
+    <ActionForm action={setPctAction.bind(null, campaignId, clip.id)} className="flex flex-wrap items-center gap-2">
+      <Input
+        name="pct"
+        type="number"
+        step="0.01"
+        min="0"
+        max="100"
+        placeholder="Qualifying audience %"
+        defaultValue={clip.qualifyingAudiencePct ?? ""}
+        disabled={!hasAnalyticsProof(clip)}
+        className="w-52"
+        required
+      />
+      <Button type="submit" variant="outline" size="sm" disabled={!hasAnalyticsProof(clip)}>Save %</Button>
+      <span className="text-sm text-text-secondary" data-testid="queue-payout">
+        Payout: <span className="font-bold text-gold-light">{money(clip.payout)}</span>
+      </span>
+    </ActionForm>
   );
 }

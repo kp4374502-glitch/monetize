@@ -1166,16 +1166,28 @@ describe("filterable clip history (getReviewerClipHistory / getMyClipHistory)", 
     await svc.attachVideoProof("c1", campX, needsReview.id, "https://youtu.be/aaaaaaaaaaa");
     await svc.clipApprove("admin", campX, needsReview.id);
 
-    const needsPayment = await approvedWithPayout(campX, "c1", 60, 4000); // Analytics Approved, unpaid
+    const needsPayment = await approvedWithPayout(campX, "c1", 60, 4000); // Analytics Approved with a %, unpaid
     const paid = await approvedWithPayout(campX, "c1", 60, 4000);
     await svc.markPaid("owner", campX, paid.id);
 
+    // Post Approved + Analytics Approved, but no Qualifying Audience % entered yet.
+    const needsPct = await makeClip("c1", campX, 4000);
+    await svc.attachVideoProof("c1", campX, needsPct.id, "https://youtu.be/aaaaaaaaaaa");
+    await svc.clipApprove("admin", campX, needsPct.id);
+    await svc.reviewClip("admin", campX, needsPct.id, { action: "approve" });
+
     expect(await idsFor("waiting_post_approved")).toEqual([needsPost.id, needsPayment.id, paid.id].sort()); // step 1 literally not done on these (never Post Approved); rejected excluded
     expect(await idsFor("waiting_analytics_approved")).toEqual([needsAnalytics.id, needsReview.id].sort());
-    expect(await idsFor("waiting_payment")).toEqual([needsPayment.id]);
+    expect(await idsFor("waiting_audience_pct")).toEqual([needsPct.id]);
+    expect(await idsFor("waiting_payment")).toEqual([needsPayment.id]); // needsPct excluded: no % yet
     expect(await idsFor("paid")).toEqual([paid.id]);
     expect(await idsFor("rejected")).toEqual([rejectedNoPost.id]);
-    expect(await idsFor("all")).toHaveLength(6);
+    expect(await idsFor("all")).toHaveLength(7);
+
+    // Entering the % moves it from "Waiting for Audience %" to "Waiting for Payment" -- the two never overlap.
+    await svc.setQualifyingAudiencePct("admin", campX, needsPct.id, 60);
+    expect(await idsFor("waiting_audience_pct")).toEqual([]);
+    expect(await idsFor("waiting_payment")).toEqual([needsPayment.id, needsPct.id].sort());
   });
 
   it("the date range narrows both the list and the summary counts", async () => {

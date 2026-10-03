@@ -9,6 +9,7 @@ const STATUS_VALUES: readonly ClipHistoryStatusFilter[] = [
   "all",
   "waiting_post_approved",
   "waiting_analytics_approved",
+  "waiting_audience_pct",
   "waiting_payment",
   "paid",
   "rejected",

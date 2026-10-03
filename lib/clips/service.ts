@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull, like, sql, gte, lte, count, ne, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, like, sql, gte, lte, count, ne, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { db } from "../db/client";
@@ -811,6 +811,7 @@ export type ClipHistoryStatusFilter =
   | "all"
   | "waiting_post_approved"
   | "waiting_analytics_approved"
+  | "waiting_audience_pct"
   | "waiting_payment"
   | "paid"
   | "rejected";
@@ -830,9 +831,14 @@ function clipHistoryStatusCondition(status: ClipHistoryStatusFilter | undefined)
     // still gate-locked or unlocked-but-no-proof-yet; pending is proof-attached, awaiting review.
     case "waiting_analytics_approved":
       return and(eq(clips.clipApproved, true), inArray(clips.status, ["awaiting_analytics", "pending"]));
-    // Analytics Approved, not yet marked paid -- same condition as getReviewQueue's awaitingPayment.
+    // Steps 1 and 2 both done, but no Qualifying Audience % entered yet -- earnings can't be
+    // calculated, so it can't be paid. Disjoint from waiting_payment below (which needs a %).
+    case "waiting_audience_pct":
+      return and(eq(clips.clipApproved, true), eq(clips.status, "approved"), isNull(clips.qualifyingAudiencePct));
+    // Analytics Approved with a % entered, not yet marked paid. Requiring the % keeps it from
+    // overlapping waiting_audience_pct. (getReviewQueue's awaitingPayment list is looser: it has no % condition.)
     case "waiting_payment":
-      return and(eq(clips.status, "approved"), ne(clips.paidStatus, "paid"));
+      return and(eq(clips.status, "approved"), ne(clips.paidStatus, "paid"), isNotNull(clips.qualifyingAudiencePct));
     case "paid":
       return eq(clips.paidStatus, "paid");
     case "rejected":

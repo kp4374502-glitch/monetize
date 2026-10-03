@@ -294,18 +294,21 @@ Solves a retention problem: creators were dropping off while waiting the full 7-
 
 **Naming:** "Post Approved"/"Post Approve" is the display name for step 1 everywhere user-facing; the underlying `clips.clip_approved`/`clip_approved_at`/`clip_approved_by` columns, `clipApprove()`, and the `clip_approve` audit action keep their original names.
 
-**History filter** is a six-option dropdown of workflow stages ("what is this clip waiting on next?"), in this order:
+**History filter** is a seven-option dropdown of workflow stages ("what is this clip waiting on next?"), in this order:
 
 | Label | Condition |
 |---|---|
 | All Submissions | no filter |
 | Waiting for Post Approved | `clip_approved = false` and `status != rejected` |
 | Waiting for Analytics Approved | `clip_approved = true` and `status` in (`awaiting_analytics`, `pending`) |
-| Waiting for Payment | `status = approved` and `paid_status != paid` |
+| Waiting for Audience % | `clip_approved = true`, `status = approved`, and `qualifying_audience_pct` is null |
+| Waiting for Payment | `status = approved`, `paid_status != paid`, and `qualifying_audience_pct` is not null |
 | Paid | `paid_status = paid` |
 | Rejected | `status = rejected` |
 
 A rejected clip is excluded from "Waiting for Post Approved" because it's a dead end, not waiting on anything. The two steps are independent, so a clip Analytics Approved without ever being Post Approved still shows under "Waiting for Post Approved" (step 1 genuinely wasn't done) as well as "Waiting for Payment". The summary tiles above the list (Submitted, Waiting, Pending, Approved, Rejected, Paid, Total Views, Approved Views) are separate from the dropdown and unchanged.
+
+**Audience % from History.** Analytics Approve doesn't require a Qualifying Audience %, so a clip can be approved with no % and therefore no payout (it can't be paid). "Waiting for Audience %" surfaces those clips, and each of their History rows has the same % entry form as the dashboard (`PctForm`, shared). Saving it computes `cpm`/`earnings`/`payout` via `setQualifyingAudiencePct`, which moves the clip into "Waiting for Payment". The two buckets are disjoint by construction (one needs a %, the other requires one). One edge: a clip Analytics Approved but never Post Approved, with no %, appears in neither bucket (it shows only under "Waiting for Post Approved"), because "Waiting for Audience %" requires both steps done. None exist today.
 
 **Mark paid from History.** Every approved, unpaid History row (most usefully under "Waiting for Payment") has a "Mark paid" button for Mod/Admin/Owner, the same `markPaid` action as the dashboard's "Approved — awaiting payment" list, so the Mod threshold, budget cap, and approved + unpaid + payout > 0 rules apply identically (enforced server-side). Once paid, the row moves from "Waiting for Payment" to "Paid" on the next load.
 

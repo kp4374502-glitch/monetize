@@ -7,7 +7,7 @@ import { analyticsGateState } from "@/lib/clips/rules";
 import type { ClipHistoryStatusFilter } from "@/lib/clips/service";
 import { AutoSubmitSelect } from "./auto-submit-select";
 import { DeleteClipButton } from "./delete-clip-button";
-import { AnalyticsProof, ClipApprovedBadge, Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
+import { AnalyticsProof, ClipApprovedBadge, PctForm, Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
 
 type Row = { clip: ClipRow; creatorUsername: string };
 
@@ -15,6 +15,7 @@ const STATUS_OPTIONS: { value: ClipHistoryStatusFilter; label: string }[] = [
   { value: "all", label: "All Submissions" },
   { value: "waiting_post_approved", label: "Waiting for Post Approved" },
   { value: "waiting_analytics_approved", label: "Waiting for Analytics Approved" },
+  { value: "waiting_audience_pct", label: "Waiting for Audience %" },
   { value: "waiting_payment", label: "Waiting for Payment" },
   { value: "paid", label: "Paid" },
   { value: "rejected", label: "Rejected" },
@@ -194,6 +195,11 @@ export function ClipHistoryBrowser({
                         Post Approve
                       </Button>
                     </ActionForm>
+                  )}
+                  {canReview && c.status === "approved" && c.qualifyingAudiencePct === null && (
+                    <div className="mt-1.5">
+                      <PctForm campaignId={campaignId} clip={c} />
+                    </div>
                   )}
                   {canReview && c.status === "approved" && c.paidStatus !== "paid" && (
                     <ActionForm action={markPaidAction.bind(null, campaignId, c.id)} className="mt-1.5">

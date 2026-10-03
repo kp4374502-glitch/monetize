@@ -3,10 +3,10 @@ import { ActionForm } from "@/components/action-form";
 import { Button } from "@/components/ui/button";
 import { Callout, Card, SectionHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { clipApproveAction, markPaidAction, reviewAction, setManualViewsAction, setPctAction } from "@/app/campaigns/clip-actions";
-import { canSetManualViews, hasAnalyticsProof } from "@/lib/clips/rules";
+import { clipApproveAction, markPaidAction, reviewAction, setManualViewsAction } from "@/app/campaigns/clip-actions";
+import { canSetManualViews } from "@/lib/clips/rules";
 import { DeleteClipButton } from "./delete-clip-button";
-import { AnalyticsProof, ClipApprovedBadge, Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
+import { AnalyticsProof, ClipApprovedBadge, PctForm, Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
 
 function ClipApproveButton({ campaignId, clip }: { campaignId: string; clip: ClipRow }) {
   if (clip.clipApproved) return null;
@@ -30,29 +30,6 @@ function ProofLine({ clip, campaignId, missingId }: { clip: ClipRow; campaignId:
       <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
       <span>Analytics proof missing — earns $0 until the creator attaches it.</span>
     </Callout>
-  );
-}
-
-function PctForm({ campaignId, clip }: { campaignId: string; clip: ClipRow }) {
-  return (
-    <ActionForm action={setPctAction.bind(null, campaignId, clip.id)} className="flex flex-wrap items-center gap-2">
-      <Input
-        name="pct"
-        type="number"
-        step="0.01"
-        min="0"
-        max="100"
-        placeholder="Qualifying audience %"
-        defaultValue={clip.qualifyingAudiencePct ?? ""}
-        disabled={!hasAnalyticsProof(clip)}
-        className="w-52"
-        required
-      />
-      <Button type="submit" variant="outline" size="sm" disabled={!hasAnalyticsProof(clip)}>Save %</Button>
-      <span className="text-sm text-text-secondary" data-testid="queue-payout">
-        Payout: <span className="font-bold text-gold-light">{money(clip.payout)}</span>
-      </span>
-    </ActionForm>
   );
 }
 
