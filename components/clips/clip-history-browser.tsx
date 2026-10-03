@@ -3,11 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Callout, Card, SectionHeader, StatCard } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/input";
 import { clipApproveAction, markPaidAction, reviewAction, setPostedAtAction } from "@/app/campaigns/clip-actions";
-import { analyticsGateState } from "@/lib/clips/rules";
+import { analyticsGateState, canRejectInline } from "@/lib/clips/rules";
 import type { ClipHistoryStatusFilter } from "@/lib/clips/service";
 import { AutoSubmitSelect } from "./auto-submit-select";
 import { DeleteClipButton } from "./delete-clip-button";
-import { AnalyticsProof, ClipApprovedBadge, PctForm, Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
+import { AnalyticsProof, ClipApprovedBadge, InlineRejectForm, PctForm, Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
 
 type Row = { clip: ClipRow; creatorUsername: string };
 
@@ -131,7 +131,7 @@ export function ClipHistoryBrowser({
         <StatCard label="Submitted" value={summary.total.toLocaleString()} valueTestId="history-total" emphasis />
         <StatCard label="Waiting" value={summary.awaitingAnalytics.toLocaleString()} hint="for analytics" />
         <StatCard label="Pending" value={summary.pending.toLocaleString()} />
-        <StatCard label="Approved" value={summary.approved.toLocaleString()} />
+        <StatCard label="Analytics Approved" value={summary.approved.toLocaleString()} />
         <StatCard label="Rejected" value={summary.rejected.toLocaleString()} />
         <StatCard label="Paid" value={summary.paid.toLocaleString()} />
         <StatCard label="Total Views" value={summary.totalViews.toLocaleString()} valueTestId="history-total-views" hint="Every submitted clip, any status" />
@@ -207,6 +207,11 @@ export function ClipHistoryBrowser({
                         Mark paid
                       </Button>
                     </ActionForm>
+                  )}
+                  {canReview && canRejectInline(c) && (
+                    <div className="mt-1.5">
+                      <InlineRejectForm campaignId={campaignId} clipId={c.id} />
+                    </div>
                   )}
                 </div>
                 <span className="text-base font-extrabold text-gold-light" data-testid="history-payout">

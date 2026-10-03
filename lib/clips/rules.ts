@@ -68,6 +68,17 @@ export function roleCanOverride(
 }
 
 /**
+ * Whether a row gets the inline Reject-with-reason control (dashboard "awaiting payment" list and
+ * History rows): any not-yet-rejected, not-yet-paid clip, except an Analytics Approved one that
+ * already has a % entered -- earnings are showing by then, and that shouldn't be rejected silently
+ * from here. UI-only convenience: reviewClip's reject path enforces roles itself regardless.
+ */
+export function canRejectInline(clip: { status: string; paidStatus: string; qualifyingAudiencePct: string | number | null }): boolean {
+  if (clip.status === "rejected" || clip.paidStatus === "paid") return false;
+  return !(clip.status === "approved" && clip.qualifyingAudiencePct !== null);
+}
+
+/**
  * Reversing a prior Analytics Reject back to Approved is a judgment call, not a routine
  * self-correction -- restricted to Admin/Owner even when roleCanOverride would otherwise let the
  * rejecting Mod undo their own call. The other direction (rejecting a previously-approved clip)

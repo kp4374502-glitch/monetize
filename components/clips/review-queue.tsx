@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Callout, Card, SectionHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { clipApproveAction, markPaidAction, reviewAction, setManualViewsAction } from "@/app/campaigns/clip-actions";
-import { canSetManualViews } from "@/lib/clips/rules";
+import { canRejectInline, canSetManualViews } from "@/lib/clips/rules";
 import { DeleteClipButton } from "./delete-clip-button";
-import { AnalyticsProof, ClipApprovedBadge, PctForm, Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
+import { AnalyticsProof, ClipApprovedBadge, InlineRejectForm, PctForm, Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
 
 function ClipApproveButton({ campaignId, clip }: { campaignId: string; clip: ClipRow }) {
   if (clip.clipApproved) return null;
@@ -135,7 +135,7 @@ export function ReviewQueue({
       </section>
 
       <section>
-        <SectionHeader title="Approved — awaiting payment" count={awaitingPayment.length} />
+        <SectionHeader title="Analytics Approved — awaiting payment" count={awaitingPayment.length} />
         {awaitingPayment.length === 0 && (
           <Card innerClassName="py-8 text-center text-sm text-text-secondary">No approved clips waiting to be paid.</Card>
         )}
@@ -159,6 +159,7 @@ export function ReviewQueue({
                     <ActionForm action={markPaidAction.bind(null, campaignId, c.id)}>
                       <Button type="submit" size="sm" disabled={c.payout === null}>Mark paid</Button>
                     </ActionForm>
+                    {canRejectInline(c) && <InlineRejectForm campaignId={campaignId} clipId={c.id} />}
                     {canDelete && <DeleteClipButton campaignId={campaignId} clipId={c.id} />}
                   </div>
                 </div>

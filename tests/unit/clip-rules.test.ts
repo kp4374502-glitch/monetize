@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   analyticsGateState,
+  canRejectInline,
   canReverseRejection,
   canSetManualViews,
   computeEconomics,
@@ -49,6 +50,22 @@ describe("override rules", () => {
   it("Admin/Owner can override anyone", () => {
     expect(roleCanOverride("admin", "a", "m2")).toBe(true);
     expect(roleCanOverride("owner", "o", "m2")).toBe(true);
+  });
+});
+
+describe("canRejectInline (which rows get the inline Reject control)", () => {
+  const row = (status: string, paidStatus: string, qualifyingAudiencePct: string | null) => ({ status, paidStatus, qualifyingAudiencePct });
+
+  it("covers the not-yet-paid clips still waiting on a step, with or without a % pending", () => {
+    expect(canRejectInline(row("awaiting_analytics", "unpaid", null))).toBe(true); // waiting for Post/Analytics Approved
+    expect(canRejectInline(row("pending", "unpaid", null))).toBe(true);
+    expect(canRejectInline(row("approved", "unpaid", null))).toBe(true); // waiting for Audience %
+  });
+  it("excludes Waiting for Payment (approved with a % entered), already-rejected, and paid clips", () => {
+    expect(canRejectInline(row("approved", "unpaid", "60.00"))).toBe(false);
+    expect(canRejectInline(row("rejected", "unpaid", null))).toBe(false);
+    expect(canRejectInline(row("approved", "paid", "60.00"))).toBe(false);
+    expect(canRejectInline(row("approved", "paid", null))).toBe(false);
   });
 });
 

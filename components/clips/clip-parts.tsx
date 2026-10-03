@@ -4,7 +4,7 @@ import { ActionForm } from "@/components/action-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { setPctAction } from "@/app/campaigns/clip-actions";
+import { reviewAction, setPctAction } from "@/app/campaigns/clip-actions";
 import { effectiveViews, hasAnalyticsProof } from "@/lib/clips/rules";
 
 export type ClipRow = typeof clips.$inferSelect;
@@ -17,10 +17,12 @@ export const money = (v: string | number | null) =>
 export function StatusBadge({ clip }: { clip: ClipRow }) {
   const label = clip.paidStatus === "paid" ? "paid" : clip.status;
   // "capitalize" only affects the first letter of the whole string, so the raw enum value would
-  // render as "Awaiting_analytics" — spell it out instead.
+  // render as "Awaiting_analytics" — spell it out instead. "approved" is the Analytics Approve step
+  // specifically (Post Approved is its own, separate badge).
+  const text = label === "awaiting_analytics" ? "Awaiting analytics" : label === "approved" ? "Analytics Approved" : undefined;
   return (
     <Badge status={label} data-testid="clip-status">
-      {label === "awaiting_analytics" ? "Awaiting analytics" : undefined}
+      {text}
     </Badge>
   );
 }
@@ -142,6 +144,18 @@ export function PctForm({ campaignId, clip }: { campaignId: string; clip: ClipRo
       <span className="text-sm text-text-secondary" data-testid="queue-payout">
         Payout: <span className="font-bold text-gold-light">{money(clip.payout)}</span>
       </span>
+    </ActionForm>
+  );
+}
+
+/** Reject-with-reason, for rows that don't already have the full review form (see canRejectInline). reviewClip enforces roles and the override rule server-side. */
+export function InlineRejectForm({ campaignId, clipId }: { campaignId: string; clipId: string }) {
+  return (
+    <ActionForm action={reviewAction.bind(null, campaignId, clipId)} className="flex flex-wrap items-center gap-2">
+      <Input name="reason" placeholder="Reason (required to reject)" className="min-w-56" />
+      <Button type="submit" name="intent" value="reject" variant="danger" formNoValidate size="sm" data-testid="inline-reject">
+        Reject
+      </Button>
     </ActionForm>
   );
 }
