@@ -178,7 +178,7 @@ describe("a brand-new account (users row with no roles) and one that never logge
     expect(await isPlatformOwner("invitee")).toBe(false);
   });
 
-  it("a legitimately-assigned Mod on THIS campaign can still Analytics Approve (unchanged), but cannot Clip Approve (Admin/Owner only)", async () => {
+  it("a legitimately-assigned Mod on THIS campaign can still Analytics Approve (unchanged), but cannot Post Approve (Admin/Owner only)", async () => {
     expect(await getRoleForCampaign("mod", camp)).toBe("mod"); // a real Mod, not a stranger
     await denied(clipSvc.clipApprove("mod", camp, clipId));
 

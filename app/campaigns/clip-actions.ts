@@ -60,7 +60,7 @@ export const setPctAction = async (campaignId: string, clipId: string, _p: Actio
 export const setManualViewsAction = async (campaignId: string, clipId: string, _p: ActionState, fd: FormData) =>
   run(campaignId, (u) => svc.setManualViews(u, campaignId, clipId, text(fd, "manualViews")));
 
-/** "Clip Approve" — content/eligibility only, independent of the 7-day gate. Admin/Owner only. */
+/** "Post Approve" — content/eligibility only, independent of the 7-day gate. Admin/Owner only. */
 export const clipApproveAction = async (campaignId: string, clipId: string, _p: ActionState, _fd: FormData) =>
   run(campaignId, (u) => svc.clipApprove(u, campaignId, clipId));
 

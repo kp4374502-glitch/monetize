@@ -29,7 +29,7 @@ export function ClipApprovedBadge({ clip }: { clip: ClipRow }) {
   if (!clip.clipApproved) return null;
   return (
     <Badge status="approved" data-testid="clip-approved-badge">
-      Clip Approved
+      Post Approved
     </Badge>
   );
 }

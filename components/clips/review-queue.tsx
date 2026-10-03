@@ -13,7 +13,7 @@ function ClipApproveButton({ campaignId, clip }: { campaignId: string; clip: Cli
   return (
     <ActionForm action={clipApproveAction.bind(null, campaignId, clip.id)}>
       <Button type="submit" variant="outline" size="sm" data-testid="clip-approve">
-        Clip Approve
+        Post Approve
       </Button>
     </ActionForm>
   );
@@ -101,7 +101,7 @@ export function ReviewQueue({
   awaitingPayment: Row[];
   /** Owner/Admin only — the server re-checks this regardless of what's rendered. */
   canDelete?: boolean;
-  /** Admin/Owner only — gates the Clip Approve button. Mod keeps Analytics Approve and Reject, unchanged. */
+  /** Admin/Owner only — gates the Post Approve button. Mod keeps Analytics Approve and Reject, unchanged. */
   canClipApprove?: boolean;
 }) {
   return (

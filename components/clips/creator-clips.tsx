@@ -52,7 +52,7 @@ export function CreatorClips({
                 <div className="flex gap-4">
                   <Thumb clip={c} />
                   <div className="min-w-0 flex-1 space-y-2">
-                    {/* Clip Approved is purely informational -- shown above the real status, which still
+                    {/* Post Approved is purely informational -- shown above the real status, which still
                         reads "Awaiting analytics" through the whole pre-proof/pre-7-day period unchanged. */}
                     {c.clipApproved && (
                       <div className="flex flex-wrap items-center gap-2">

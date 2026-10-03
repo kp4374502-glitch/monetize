@@ -451,16 +451,17 @@ describe("Task 5 Part 3: 7-day analytics-proof gate", () => {
     });
   });
 
-  it("the History 'Waiting for Analytics' filter surfaces the whole bucket — locked and unlocked-but-unsubmitted alike", async () => {
+  it("the History 'Waiting for Analytics Approved' filter surfaces the whole Post-Approved-but-not-yet-Analytics-Approved bucket — locked, unlocked-no-proof, and proof-attached alike", async () => {
     const campX = await freshCampaign("History: waiting for analytics");
     const { clip: locked } = await svc.submitClip("c1", campX, tiktok(), opts(1000, 2));
     const { clip: unlockedNoProof } = await svc.submitClip("c1", campX, tiktok(), opts(1000, 8));
     const { clip: unknownDate } = await svc.submitClip("c1", campX, tiktok(), { fetchImpl: failFetch, sleep });
     const { clip: pendingClip } = await svc.submitClip("c1", campX, tiktok(), opts(1000, 30));
     await svc.attachVideoProof("c1", campX, pendingClip.id, "https://youtu.be/aaaaaaaaaaa");
+    for (const c of [locked, unlockedNoProof, unknownDate, pendingClip]) await svc.clipApprove("admin", campX, c.id);
 
-    const { rows, summary } = await svc.getReviewerClipHistory("owner", campX, { status: "awaiting_analytics" });
-    expect(rows.map((r) => r.clip.id).sort()).toEqual([locked.id, unknownDate.id, unlockedNoProof.id].sort());
+    const { rows, summary } = await svc.getReviewerClipHistory("owner", campX, { status: "waiting_analytics_approved" });
+    expect(rows.map((r) => r.clip.id).sort()).toEqual([locked.id, unknownDate.id, unlockedNoProof.id, pendingClip.id].sort());
     expect(summary.awaitingAnalytics).toBe(3);
     // "Pending" now includes awaiting_analytics -- submitted but not yet Analytics Approved/Rejected,
     // regardless of proof. All 4 clips here qualify (3 awaiting_analytics + 1 genuinely pending).
@@ -724,7 +725,7 @@ describe("reviewClip", () => {
   });
 });
 
-describe("clipApprove (two-step approval, Task: Clip Approved / Analytics Approved)", () => {
+describe("clipApprove (two-step approval, Task: Post Approved / Analytics Approved)", () => {
   it("is settable while still locked behind the 7-day gate, before any proof exists -- independent of status and the gate", async () => {
     const { clip } = await svc.submitClip("c1", camp, tiktok(), opts(1000, 2)); // posted 2 days ago -> still locked
     expect(clip.status).toBe("awaiting_analytics");
@@ -763,7 +764,7 @@ describe("clipApprove (two-step approval, Task: Clip Approved / Analytics Approv
     expect(row).toMatchObject({ status: "approved", payout: payoutBeforeAnalyticsApprove }); // unchanged by clipApprove having run first
   });
 
-  it("Clip Approved, then Analytics-Rejected -- the final outcome is a full reject with zero payout, regardless of the earlier Clip Approved state", async () => {
+  it("Post Approved, then Analytics-Rejected -- the final outcome is a full reject with zero payout, regardless of the earlier Post Approved state", async () => {
     const clip = await makeClip("c1", camp, 5000);
     await svc.attachVideoProof("c1", camp, clip.id, "https://youtu.be/aaaaaaaaaaa");
     await svc.setQualifyingAudiencePct("admin", camp, clip.id, 50);
@@ -776,12 +777,12 @@ describe("clipApprove (two-step approval, Task: Clip Approved / Analytics Approv
     await expect(svc.markPaid("admin", camp, clip.id)).rejects.toThrow(); // no path to payout from here
   });
 
-  it("is idempotent-guarded (can't Clip Approve twice) and Admin/Owner only", async () => {
+  it("is idempotent-guarded (can't Post Approve twice) and Admin/Owner only", async () => {
     const clip = await makeClip("c1", camp, 1000);
     await expect(svc.clipApprove("modA", camp, clip.id)).rejects.toThrow(/Access denied/);
     await expect(svc.clipApprove("c1", camp, clip.id)).rejects.toThrow(/Access denied/);
     await svc.clipApprove("admin", camp, clip.id);
-    await expect(svc.clipApprove("owner", camp, clip.id)).rejects.toThrow(/already been Clip Approved/);
+    await expect(svc.clipApprove("owner", camp, clip.id)).rejects.toThrow(/already been Post Approved/);
   });
 });
 
@@ -1145,11 +1146,36 @@ describe("filterable clip history (getReviewerClipHistory / getMyClipHistory)", 
     expect(forRejected.rows.map((r) => r.clip.id)).toEqual([rejected.id]);
     expect(forRejected.summary).toMatchObject({ total: 3, pending: 1, approved: 1, rejected: 1, paid: 1 }); // unchanged by the tab
 
-    const forPending = await svc.getReviewerClipHistory("owner", campX, { status: "pending" });
-    expect(forPending.rows.map((r) => r.clip.id)).toEqual([pending.id]);
-
     const forPaid = await svc.getReviewerClipHistory("owner", campX, { status: "paid" });
     expect(forPaid.rows.map((r) => r.clip.id)).toEqual([paid.id]);
+    void pending;
+  });
+
+  it("the Post Approved / Analytics Approved / Payment workflow filters each pick exactly their own stage", async () => {
+    const campX = await freshCampaign("History workflow filters");
+    const idsFor = async (status: svc.ClipHistoryStatusFilter) =>
+      (await svc.getReviewerClipHistory("owner", campX, { status })).rows.map((r) => r.clip.id).sort();
+
+    const needsPost = await makeClip("c1", campX, 1000); // step 1 not done
+    const rejectedNoPost = await makeClip("c1", campX, 1000); // step 1 never done, but rejected: a dead end, not "waiting"
+    await svc.reviewClip("owner", campX, rejectedNoPost.id, { action: "reject", reason: "spam" });
+
+    const needsAnalytics = await makeClip("c1", campX, 1000); // step 1 done, awaiting analytics
+    await svc.clipApprove("admin", campX, needsAnalytics.id);
+    const needsReview = await makeClip("c1", campX, 1000); // step 1 done, proof attached -> pending
+    await svc.attachVideoProof("c1", campX, needsReview.id, "https://youtu.be/aaaaaaaaaaa");
+    await svc.clipApprove("admin", campX, needsReview.id);
+
+    const needsPayment = await approvedWithPayout(campX, "c1", 60, 4000); // Analytics Approved, unpaid
+    const paid = await approvedWithPayout(campX, "c1", 60, 4000);
+    await svc.markPaid("owner", campX, paid.id);
+
+    expect(await idsFor("waiting_post_approved")).toEqual([needsPost.id, needsPayment.id, paid.id].sort()); // step 1 literally not done on these (never Post Approved); rejected excluded
+    expect(await idsFor("waiting_analytics_approved")).toEqual([needsAnalytics.id, needsReview.id].sort());
+    expect(await idsFor("waiting_payment")).toEqual([needsPayment.id]);
+    expect(await idsFor("paid")).toEqual([paid.id]);
+    expect(await idsFor("rejected")).toEqual([rejectedNoPost.id]);
+    expect(await idsFor("all")).toHaveLength(6);
   });
 
   it("the date range narrows both the list and the summary counts", async () => {

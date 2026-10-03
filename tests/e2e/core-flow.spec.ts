@@ -122,7 +122,7 @@ test.describe("core flow", () => {
     await row.getByPlaceholder(/qualifying audience/i).fill("25");
     await row.getByRole("button", { name: "Save %" }).click();
     await expect(row.getByTestId("queue-payout")).not.toContainText("—");
-    // "Approve" alone would match both "Clip Approve" and "Analytics Approve" (Playwright's name
+    // "Approve" alone would match both "Post Approve" and "Analytics Approve" (Playwright's name
     // match is substring-based) -- exact text picks the one that actually determines payout.
     await row.getByRole("button", { name: "Analytics Approve", exact: true }).click();
     await expect(owner.getByTestId("payment-row").first()).toBeVisible();

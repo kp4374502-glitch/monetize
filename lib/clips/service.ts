@@ -413,7 +413,7 @@ const reviewSchema = z.discriminatedUnion("action", [
 
 /**
  * "Analytics Approve"/Reject in the UI (relabeled; mechanics AND permissions unchanged) — this is
- * what actually determines and locks in payout. Mod/Admin/Owner, exactly as before Clip Approve
+ * what actually determines and locks in payout. Mod/Admin/Owner, exactly as before Post Approve
  * existed; only the brand-new clipApprove() below is Admin/Owner-only.
  *
  * Both directions of reversal are allowed (approving a rejected clip, rejecting an approved one —
@@ -482,7 +482,7 @@ export async function reviewClip(actorId: string, campaignId: string, clipId: st
 }
 
 /**
- * "Clip Approve" in the UI — a pure content/eligibility check (guidelines, brand integration, CTA),
+ * "Post Approve" in the UI — a pure content/eligibility check (guidelines, brand integration, CTA),
  * independent of `status` and the 7-day gate. Admin/Owner only. Never a payout signal by itself:
  * payout is only ever set by reviewClip's approve path. Idempotent-guarded, not reversible here —
  * there's no "un-approve"; a bad call is caught downstream by an Analytics-stage Reject instead.
@@ -490,7 +490,7 @@ export async function reviewClip(actorId: string, campaignId: string, clipId: st
 export async function clipApprove(actorId: string, campaignId: string, clipId: string) {
   await requireRole(actorId, campaignId, "admin");
   const clip = await loadClip(campaignId, clipId);
-  if (clip.clipApproved) throw new Error("This clip has already been Clip Approved.");
+  if (clip.clipApproved) throw new Error("This clip has already been Post Approved.");
 
   await db.transaction(async (tx) => {
     await tx.insert(clipReviewEvents).values({ clipId, actorUserId: actorId, action: "clip_approve" });
@@ -806,16 +806,14 @@ export async function getClipHistory(actorId: string, campaignId: string) {
 // same clips rows getReviewQueue/getClipHistory already read, not a separate data model.
 // ---------------------------------------------------------------------------------------------
 
+// Workflow-stage filters, not raw statuses: each one answers "what is this clip waiting on next?"
 export type ClipHistoryStatusFilter =
   | "all"
-  | "awaiting_analytics"
-  | "pending"
-  | "approved"
-  | "rejected"
+  | "waiting_post_approved"
+  | "waiting_analytics_approved"
+  | "waiting_payment"
   | "paid"
-  // Not a clip status -- narrows to clip_approved = true (any underlying status) and pairs with a
-  // breakdown tile (still awaiting analytics vs. fully Analytics Approved); see filteredClipHistory.
-  | "clip_approved";
+  | "rejected";
 export interface ClipHistoryFilters {
   status?: ClipHistoryStatusFilter;
   from?: Date;
@@ -825,26 +823,20 @@ const CLIP_HISTORY_LIMIT = 500;
 
 function clipHistoryStatusCondition(status: ClipHistoryStatusFilter | undefined) {
   switch (status) {
-    // "Waiting for Analytics" (Task 5 Part 3): covers a clip whether still locked (posted_at unknown,
-    // or the 7 days haven't passed) or already unlocked but the creator hasn't submitted proof yet —
-    // both are the same status value, so this one condition covers the whole bucket. A narrower
-    // sub-filter than "pending" below, for anyone who wants only the still-missing-proof clips.
-    case "awaiting_analytics":
-      return eq(clips.status, "awaiting_analytics");
-    // "Pending" = submitted but not yet Analytics Approved/Rejected -- pending OR awaiting_analytics,
-    // regardless of whether proof exists yet. Proof (or its absence) is visible per-row instead.
-    case "pending":
-      return inArray(clips.status, ["pending", "awaiting_analytics"]);
-    case "approved":
-      return eq(clips.status, "approved");
+    // Step 1 not done yet. A rejected clip is excluded: it's a dead end, not waiting on anything.
+    case "waiting_post_approved":
+      return and(eq(clips.clipApproved, false), ne(clips.status, "rejected"));
+    // Step 1 done, step 2 (Analytics Approve/Reject) not. awaiting_analytics covers a clip whether
+    // still gate-locked or unlocked-but-no-proof-yet; pending is proof-attached, awaiting review.
+    case "waiting_analytics_approved":
+      return and(eq(clips.clipApproved, true), inArray(clips.status, ["awaiting_analytics", "pending"]));
+    // Analytics Approved, not yet marked paid -- same condition as getReviewQueue's awaitingPayment.
+    case "waiting_payment":
+      return and(eq(clips.status, "approved"), ne(clips.paidStatus, "paid"));
+    case "paid":
+      return eq(clips.paidStatus, "paid");
     case "rejected":
       return eq(clips.status, "rejected");
-    case "paid":
-      // Only an approved clip can be paid, but this filters on paid_status directly (not status)
-      // so it reads naturally as its own tab, same as the others.
-      return eq(clips.paidStatus, "paid");
-    case "clip_approved":
-      return eq(clips.clipApproved, true);
     default:
       return undefined;
   }
@@ -875,12 +867,6 @@ async function filteredClipHistory(scope: SQL, filters: ClipHistoryFilters) {
       // over `rows`, which is capped at CLIP_HISTORY_LIMIT — this must total every matching clip.
       totalViews: sql<string>`coalesce(sum(coalesce(${clips.manualViews}, ${clips.views})), 0)`,
       approvedViews: sql<string>`coalesce(sum(coalesce(${clips.manualViews}, ${clips.views})) filter (where ${clips.status} = 'approved'), 0)`,
-      // Clip Approved breakdown: of the clips that passed the content/eligibility check, how many
-      // are still working through analytics review vs. how many made it all the way to Analytics
-      // Approved. A clip_approved clip that was later Analytics-Rejected falls into neither bucket
-      // (it's neither "still awaiting" nor "approved") -- it shows up in the existing Rejected tile.
-      clipApprovedAwaitingAnalytics: sql<number>`count(*) filter (where ${clips.clipApproved} and ${clips.status} in ('awaiting_analytics', 'pending'))`,
-      clipApprovedAnalyticsApproved: sql<number>`count(*) filter (where ${clips.clipApproved} and ${clips.status} = 'approved')`,
     })
     .from(clips)
     .where(dateScope);
@@ -904,8 +890,6 @@ async function filteredClipHistory(scope: SQL, filters: ClipHistoryFilters) {
       paid: Number(summaryRow.paid),
       totalViews: Number(summaryRow.totalViews),
       approvedViews: Number(summaryRow.approvedViews),
-      clipApprovedAwaitingAnalytics: Number(summaryRow.clipApprovedAwaitingAnalytics),
-      clipApprovedAnalyticsApproved: Number(summaryRow.clipApprovedAnalyticsApproved),
     },
     rows,
   };

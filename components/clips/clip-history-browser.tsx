@@ -12,13 +12,12 @@ import { AnalyticsProof, ClipApprovedBadge, Stats, StatusBadge, Thumb, money, ty
 type Row = { clip: ClipRow; creatorUsername: string };
 
 const STATUS_OPTIONS: { value: ClipHistoryStatusFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "awaiting_analytics", label: "Waiting for Analytics" },
-  { value: "pending", label: "Pending / awaiting review" },
-  { value: "approved", label: "Approved" },
-  { value: "rejected", label: "Rejected" },
+  { value: "all", label: "All Submissions" },
+  { value: "waiting_post_approved", label: "Waiting for Post Approved" },
+  { value: "waiting_analytics_approved", label: "Waiting for Analytics Approved" },
+  { value: "waiting_payment", label: "Waiting for Payment" },
   { value: "paid", label: "Paid" },
-  { value: "clip_approved", label: "Clip Approved" },
+  { value: "rejected", label: "Rejected" },
 ];
 
 const onDate = (d: Date) => d.toISOString().slice(0, 10);
@@ -78,8 +77,6 @@ export function ClipHistoryBrowser({
     paid: number;
     totalViews: number;
     approvedViews: number;
-    clipApprovedAwaitingAnalytics: number;
-    clipApprovedAnalyticsApproved: number;
   };
   rows: Row[];
   showCreator: boolean;
@@ -87,7 +84,7 @@ export function ClipHistoryBrowser({
   canDelete?: boolean;
   /** Mod/Admin/Owner — gates the manual post-date-confirmation form. Server re-checks regardless. */
   canReview?: boolean;
-  /** Admin/Owner only — gates the Clip Approve button. Server re-checks regardless. */
+  /** Admin/Owner only — gates the Post Approve button. Server re-checks regardless. */
   canClipApprove?: boolean;
   /** Admin/Owner only — gates reversing a Rejected clip back to Approved. Server re-checks regardless. */
   canReverseRejection?: boolean;
@@ -145,24 +142,6 @@ export function ClipHistoryBrowser({
         />
       </div>
 
-      {status === "clip_approved" && (
-        <div className="grid grid-cols-2 gap-3" data-testid="clip-approved-breakdown">
-          <StatCard
-            label="Still awaiting analytics"
-            value={summary.clipApprovedAwaitingAnalytics.toLocaleString()}
-            valueTestId="clip-approved-awaiting"
-            hint="Clip Approved, not yet through analytics review"
-          />
-          <StatCard
-            label="Analytics Approved"
-            value={summary.clipApprovedAnalyticsApproved.toLocaleString()}
-            valueTestId="clip-approved-full"
-            emphasis
-            hint="Made it all the way through"
-          />
-        </div>
-      )}
-
       {rows.length === 0 ? (
         <Card innerClassName="py-10 text-center text-sm text-text-secondary">No clips match this filter.</Card>
       ) : (
@@ -212,7 +191,7 @@ export function ClipHistoryBrowser({
                   {canClipApprove && !c.clipApproved && (
                     <ActionForm action={clipApproveAction.bind(null, campaignId, c.id)} className="mt-1.5">
                       <Button type="submit" variant="outline" size="sm" data-testid="clip-approve">
-                        Clip Approve
+                        Post Approve
                       </Button>
                     </ActionForm>
                   )}

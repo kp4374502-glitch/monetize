@@ -57,7 +57,7 @@ A platform-wide **Admin is a strict superset of Mod** — anything a Mod can do,
 
 **Clip review**
 
-- Can Clip Approve (see "Two-step approval" below) — a Mod cannot. (Analytics Approve stays Mod/Admin/Owner, unchanged.)
+- Can Post Approve (see "Two-step approval" below) — a Mod cannot. (Analytics Approve stays Mod/Admin/Owner, unchanged.)
 - Can override a Mod's decision (re-approve something rejected, or reverse an approval).
 - Can edit a Qualifying Audience % that a Mod already entered.
 - Can delete a clip in any status (pending, approved, rejected, or paid) — see "Clip deletion" below. A Mod cannot.
@@ -91,8 +91,8 @@ Unlike Admin, a Mod is **not** automatic across campaigns — they must be expli
 
 **Clip review**
 
-- **Cannot Clip Approve — Admin/Owner only** (see "Two-step approval" below). Can still Analytics Approve and Reject, exactly as before.
-- Can Reject at any stage, including a clip that's already been Clip Approved (Clip Approved is never a payout guarantee) — subject to the override rule below.
+- **Cannot Post Approve — Admin/Owner only** (see "Two-step approval" below). Can still Analytics Approve and Reject, exactly as before.
+- Can Reject at any stage, including a clip that's already been Post Approved (Post Approved is never a payout guarantee) — subject to the override rule below.
 - Cannot override another reviewer's prior decision on the same clip (approve or reject).
 - Cannot edit a Qualifying Audience % that a different Mod already entered.
 - A Mod's reject decision is final on its own — but an Admin can review and change it afterward.
@@ -136,7 +136,7 @@ Unlike Admin, a Mod is **not** automatic across campaigns — they must be expli
 
 **Clip review**
 
-- Same review powers as Admin: can Clip Approve, Analytics Approve, override a Mod's decision, and edit a Qualifying Audience % already entered.
+- Same review powers as Admin: can Post Approve, Analytics Approve, override a Mod's decision, and edit a Qualifying Audience % already entered.
 - Can see everyone's individual review speed/activity, same as Admin.
 - Can delete a clip in any status, same as Admin — see "Clip deletion" below.
 
@@ -258,7 +258,7 @@ TikTok does not expose per-video audience-demographic data to anyone but the acc
 - 7 days have passed since the post's own real publish date (`posted_at`, captured from ScrapeCreators at submission — confirmed live per platform: TikTok's `create_time`, Instagram's `taken_at_timestamp` [present even for a photo/carousel], YouTube's top-level `publishDate`), **and**
 - the creator has submitted the video-link proof.
 
-Only once both are true does the `status` column itself move from `awaiting_analytics` to `pending`. The reviewer's Pending queue and the History "Pending" filter/tile, however, surface **both** statuses — Pending means "submitted, not yet Analytics Approved/Rejected," regardless of whether proof has landed yet. "Waiting for Analytics" stays available as a narrower sub-filter for just the still-missing-proof clips, and each row shows its own analytics-proof link (or its absence) directly, so a reviewer never has to guess.
+Only once both are true does the `status` column itself move from `awaiting_analytics` to `pending`. The reviewer's Pending queue and the History "Pending" tile, however, surface **both** statuses — Pending means "submitted, not yet Analytics Approved/Rejected," regardless of whether proof has landed yet, and each row shows its own analytics-proof link (or its absence) directly, so a reviewer never has to guess.
 
 **A missing `posted_at` never silently counts as "7 days have passed."** If ScrapeCreators couldn't return a publish date (rate-limited, a later refresh usually fills it in), the clip stays locked indefinitely rather than guessing either way, until a Mod/Admin/Owner manually confirms the real date (a one-time action, refused if a date is already known).
 
@@ -272,29 +272,42 @@ An Admin or Mod reads the proof and manually enters the **Qualifying Audience %*
 
 If a creator never submits the analytics proof once unlocked, there's no automatic rejection or expiry — the clip just stays blocked, and the assigned reviewer gets an in-app notification reminding them to chase it up (this older per-campaign reminder is separate from the unlock notification above, and no longer fires for a clip still gated — it would always be a false alarm, since a gated clip can't have proof yet by construction).
 
-## Two-step approval: Clip Approved vs. Analytics Approved
+## Two-step approval: Post Approved vs. Analytics Approved
 
-Solves a retention problem: creators were dropping off while waiting the full 7-day analytics cycle for their only feedback signal. **Clip Approved** gives them fast content-validity feedback without touching payout at all.
+Solves a retention problem: creators were dropping off while waiting the full 7-day analytics cycle for their only feedback signal. **Post Approved** gives them fast content-validity feedback without touching payout at all.
 
-**Clip Approved** (`clips.clip_approved`/`clip_approved_at`/`clip_approved_by`) is a pure content/eligibility check — do the post/clip itself follow every campaign guideline, brand-integration requirement, and CTA requirement (required brand slide present, caption hashtags, bio link, no violations)? It never involves audience %, views, or CPM — those are set later, only at Analytics Approved.
+**Post Approved** (`clips.clip_approved`/`clip_approved_at`/`clip_approved_by`) is a pure content/eligibility check — do the post/clip itself follow every campaign guideline, brand-integration requirement, and CTA requirement (required brand slide present, caption hashtags, bio link, no violations)? It never involves audience %, views, or CPM — those are set later, only at Analytics Approved.
 
 - **Independent of `status` and of the 7-day analytics gate.** Settable any time, including while a clip is still `awaiting_analytics` and before any proof exists — that's the whole point: a reviewer can give the fast content signal well before the 7-day/proof cycle finishes.
-- **Admin/Owner only** — a Mod cannot Clip Approve (see the Mod/Admin/Owner permissions above).
+- **Admin/Owner only** — a Mod cannot Post Approve (see the Mod/Admin/Owner permissions above).
 - **Never a payout signal.** It has zero effect on `cpm`/`earnings`/`payout` and zero effect on the campaign budget. Only Analytics Approve (below) ever sets those.
-- **Never reset.** If a clip was Clip Approved and is later Analytics-Rejected (bad proof, disqualifying audience, a mismatch caught late, etc.), the final outcome is a full Reject — no payout, regardless of the earlier Clip Approved state. A clip can be `clip_approved = true` and `status = 'rejected'` at the same time; Clip Approved is never a guarantee of payment.
-- **One-way in the UI.** There's no "un-approve" — a bad Clip Approve call is caught downstream by an Analytics-stage Reject instead.
+- **Never reset.** If a clip was Post Approved and is later Analytics-Rejected (bad proof, disqualifying audience, a mismatch caught late, etc.), the final outcome is a full Reject — no payout, regardless of the earlier Post Approved state. A clip can be `clip_approved = true` and `status = 'rejected'` at the same time; Post Approved is never a guarantee of payment.
+- **One-way in the UI.** There's no "un-approve" — a bad Post Approve call is caught downstream by an Analytics-stage Reject instead.
 
-**Analytics Approved** is the existing full-approval flow (proof + Qualifying Audience % → CPM/payout) — same mechanics *and* same permissions as always, just labeled "Analytics Approve" in the UI to distinguish it from Clip Approve. This is what actually determines and locks in payout, and stays **Mod/Admin/Owner**, unchanged. Only Clip Approve (above) is the new Admin/Owner-only action; Reject also stays Mod/Admin/Owner.
+**Analytics Approved** is the existing full-approval flow (proof + Qualifying Audience % → CPM/payout) — same mechanics *and* same permissions as always, just labeled "Analytics Approve" in the UI to distinguish it from Post Approve. This is what actually determines and locks in payout, and stays **Mod/Admin/Owner**, unchanged. Only Post Approve (above) is the new Admin/Owner-only action; Reject also stays Mod/Admin/Owner.
 
-**Reversing an Analytics decision.** Analytics Approve/Reject already supports multi-round review in both directions — approving a previously-Rejected clip, or rejecting a previously-Approved one — gated by the normal Mod/Admin/Owner override rule (a Mod may act on an untouched clip or their own prior decision; Admin/Owner may always override anyone). **One exception: reversing a Rejection back to Approved specifically requires Admin/Owner**, even when the override rule alone would let the original rejecting Mod self-correct — undoing a rejection and letting a clip earn again is a judgment call, not a routine correction. The other direction (rejecting a previously-Approved clip) is unaffected — undoing a payout back to not-earning needs no extra gate. A reversal writes a normal `clip_review_events` row exactly like any other review action — no separate audit-trail shape. It never touches `clip_approved`/`clip_approved_at` (Clip Approve stays a one-way, step-1-only flag either way), and never needs to re-trigger `cpm`/`earnings`/`payout` — those stay current via `setQualifyingAudiencePct`/view refreshes regardless of `status`, so a clip reversed back to Approved shows its already-correct payout immediately. In the UI, the reversal button appears wherever a Rejected clip is visible (the dashboard's condensed History and the full `/history` page) for Admin/Owner only.
+**Reversing an Analytics decision.** Analytics Approve/Reject already supports multi-round review in both directions — approving a previously-Rejected clip, or rejecting a previously-Approved one — gated by the normal Mod/Admin/Owner override rule (a Mod may act on an untouched clip or their own prior decision; Admin/Owner may always override anyone). **One exception: reversing a Rejection back to Approved specifically requires Admin/Owner**, even when the override rule alone would let the original rejecting Mod self-correct — undoing a rejection and letting a clip earn again is a judgment call, not a routine correction. The other direction (rejecting a previously-Approved clip) is unaffected — undoing a payout back to not-earning needs no extra gate. A reversal writes a normal `clip_review_events` row exactly like any other review action — no separate audit-trail shape. It never touches `clip_approved`/`clip_approved_at` (Post Approve stays a one-way, step-1-only flag either way), and never needs to re-trigger `cpm`/`earnings`/`payout` — those stay current via `setQualifyingAudiencePct`/view refreshes regardless of `status`, so a clip reversed back to Approved shows its already-correct payout immediately. In the UI, the reversal button appears wherever a Rejected clip is visible (the dashboard's condensed History and the full `/history` page) for Admin/Owner only.
 
-**Reviewer UI** shows four actions per clip: Clip Approve, Analytics Approve, Reject, Delete (Owner/Admin only, unchanged from Task 5).
+**Reviewer UI** shows four actions per clip: Post Approve, Analytics Approve, Reject, Delete (Owner/Admin only, unchanged from Task 5).
 
-**Creator-facing display:** a green "Clip Approved" badge appears as soon as it's set, shown additively alongside — never instead of — the clip's real status. A clip can show "Clip Approved" plus "Awaiting analytics" at the same time; Clip Approved has no bearing on when the proof-submission field unlocks, which is still strictly the 7-day rule.
+**Creator-facing display:** a green "Post Approved" badge appears as soon as it's set, shown additively alongside — never instead of — the clip's real status. A clip can show "Post Approved" plus "Awaiting analytics" at the same time; Post Approved has no bearing on when the proof-submission field unlocks, which is still strictly the 7-day rule.
 
-**History filter** has a "Clip Approved" option showing a breakdown: how many Clip Approved clips are still working through analytics review vs. how many made it all the way to Analytics Approved.
+**Naming:** "Post Approved"/"Post Approve" is the display name for step 1 everywhere user-facing; the underlying `clips.clip_approved`/`clip_approved_at`/`clip_approved_by` columns, `clipApprove()`, and the `clip_approve` audit action keep their original names.
 
-**Backfill (existing clips, applied once on deploy):** clips already `approved` or `paid` → `clip_approved = true` retroactively (they already passed full review, so they clearly passed the content bar too). Clips `rejected` → left `false` (a past rejection stands; not implied to have been content-approved). Clips `pending`/`awaiting_analytics` → left `false` — genuinely not yet Clip Approved; reviewers work through them going forward with the new button.
+**History filter** is a six-option dropdown of workflow stages ("what is this clip waiting on next?"), in this order:
+
+| Label | Condition |
+|---|---|
+| All Submissions | no filter |
+| Waiting for Post Approved | `clip_approved = false` and `status != rejected` |
+| Waiting for Analytics Approved | `clip_approved = true` and `status` in (`awaiting_analytics`, `pending`) |
+| Waiting for Payment | `status = approved` and `paid_status != paid` |
+| Paid | `paid_status = paid` |
+| Rejected | `status = rejected` |
+
+A rejected clip is excluded from "Waiting for Post Approved" because it's a dead end, not waiting on anything. The two steps are independent, so a clip Analytics Approved without ever being Post Approved still shows under "Waiting for Post Approved" (step 1 genuinely wasn't done) as well as "Waiting for Payment". The summary tiles above the list (Submitted, Waiting, Pending, Approved, Rejected, Paid, Total Views, Approved Views) are separate from the dropdown and unchanged.
+
+**Backfill (existing clips, applied once on deploy):** clips already `approved` or `paid` → `clip_approved = true` retroactively (they already passed full review, so they clearly passed the content bar too). Clips `rejected` → left `false` (a past rejection stands; not implied to have been content-approved). Clips `pending`/`awaiting_analytics` → left `false` — genuinely not yet Post Approved; reviewers work through them going forward with the new button.
 
 ## Payout formula
 
