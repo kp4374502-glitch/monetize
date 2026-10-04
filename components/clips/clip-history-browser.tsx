@@ -79,6 +79,8 @@ export function ClipHistoryBrowser({
     paid: number;
     totalViews: number;
     approvedViews: number;
+    paidAmount: string;
+    owedAmount: string;
   };
   rows: Row[];
   showCreator: boolean;
@@ -151,13 +153,29 @@ export function ClipHistoryBrowser({
         <StatCard label="Pending" value={summary.pending.toLocaleString()} />
         <StatCard label="Analytics Approved" value={summary.approved.toLocaleString()} />
         <StatCard label="Rejected" value={summary.rejected.toLocaleString()} />
-        <StatCard label="Paid" value={summary.paid.toLocaleString()} />
+        <StatCard label="Paid" value={summary.paid.toLocaleString()} hint="clips" />
         <StatCard label="Total Views" value={summary.totalViews.toLocaleString()} valueTestId="history-total-views" hint="Every submitted clip, any status" />
         <StatCard
           label="Approved Views"
           value={summary.approvedViews.toLocaleString()}
           valueTestId="history-approved-views"
           hint="Clips that passed review (approved or paid)"
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3" data-testid="history-money">
+        <StatCard
+          label="Paid out"
+          value={money(summary.paidAmount)}
+          valueTestId="history-paid-amount"
+          emphasis
+          hint="Payouts marked paid"
+        />
+        <StatCard
+          label="Owed"
+          value={money(summary.owedAmount)}
+          valueTestId="history-owed-amount"
+          hint="Analytics Approved, not yet paid"
         />
       </div>
 

@@ -1232,6 +1232,37 @@ describe("filterable clip history (getReviewerClipHistory / getMyClipHistory)", 
     expect((await svc.getReviewerClipHistory("owner", campX)).summary.total).toBe(3);
   });
 
+  it("the Paid out / Owed money tiles use the home page's definitions and narrow with the creator scope, ignoring the status tab", async () => {
+    const campX = await freshCampaign("History money tiles");
+    const payoutOf = async (id: string) => Number((await db.select().from(clips).where(eq(clips.id, id)))[0].payout);
+
+    const c1Paid = await approvedWithPayout(campX, "c1", 60, 4000);
+    await svc.markPaid("owner", campX, c1Paid.id);
+    const c1Owed = await approvedWithPayout(campX, "c1", 60, 3000);
+    const c2Owed = await approvedWithPayout(campX, "c2", 60, 2000);
+    const c1Rejected = await approvedWithPayout(campX, "c1", 60, 5000); // has a payout figure, but rejecting it means it's owed nothing
+    await svc.reviewClip("owner", campX, c1Rejected.id, { action: "reject", reason: "fake views" });
+    await makeClip("c1", campX, 1000); // still awaiting analytics: no payout, counts toward neither
+
+    const [p1, o1, o2] = [await payoutOf(c1Paid.id), await payoutOf(c1Owed.id), await payoutOf(c2Owed.id)];
+    const fixed = (n: number) => n.toFixed(2);
+
+    const all = await svc.getReviewerClipHistory("owner", campX);
+    expect(all.summary).toMatchObject({ paidAmount: fixed(p1), owedAmount: fixed(o1 + o2) });
+
+    const c1 = await svc.getReviewerClipHistory("owner", campX, { creatorId: "c1" });
+    expect(c1.summary).toMatchObject({ paidAmount: fixed(p1), owedAmount: fixed(o1) });
+    const c2 = await svc.getReviewerClipHistory("owner", campX, { creatorId: "c2" });
+    expect(c2.summary).toMatchObject({ paidAmount: "0.00", owedAmount: fixed(o2) });
+
+    // the status tab narrows the list, never the money tiles (same as every other tile)
+    const rejectedTab = await svc.getReviewerClipHistory("owner", campX, { creatorId: "c1", status: "rejected" });
+    expect(rejectedTab.summary).toMatchObject({ paidAmount: fixed(p1), owedAmount: fixed(o1) });
+
+    // a creator's own view totals just their own clips, same as the scoped reviewer view
+    expect((await svc.getMyClipHistory("c1", campX)).summary).toMatchObject({ paidAmount: fixed(p1), owedAmount: fixed(o1) });
+  });
+
   it("getCampaignCreator resolves only real members of THIS campaign, with the username looked up server-side", async () => {
     const campX = await freshCampaign("History creator lookup X");
     const campY = (await campaignSvc.createCampaign("owner", { ...validCampaign, name: "History creator lookup Y" })).id;

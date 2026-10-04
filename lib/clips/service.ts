@@ -878,6 +878,10 @@ async function filteredClipHistory(scope: SQL, filters: ClipHistoryFilters) {
       // over `rows`, which is capped at CLIP_HISTORY_LIMIT — this must total every matching clip.
       totalViews: sql<string>`coalesce(sum(coalesce(${clips.manualViews}, ${clips.views})), 0)`,
       approvedViews: sql<string>`coalesce(sum(coalesce(${clips.manualViews}, ${clips.views})) filter (where ${clips.status} = 'approved'), 0)`,
+      // Same definitions as getClipHistory's campaign-wide totals, but over this scope (date range
+      // and, when set, one creator): paid = payouts marked paid; owed = Analytics Approved, unpaid.
+      paidAmount: sql<string>`coalesce(sum(${clips.payout}) filter (where ${clips.paidStatus} = 'paid'), 0)`,
+      owedAmount: sql<string>`coalesce(sum(${clips.payout}) filter (where ${clips.status} = 'approved' and ${clips.paidStatus} = 'unpaid'), 0)`,
     })
     .from(clips)
     .where(dateScope);
@@ -901,6 +905,8 @@ async function filteredClipHistory(scope: SQL, filters: ClipHistoryFilters) {
       paid: Number(summaryRow.paid),
       totalViews: Number(summaryRow.totalViews),
       approvedViews: Number(summaryRow.approvedViews),
+      paidAmount: Number(summaryRow.paidAmount).toFixed(2),
+      owedAmount: Number(summaryRow.owedAmount).toFixed(2),
     },
     rows,
   };
