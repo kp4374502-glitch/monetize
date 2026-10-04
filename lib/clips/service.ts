@@ -711,13 +711,59 @@ export async function deleteClip(actorId: string, campaignId: string, clipId: st
 // Reads for the dashboard
 // ---------------------------------------------------------------------------------------------
 
-/** A creator's own clips on one campaign — never anyone else's. */
+// ---------------------------------------------------------------------------------------------
+// Post numbers: "post #137" = the 137th post ever submitted to this campaign, so a reviewer looking
+// at 282 posts can tell them apart and refer to one by number.
+// ---------------------------------------------------------------------------------------------
+
+type PostNumbers = Map<string, { campaign: number; creator: number }>;
+
+/**
+ * Ranks every post on THIS campaign by submission order -- overall, and within each creator's own
+ * posts. Soft-deleted posts are deliberately included in the ranking, so deleting one leaves a gap
+ * instead of renumbering every later post (a number someone already quoted keeps meaning the same
+ * post). Computed over the whole campaign BEFORE any list filter is applied, so a post's number
+ * never depends on which list or filter it happens to appear in.
+ *
+ * Call this AFTER fetching the rows you're numbering: posts are never hard-deleted, so every fetched
+ * row is guaranteed to be in the map.
+ */
+async function loadPostNumbers(campaignId: string): Promise<PostNumbers> {
+  const rows = await db
+    .select({
+      id: clips.id,
+      campaign: sql<number>`(row_number() over (order by ${clips.submittedAt}, ${clips.id}))::int`,
+      creator: sql<number>`(row_number() over (partition by ${clips.creatorUserId} order by ${clips.submittedAt}, ${clips.id}))::int`,
+    })
+    .from(clips)
+    .where(eq(clips.campaignId, campaignId));
+  return new Map(rows.map((r) => [r.id, { campaign: r.campaign, creator: r.creator }]));
+}
+
+/**
+ * Reviewer view: the campaign-wide number, plus the creator's own count of their posts (so "my post
+ * #5" from a creator can be matched to the row a reviewer is looking at).
+ */
+function withReviewerNumbers<T extends { clip: Clip }>(rows: T[], nums: PostNumbers) {
+  return rows.map((r) => {
+    const n = nums.get(r.clip.id);
+    return { ...r, postNumber: n?.campaign ?? 0, creatorPostNumber: n?.creator ?? 0 };
+  });
+}
+
+/**
+ * A creator's own posts on one campaign -- never anyone else's -- each with its number in THEIR OWN
+ * sequence. Creators are never given the campaign-wide number: its gaps would reveal how many posts
+ * other creators have submitted.
+ */
 export async function getCreatorClips(actorId: string, campaignId: string) {
-  return db
+  const mine = await db
     .select()
     .from(clips)
     .where(and(eq(clips.campaignId, campaignId), eq(clips.creatorUserId, actorId), isNull(clips.deletedAt)))
     .orderBy(desc(clips.submittedAt));
+  const nums = await loadPostNumbers(campaignId);
+  return mine.map((c) => ({ ...c, postNumber: nums.get(c.id)?.creator ?? 0 }));
 }
 
 /**
@@ -738,7 +784,10 @@ export async function getReviewQueue(actorId: string, campaignId: string) {
           : and(eq(clips.campaignId, campaignId), eq(clips.status, "approved"), eq(clips.paidStatus, "unpaid"), isNull(clips.deletedAt)),
       )
       .orderBy(asc(clips.submittedAt));
-  return { pending: await rows("pending"), awaitingPayment: await rows("approved") };
+  const pending = await rows("pending");
+  const awaitingPayment = await rows("approved");
+  const nums = await loadPostNumbers(campaignId);
+  return { pending: withReviewerNumbers(pending, nums), awaitingPayment: withReviewerNumbers(awaitingPayment, nums) };
 }
 
 const HISTORY_LIMIT = 50;
@@ -796,9 +845,13 @@ export async function getClipHistory(actorId: string, campaignId: string) {
     .from(clips)
     .where(and(eq(clips.campaignId, campaignId), isNull(clips.deletedAt)));
 
+  const nums = await loadPostNumbers(campaignId);
   return {
-    paid,
-    rejected: rejectedRows.map((r) => ({ ...r, rejectedBy: rejecters.get(r.clip.id) ?? null })),
+    paid: withReviewerNumbers(paid, nums),
+    rejected: withReviewerNumbers(
+      rejectedRows.map((r) => ({ ...r, rejectedBy: rejecters.get(r.clip.id) ?? null })),
+      nums,
+    ),
     totals: { paid: Number(totals.paid).toFixed(2), owed: Number(totals.owed).toFixed(2), views: Number(totals.views) },
   };
 }
@@ -858,7 +911,7 @@ function clipHistoryStatusCondition(status: ClipHistoryStatusFilter | undefined)
  * are for the DATE RANGE alone (every status at once), so switching the status tab narrows the list
  * below without the summary bar itself jumping around; the list applies both the range and the tab.
  */
-async function filteredClipHistory(scope: SQL, filters: ClipHistoryFilters) {
+async function filteredClipHistory(scope: SQL, filters: ClipHistoryFilters, campaignId: string, view: "reviewer" | "creator") {
   const rangeParts = [scope];
   if (filters.from) rangeParts.push(gte(clips.submittedAt, filters.from));
   if (filters.to) rangeParts.push(lte(clips.submittedAt, filters.to));
@@ -896,6 +949,7 @@ async function filteredClipHistory(scope: SQL, filters: ClipHistoryFilters) {
     .where(statusCondition ? and(dateScope, statusCondition) : dateScope)
     .orderBy(desc(clips.submittedAt))
     .limit(CLIP_HISTORY_LIMIT);
+  const nums = await loadPostNumbers(campaignId); // after the rows, see loadPostNumbers
 
   return {
     summary: {
@@ -910,19 +964,24 @@ async function filteredClipHistory(scope: SQL, filters: ClipHistoryFilters) {
       paidAmount: Number(summaryRow.paidAmount).toFixed(2),
       owedAmount: Number(summaryRow.owedAmount).toFixed(2),
     },
-    rows,
+    // A creator only ever gets the number within their OWN posts; the campaign-wide number (whose
+    // gaps would leak other creators' activity) is reviewer-only. See loadPostNumbers.
+    rows:
+      view === "reviewer"
+        ? withReviewerNumbers(rows, nums)
+        : rows.map((r) => ({ ...r, postNumber: nums.get(r.clip.id)?.creator ?? 0, creatorPostNumber: null as number | null })),
   };
 }
 
 /** Every clip ever submitted to THIS campaign, filtered — Mod/Admin/Owner only. */
 export async function getReviewerClipHistory(actorId: string, campaignId: string, filters: ClipHistoryFilters = {}) {
   await requireRole(actorId, campaignId, "mod");
-  return filteredClipHistory(and(eq(clips.campaignId, campaignId), isNull(clips.deletedAt))!, filters);
+  return filteredClipHistory(and(eq(clips.campaignId, campaignId), isNull(clips.deletedAt))!, filters, campaignId, "reviewer");
 }
 
 /** A creator's own submissions to THIS campaign, filtered — never anyone else's (same scoping as getCreatorClips). */
 export async function getMyClipHistory(actorId: string, campaignId: string, filters: ClipHistoryFilters = {}) {
-  return filteredClipHistory(and(eq(clips.campaignId, campaignId), eq(clips.creatorUserId, actorId), isNull(clips.deletedAt))!, filters);
+  return filteredClipHistory(and(eq(clips.campaignId, campaignId), eq(clips.creatorUserId, actorId), isNull(clips.deletedAt))!, filters, campaignId, "creator");
 }
 
 /**

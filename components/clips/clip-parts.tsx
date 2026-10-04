@@ -159,3 +159,27 @@ export function InlineRejectForm({ campaignId, clipId }: { campaignId: string; c
     </ActionForm>
   );
 }
+
+/** "#137": the post's submission-order number (see loadPostNumbers). Renders nothing for a missing number. */
+export function PostNumber({ n }: { n: number | null | undefined }) {
+  if (!n) return null;
+  return (
+    <span
+      className="inline-flex items-center rounded-full border border-gold-border/50 bg-gold-light/10 px-2 py-0.5 text-xs font-bold tabular-nums text-gold-light"
+      title={`Post #${n}`}
+      data-testid="post-number"
+    >
+      #{n}
+    </span>
+  );
+}
+
+/** Reviewer-only hint beside a creator's name: which of THEIR posts this is, so "my post #5" can be matched to a row. */
+export function CreatorPostNumber({ n }: { n: number | null | undefined }) {
+  if (!n) return null;
+  return (
+    <span className="text-xs text-text-secondary" data-testid="creator-post-number">
+      their #{n}
+    </span>
+  );
+}

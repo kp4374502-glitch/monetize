@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, SectionHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DeleteClipButton } from "./delete-clip-button";
-import { Thumb, money } from "./clip-parts";
+import { CreatorPostNumber, PostNumber, Thumb, money } from "./clip-parts";
 
 type History = Awaited<ReturnType<typeof getClipHistory>>;
 
@@ -33,14 +33,16 @@ export function ClipHistory({
           <Card innerClassName="py-8 text-center text-sm text-text-secondary">Nothing paid yet.</Card>
         )}
         <ul className="grid grid-cols-1 gap-2.5">
-          {history.paid.map(({ clip: c, creatorUsername, paidByUsername }) => (
+          {history.paid.map(({ clip: c, creatorUsername, paidByUsername, postNumber, creatorPostNumber }) => (
             <li key={c.id} data-testid="paid-row">
               <Card innerClassName="flex items-center gap-4 p-4">
                 <Thumb clip={c} />
                 <div className="min-w-0 flex-1 text-sm">
                   <div className="flex flex-wrap items-center gap-2">
+                    <PostNumber n={postNumber} />
                     <Badge status="paid" />
                     <span className="font-bold">{creatorUsername}</span>
+                    <CreatorPostNumber n={creatorPostNumber} />
                     <span className="text-text-secondary">{c.views.toLocaleString()} views</span>
                   </div>
                   <p className="mt-1 text-xs text-text-secondary">
@@ -61,14 +63,16 @@ export function ClipHistory({
           <Card innerClassName="py-8 text-center text-sm text-text-secondary">No rejected posts.</Card>
         )}
         <ul className="grid grid-cols-1 gap-2.5">
-          {history.rejected.map(({ clip: c, creatorUsername, rejectedBy }) => (
+          {history.rejected.map(({ clip: c, creatorUsername, rejectedBy, postNumber, creatorPostNumber }) => (
             <li key={c.id} data-testid="rejected-row">
               <Card innerClassName="flex items-center gap-4 p-4">
                 <Thumb clip={c} />
                 <div className="min-w-0 flex-1 text-sm">
                   <div className="flex flex-wrap items-center gap-2">
+                    <PostNumber n={postNumber} />
                     <Badge status="rejected" />
                     <span className="font-bold">{creatorUsername}</span>
+                    <CreatorPostNumber n={creatorPostNumber} />
                     <a href={c.url} target="_blank" rel="noreferrer" className="truncate text-text-secondary underline-offset-2 hover:text-gold-light hover:underline">
                       {c.url}
                     </a>

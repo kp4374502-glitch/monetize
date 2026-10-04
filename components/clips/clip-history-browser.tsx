@@ -7,9 +7,9 @@ import { analyticsGateState, canRejectInline } from "@/lib/clips/rules";
 import type { ClipHistoryStatusFilter } from "@/lib/clips/service";
 import { AutoSubmitSelect } from "./auto-submit-select";
 import { DeleteClipButton } from "./delete-clip-button";
-import { AnalyticsProof, ClipApprovedBadge, InlineRejectForm, PctForm, Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
+import { AnalyticsProof, ClipApprovedBadge, CreatorPostNumber, InlineRejectForm, PctForm, PostNumber, Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
 
-type Row = { clip: ClipRow; creatorUsername: string };
+type Row = { clip: ClipRow; creatorUsername: string; postNumber: number; creatorPostNumber: number | null };
 
 const STATUS_OPTIONS: { value: ClipHistoryStatusFilter; label: string }[] = [
   { value: "all", label: "All Submissions" },
@@ -183,7 +183,7 @@ export function ClipHistoryBrowser({
         <Card innerClassName="py-10 text-center text-sm text-text-secondary">No posts match this filter.</Card>
       ) : (
         <ul className="grid grid-cols-1 gap-2.5" data-testid="history-list">
-          {rows.map(({ clip: c, creatorUsername }) => {
+          {rows.map(({ clip: c, creatorUsername, postNumber, creatorPostNumber }) => {
             const gate = analyticsGateState(c);
             return (
             <li key={c.id} data-testid="history-row">
@@ -191,9 +191,11 @@ export function ClipHistoryBrowser({
                 <Thumb clip={c} />
                 <div className="min-w-0 flex-1 text-sm">
                   <div className="flex flex-wrap items-center gap-2">
+                    <PostNumber n={postNumber} />
                     <StatusBadge clip={c} />
                     <ClipApprovedBadge clip={c} />
                     {showCreator && <span className="font-bold" data-testid="history-creator">{creatorUsername}</span>}
+                    {showCreator && <CreatorPostNumber n={creatorPostNumber} />}
                     <a href={c.url} target="_blank" rel="noreferrer" className="min-w-0 truncate text-text-secondary underline-offset-2 hover:text-gold-light hover:underline">
                       {c.url}
                     </a>

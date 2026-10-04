@@ -1282,6 +1282,55 @@ describe("filterable clip history (getReviewerClipHistory / getMyClipHistory)", 
     expect((await svc.getReviewerClipHistory("owner", campX)).summary.totalViews).toBe(home.totals.views);
   });
 
+  it("post numbers follow submission order, mean the same post in every list, never renumber on delete, and ignore other campaigns", async () => {
+    const campX = await freshCampaign("Post numbers X");
+    const campY = await freshCampaign("Post numbers Y");
+    await makeClip("c1", campY); // another campaign's posts must not shift campX's numbers
+    const c1a = await makeClip("c1", campX); // #1 overall, c1's #1
+    const c2a = await makeClip("c2", campX); // #2,            c2's #1
+    const c1b = await makeClip("c1", campX); // #3,            c1's #2
+    const c1c = await makeClip("c1", campX); // #4,            c1's #3
+    const c2b = await makeClip("c2", campX); // #5,            c2's #2
+    await makeClip("c1", campY);
+
+    const byId = (rows: { clip: { id: string }; postNumber: number; creatorPostNumber: number | null }[]) =>
+      Object.fromEntries(rows.map((r) => [r.clip.id, [r.postNumber, r.creatorPostNumber]]));
+    const expected = { [c1a.id]: [1, 1], [c2a.id]: [2, 1], [c1b.id]: [3, 2], [c1c.id]: [4, 3], [c2b.id]: [5, 2] };
+
+    // reviewer Dashboard: campaign-wide number, plus the creator's own count beside it
+    expect(byId((await svc.getReviewerClipHistory("owner", campX)).rows)).toEqual(expected);
+    // the same post keeps the same number in the review queue...
+    expect(byId((await svc.getReviewQueue("owner", campX)).pending)).toEqual(expected);
+    // ...and when a filter narrows the list (numbers come from the whole campaign, not the filtered rows)
+    expect(byId((await svc.getReviewerClipHistory("owner", campX, { creatorId: "c2" })).rows)).toEqual({ [c2a.id]: [2, 1], [c2b.id]: [5, 2] });
+
+    // deleting a post leaves a gap; nothing after it renumbers
+    await svc.deleteClip("owner", campX, c1b.id);
+    expect(byId((await svc.getReviewerClipHistory("owner", campX)).rows)).toEqual({
+      [c1a.id]: [1, 1], [c2a.id]: [2, 1], [c1c.id]: [4, 3], [c2b.id]: [5, 2],
+    });
+
+    // a creator only ever sees THEIR OWN sequence (gap included) -- never the campaign-wide number
+    const mine = await svc.getCreatorClips("c1", campX);
+    expect(Object.fromEntries(mine.map((c) => [c.id, c.postNumber]))).toEqual({ [c1a.id]: 1, [c1c.id]: 3 });
+    const myHistory = await svc.getMyClipHistory("c1", campX);
+    expect(byId(myHistory.rows)).toEqual({ [c1a.id]: [1, null], [c1c.id]: [3, null] }); // c1c is overall #4 -- not exposed
+    const theirs = await svc.getMyClipHistory("c2", campX);
+    expect(byId(theirs.rows)).toEqual({ [c2a.id]: [1, null], [c2b.id]: [2, null] });
+  });
+
+  it("the reviewer's 'their #N' matches the number the creator sees on the same post", async () => {
+    const campX = await freshCampaign("Post numbers match");
+    await makeClip("c2", campX);
+    await makeClip("c1", campX);
+    const second = await makeClip("c1", campX);
+
+    const reviewerRow = (await svc.getReviewerClipHistory("owner", campX)).rows.find((r) => r.clip.id === second.id)!;
+    const creatorRow = (await svc.getMyClipHistory("c1", campX)).rows.find((r) => r.clip.id === second.id)!;
+    expect(reviewerRow).toMatchObject({ postNumber: 3, creatorPostNumber: 2 });
+    expect(creatorRow.postNumber).toBe(reviewerRow.creatorPostNumber);
+  });
+
   it("getCampaignCreator resolves only real members of THIS campaign, with the username looked up server-side", async () => {
     const campX = await freshCampaign("History creator lookup X");
     const campY = (await campaignSvc.createCampaign("owner", { ...validCampaign, name: "History creator lookup Y" })).id;

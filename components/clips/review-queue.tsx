@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { clipApproveAction, markPaidAction, reviewAction, setManualViewsAction } from "@/app/campaigns/clip-actions";
 import { canRejectInline, canSetManualViews } from "@/lib/clips/rules";
 import { DeleteClipButton } from "./delete-clip-button";
-import { AnalyticsProof, ClipApprovedBadge, InlineRejectForm, PctForm, Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
+import { AnalyticsProof, ClipApprovedBadge, CreatorPostNumber, InlineRejectForm, PctForm, PostNumber, Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
 
 function ClipApproveButton({ campaignId, clip }: { campaignId: string; clip: ClipRow }) {
   if (clip.clipApproved) return null;
@@ -19,7 +19,7 @@ function ClipApproveButton({ campaignId, clip }: { campaignId: string; clip: Cli
   );
 }
 
-type Row = { clip: ClipRow; creatorUsername: string };
+type Row = { clip: ClipRow; creatorUsername: string; postNumber: number; creatorPostNumber: number };
 
 /** Adds the "proof missing" nudge on top of the shared AnalyticsProof display — only the active review queue needs it. */
 function ProofLine({ clip, campaignId, missingId }: { clip: ClipRow; campaignId: string; missingId?: string }) {
@@ -93,16 +93,18 @@ export function ReviewQueue({
           <Card innerClassName="py-10 text-center text-sm text-text-secondary">Nothing waiting on you. 🎉</Card>
         )}
         <ul className="grid grid-cols-1 gap-3">
-          {pending.map(({ clip: c, creatorUsername }) => (
+          {pending.map(({ clip: c, creatorUsername, postNumber, creatorPostNumber }) => (
             <li key={c.id} data-testid="queue-row">
               <Card innerClassName="p-4">
                 <div className="flex gap-4">
                   <Thumb clip={c} />
                   <div className="min-w-0 flex-1 space-y-2.5">
                     <div className="flex flex-wrap items-center gap-2">
+                      <PostNumber n={postNumber} />
                       <StatusBadge clip={c} />
                       <ClipApprovedBadge clip={c} />
                       <span className="text-sm font-bold" data-testid="queue-creator">{creatorUsername}</span>
+                      <CreatorPostNumber n={creatorPostNumber} />
                       <a href={c.url} target="_blank" rel="noreferrer" className="truncate text-sm text-text-secondary underline-offset-2 hover:text-gold-light hover:underline">
                         {c.url}
                       </a>
@@ -140,14 +142,16 @@ export function ReviewQueue({
           <Card innerClassName="py-8 text-center text-sm text-text-secondary">No approved posts waiting to be paid.</Card>
         )}
         <ul className="grid grid-cols-1 gap-3">
-          {awaitingPayment.map(({ clip: c, creatorUsername }) => (
+          {awaitingPayment.map(({ clip: c, creatorUsername, postNumber, creatorPostNumber }) => (
             <li key={c.id} data-testid="payment-row">
               <Card innerClassName="p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                    <PostNumber n={postNumber} />
                     <StatusBadge clip={c} />
                     <ClipApprovedBadge clip={c} />
                     <span className="font-bold">{creatorUsername}</span>
+                    <CreatorPostNumber n={creatorPostNumber} />
                     <a href={c.url} target="_blank" rel="noreferrer" className="truncate text-text-secondary underline-offset-2 hover:text-gold-light hover:underline">
                       {c.url}
                     </a>

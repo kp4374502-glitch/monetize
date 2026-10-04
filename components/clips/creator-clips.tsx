@@ -5,7 +5,7 @@ import { Callout, Card, SectionHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { attachProofAction, refreshViewsAction, submitClipAction } from "@/app/campaigns/clip-actions";
 import { analyticsGateState, hasAnalyticsProof } from "@/lib/clips/rules";
-import { ClipApprovedBadge, StatusBadge, Stats, Thumb, money, type ClipRow } from "./clip-parts";
+import { ClipApprovedBadge, PostNumber, StatusBadge, Stats, Thumb, money, type ClipRow } from "./clip-parts";
 
 const onDate = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -17,7 +17,7 @@ export function CreatorClips({
   campaignStatus,
 }: {
   campaignId: string;
-  clips: ClipRow[];
+  clips: (ClipRow & { postNumber: number })[];
   viewMinimum: number;
   campaignStatus: string;
 }) {
@@ -60,6 +60,7 @@ export function CreatorClips({
                       </div>
                     )}
                     <div className="flex flex-wrap items-center gap-2">
+                      <PostNumber n={c.postNumber} />
                       <StatusBadge clip={c} />
                       <a href={c.url} target="_blank" rel="noreferrer" className="truncate text-sm text-text-secondary underline-offset-2 hover:text-gold-light hover:underline">
                         {c.url}
