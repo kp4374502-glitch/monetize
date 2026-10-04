@@ -48,7 +48,7 @@ export function SectionHeader({
   );
 }
 
-/** Stat card in the "CLIPS / TOTAL VIEWS / EARNED" style: small caps label over a big number. */
+/** Stat card in the "POSTS / TOTAL VIEWS / EARNED" style: small caps label over a big number. */
 export function StatCard({
   label,
   value,

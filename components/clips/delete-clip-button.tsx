@@ -16,12 +16,12 @@ export function DeleteClipButton({ campaignId, clipId }: { campaignId: string; c
       action={deleteClipAction.bind(null, campaignId, clipId)}
       className="inline"
       onSubmit={(e) => {
-        if (!confirm("Delete this clip? This removes it from every list — the audit trail is kept, but this can't be undone from the UI.")) {
+        if (!confirm("Delete this post? This removes it from every list — the audit trail is kept, but this can't be undone from the UI.")) {
           e.preventDefault();
         }
       }}
     >
-      <Button type="submit" variant="danger" size="sm" aria-label="Delete clip" data-testid="delete-clip">
+      <Button type="submit" variant="danger" size="sm" aria-label="Delete post" data-testid="delete-clip">
         <Trash2 className="h-3.5 w-3.5" aria-hidden />
       </Button>
     </ActionForm>

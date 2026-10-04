@@ -12,7 +12,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, SectionHeader } from "@/components/ui/card";
 
 const features = [
-  { icon: Film, title: "Creators submit clips", body: "Paste a TikTok, Instagram or YouTube link — views and likes are pulled in automatically." },
+  { icon: Film, title: "Creators submit posts", body: "Paste a TikTok, Instagram or YouTube link — views and likes are pulled in automatically." },
   { icon: BadgeCheck, title: "Reviewers verify", body: "Approve or reject with a reason, check the analytics proof, and set the qualifying audience." },
   { icon: Wallet, title: "Payouts calculate themselves", body: "Each campaign's formula, budget cap and mark-paid limits are enforced for you." },
 ];
@@ -30,7 +30,7 @@ function Landing() {
           Paid clipping campaigns
         </p>
         <h1 className="text-5xl font-extrabold leading-[1.05] tracking-tight sm:text-7xl">
-          Get every clip <span className="font-serif font-medium italic text-gold-light">reviewed</span>,<br className="hidden sm:block" /> every payout{" "}
+          Get every post <span className="font-serif font-medium italic text-gold-light">reviewed</span>,<br className="hidden sm:block" /> every payout{" "}
           <span className="font-serif font-medium italic text-gold-light">tracked</span>.
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-lg text-text-secondary">

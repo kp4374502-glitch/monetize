@@ -36,7 +36,7 @@ export function CreatorRoster({ roster, limit, campaignId }: { roster: Roster; l
                 <thead className="sticky top-0 bg-bg-secondary text-[11px] font-semibold uppercase tracking-widest text-text-secondary">
                   <tr>
                     <th className="px-5 py-2.5 text-left">Creator</th>
-                    <th className="px-3 py-2.5 text-right">Clips</th>
+                    <th className="px-3 py-2.5 text-right">Posts</th>
                     <th className="px-3 py-2.5 text-right">Total views</th>
                     <th className="px-3 py-2.5 text-right">Earned</th>
                     <th className="px-5 py-2.5 text-right">Owed</th>

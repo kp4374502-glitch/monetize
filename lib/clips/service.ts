@@ -49,7 +49,7 @@ async function loadClip(campaignId: string, clipId: string): Promise<Clip> {
     .from(clips)
     .where(and(eq(clips.id, clipId), eq(clips.campaignId, campaignId), isNull(clips.deletedAt)))
     .limit(1);
-  if (!c) throw new Error("Clip not found.");
+  if (!c) throw new Error("Post not found.");
   return c;
 }
 
@@ -94,7 +94,7 @@ export async function submitClip(actorId: string, campaignId: string, rawUrl: st
   const parsed = parseClipUrl(rawUrl);
   if (!parsed) throw new Error("That doesn't look like a TikTok, Instagram or YouTube post link.");
   if (!campaign.eligiblePlatforms.includes(parsed.platform)) {
-    throw new Error(`${parsed.platform} clips are not eligible for this campaign.`);
+    throw new Error(`${parsed.platform} posts are not eligible for this campaign.`);
   }
 
   const now = new Date();
@@ -172,7 +172,7 @@ const proofSchema = z.string().trim().refine(isValidProofUrl, "Analytics proof m
 function analyticsGateError(gate: Extract<ReturnType<typeof analyticsGateState>, { locked: true }>): Error {
   return new Error(
     gate.reason === "unknown_posted_at"
-      ? "This clip's post date isn't available yet, so we can't confirm the 7-day analytics window — ask a Mod/Admin/Owner to confirm it before submitting proof."
+      ? "This post's date isn't available yet, so we can't confirm the 7-day analytics window — ask a Mod/Admin/Owner to confirm it before submitting proof."
       : `Analytics proof can't be submitted until 7 days after the post went live (unlocks ${gate.unlocksAt.toISOString().slice(0, 10)}).`,
   );
 }
@@ -197,8 +197,8 @@ export async function attachVideoProof(
     .from(clips)
     .where(and(eq(clips.id, clipId), eq(clips.campaignId, campaignId), eq(clips.creatorUserId, actorId), isNull(clips.deletedAt)))
     .limit(1);
-  if (!clip) throw new Error("Clip not found.");
-  if (clip.paidStatus === "paid") throw new Error("This clip has already been paid.");
+  if (!clip) throw new Error("Post not found.");
+  if (clip.paidStatus === "paid") throw new Error("This post has already been paid.");
 
   const wasAwaitingAnalytics = clip.status === "awaiting_analytics";
   if (wasAwaitingAnalytics) {
@@ -240,12 +240,12 @@ export async function getProofImage(
   store: ProofImageStore = vercelBlobStore,
 ) {
   const role = await getRoleForCampaign(actorId, campaignId);
-  if (!role || role === "brand") throw new Error("Clip not found."); // reviewer-only artifact -- not part of Brand's read-only feed
+  if (!role || role === "brand") throw new Error("Post not found."); // reviewer-only artifact -- not part of Brand's read-only feed
   const clip = await loadClip(campaignId, clipId);
-  if (role === "creator" && clip.creatorUserId !== actorId) throw new Error("Clip not found.");
-  if (!clip.analyticsScreenshotPathname) throw new Error("Clip not found.");
+  if (role === "creator" && clip.creatorUserId !== actorId) throw new Error("Post not found.");
+  if (!clip.analyticsScreenshotPathname) throw new Error("Post not found.");
   const blob = await store.get(clip.analyticsScreenshotPathname);
-  if (!blob) throw new Error("Clip not found.");
+  if (!blob) throw new Error("Post not found.");
   return blob;
 }
 
@@ -286,7 +286,7 @@ export async function refreshViews(actorId: string, campaignId: string, clipId: 
   const role = await getRoleForCampaign(actorId, campaignId);
   if (!role || role === "brand") throw new Error("Access denied.");
   const clip = await loadClip(campaignId, clipId);
-  if (role === "creator" && clip.creatorUserId !== actorId) throw new Error("Clip not found.");
+  if (role === "creator" && clip.creatorUserId !== actorId) throw new Error("Post not found.");
   const campaign = await loadCampaign(campaignId);
   // Mirrors the UI's disabled-button state; this is the defense-in-depth path for a direct POST.
   if (campaign.status === "paused") throw new Error("This campaign is paused — views don't update until it's reopened.");
@@ -408,7 +408,7 @@ export async function runAnalyticsGateSweep(now: Date = new Date()) {
 
 const reviewSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("approve") }),
-  z.object({ action: z.literal("reject"), reason: z.string().trim().min(1, "A reason is required to reject a clip") }),
+  z.object({ action: z.literal("reject"), reason: z.string().trim().min(1, "A reason is required to reject a post") }),
 ]);
 
 /**
@@ -430,9 +430,9 @@ export async function reviewClip(actorId: string, campaignId: string, clipId: st
   const role = await requireRole(actorId, campaignId, "mod");
   const decision = reviewSchema.parse(input);
   const clip = await loadClip(campaignId, clipId);
-  if (clip.paidStatus === "paid") throw new Error("This clip has already been paid; its review can't be changed.");
+  if (clip.paidStatus === "paid") throw new Error("This post has already been paid; its review can't be changed.");
   if (clip.status === (decision.action === "approve" ? "approved" : "rejected")) {
-    throw new Error(`This clip is already ${clip.status}.`);
+    throw new Error(`This post is already ${clip.status}.`);
   }
 
   const [last] = await db
@@ -445,14 +445,14 @@ export async function reviewClip(actorId: string, campaignId: string, clipId: st
     throw new Error("Access denied: only an Admin or Owner can override another reviewer's decision.");
   }
   if (decision.action === "approve" && clip.status === "rejected" && !canReverseRejection(role)) {
-    throw new Error("Access denied: only an Admin or Owner can approve a previously rejected clip.");
+    throw new Error("Access denied: only an Admin or Owner can approve a previously rejected post.");
   }
 
   if (decision.action === "approve") {
     if (!hasAnalyticsProof(clip)) throw new Error("Analytics proof is missing — attach it before Analytics Approving.");
     const campaign = await loadCampaign(campaignId);
     if (wouldExceedBudget(campaign.budgetSpent, clip.payout ?? 0, campaign.totalBudget)) {
-      throw new Error("This clip's payout would exceed the campaign's total budget.");
+      throw new Error("This post's payout would exceed the campaign's total budget.");
     }
   }
 
@@ -476,7 +476,7 @@ export async function reviewClip(actorId: string, campaignId: string, clipId: st
       clipId,
       type: decision.action === "approve" ? "clip_approved" : "clip_rejected",
       message:
-        decision.action === "approve" ? "Your clip's analytics were approved." : `Your clip was rejected: ${decision.reason}`,
+        decision.action === "approve" ? "Your post's analytics were approved." : `Your post was rejected: ${decision.reason}`,
     });
   });
 }
@@ -490,7 +490,7 @@ export async function reviewClip(actorId: string, campaignId: string, clipId: st
 export async function clipApprove(actorId: string, campaignId: string, clipId: string) {
   await requireRole(actorId, campaignId, "admin");
   const clip = await loadClip(campaignId, clipId);
-  if (clip.clipApproved) throw new Error("This clip has already been Post Approved.");
+  if (clip.clipApproved) throw new Error("This post has already been Post Approved.");
 
   await db.transaction(async (tx) => {
     await tx.insert(clipReviewEvents).values({ clipId, actorUserId: actorId, action: "clip_approve" });
@@ -507,7 +507,7 @@ export async function setQualifyingAudiencePct(actorId: string, campaignId: stri
   const role = await requireRole(actorId, campaignId, "mod");
   const pct = pctSchema.parse(rawPct);
   const clip = await loadClip(campaignId, clipId);
-  if (clip.paidStatus === "paid") throw new Error("This clip has already been paid.");
+  if (clip.paidStatus === "paid") throw new Error("This post has already been paid.");
   // CLAUDE.md verification flow: proof must exist before a % can be entered.
   if (!hasAnalyticsProof(clip)) throw new Error("Analytics proof is missing — the creator must attach it before a Qualifying Audience % can be entered.");
   if (!roleCanOverride(role, actorId, clip.qualifyingPctSetBy)) {
@@ -545,7 +545,7 @@ export async function setManualViews(actorId: string, campaignId: string, clipId
   const role = await requireRole(actorId, campaignId, "mod");
   const manualViews = manualViewsSchema.parse(rawViews);
   const clip = await loadClip(campaignId, clipId);
-  if (clip.paidStatus === "paid") throw new Error("This clip has already been paid.");
+  if (clip.paidStatus === "paid") throw new Error("This post has already been paid.");
   if (!canSetManualViews(clip)) {
     throw new Error(
       "Manual view entry is only for an Instagram post ScrapeCreators has confirmed is a photo/carousel — a real video's automatic view count is used as-is.",
@@ -583,7 +583,7 @@ export async function setPostedAt(actorId: string, campaignId: string, clipId: s
   await requireRole(actorId, campaignId, "mod");
   const postedAt = postedAtSchema.parse(rawDate);
   const clip = await loadClip(campaignId, clipId);
-  if (clip.postedAt !== null) throw new Error("This clip's post date is already known.");
+  if (clip.postedAt !== null) throw new Error("This post's date is already known.");
 
   const shouldUnlock = clip.status === "awaiting_analytics" && hasAnalyticsProof(clip) && !analyticsGateState({ ...clip, postedAt }).locked;
 
@@ -609,8 +609,8 @@ export async function setPostedAt(actorId: string, campaignId: string, clipId: s
 export async function unlockAnalyticsEarly(actorId: string, campaignId: string, clipId: string) {
   await requireRole(actorId, campaignId, "mod");
   const clip = await loadClip(campaignId, clipId);
-  if (clip.analyticsUnlockedEarlyAt !== null) throw new Error("This clip has already been unlocked early.");
-  if (!analyticsGateState(clip).locked) throw new Error("This clip isn't currently gate-locked.");
+  if (clip.analyticsUnlockedEarlyAt !== null) throw new Error("This post has already been unlocked early.");
+  if (!analyticsGateState(clip).locked) throw new Error("This post isn't currently gate-locked.");
 
   const [row] = await db.transaction(async (tx) => {
     await tx.insert(clipReviewEvents).values({ clipId, actorUserId: actorId, action: "unlock_analytics_early" });
@@ -638,9 +638,9 @@ export async function unlockAnalyticsEarly(actorId: string, campaignId: string, 
 export async function markPaid(actorId: string, campaignId: string, clipId: string) {
   const role = await requireRole(actorId, campaignId, "mod");
   const clip = await loadClip(campaignId, clipId);
-  if (clip.status !== "approved") throw new Error("Only approved clips can be marked paid.");
-  if (clip.paidStatus === "paid") throw new Error("This clip is already marked paid.");
-  if (clip.payout === null || Number(clip.payout) <= 0) throw new Error("Nothing is owed on this clip yet.");
+  if (clip.status !== "approved") throw new Error("Only approved posts can be marked paid.");
+  if (clip.paidStatus === "paid") throw new Error("This post is already marked paid.");
+  if (clip.payout === null || Number(clip.payout) <= 0) throw new Error("Nothing is owed on this post yet.");
 
   const campaign = await loadCampaign(campaignId);
   if (!roleCanMarkPaid(role, clip.payout, campaign.modMarkPaidThreshold)) {
@@ -656,7 +656,7 @@ export async function markPaid(actorId: string, campaignId: string, clipId: stri
       .set({ paidStatus: "paid", paidBy: actorId, paidAt: new Date() })
       .where(and(eq(clips.id, clipId), eq(clips.campaignId, campaignId), eq(clips.paidStatus, "unpaid")))
       .returning({ id: clips.id });
-    if (!paid.length) throw new Error("This clip is already marked paid.");
+    if (!paid.length) throw new Error("This post is already marked paid.");
 
     // Atomic cap check-and-increment: two concurrent payouts can't both slip under the cap.
     const bumped = await tx
@@ -671,7 +671,7 @@ export async function markPaid(actorId: string, campaignId: string, clipId: stri
       campaignId,
       clipId,
       type: "payout_paid",
-      message: "Your clip has been marked paid.",
+      message: "Your post has been marked paid.",
     });
   });
 }
@@ -790,6 +790,8 @@ export async function getClipHistory(actorId: string, campaignId: string) {
     .select({
       paid: sql<string>`coalesce(sum(${clips.payout}) filter (where ${clips.paidStatus} = 'paid'), 0)`,
       owed: sql<string>`coalesce(sum(${clips.payout}) filter (where ${clips.status} = 'approved' and ${clips.paidStatus} = 'unpaid'), 0)`,
+      // Every post on the campaign, any status; manual override wins (same as effectiveViews and the Dashboard's Total Views).
+      views: sql<string>`coalesce(sum(coalesce(${clips.manualViews}, ${clips.views})), 0)`,
     })
     .from(clips)
     .where(and(eq(clips.campaignId, campaignId), isNull(clips.deletedAt)));
@@ -797,7 +799,7 @@ export async function getClipHistory(actorId: string, campaignId: string) {
   return {
     paid,
     rejected: rejectedRows.map((r) => ({ ...r, rejectedBy: rejecters.get(r.clip.id) ?? null })),
-    totals: { paid: Number(totals.paid).toFixed(2), owed: Number(totals.owed).toFixed(2) },
+    totals: { paid: Number(totals.paid).toFixed(2), owed: Number(totals.owed).toFixed(2), views: Number(totals.views) },
   };
 }
 

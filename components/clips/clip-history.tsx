@@ -58,7 +58,7 @@ export function ClipHistory({
       <section>
         <SectionHeader title="Rejected" count={history.rejected.length} />
         {history.rejected.length === 0 && (
-          <Card innerClassName="py-8 text-center text-sm text-text-secondary">No rejected clips.</Card>
+          <Card innerClassName="py-8 text-center text-sm text-text-secondary">No rejected posts.</Card>
         )}
         <ul className="grid grid-cols-1 gap-2.5">
           {history.rejected.map(({ clip: c, creatorUsername, rejectedBy }) => (

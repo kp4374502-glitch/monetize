@@ -278,7 +278,7 @@ describe("Task 5 Part 3: 7-day analytics-proof gate", () => {
     expect(clip.postedAt).toBeNull();
     await db.update(clips).set({ submittedAt: new Date(Date.now() - 365 * 86_400_000) }).where(eq(clips.id, clip.id));
     await expect(svc.attachVideoProof("c1", campX, clip.id, "https://youtu.be/aaaaaaaaaaa")).rejects.toThrow(
-      /post date isn't available/,
+      /date isn't available/,
     );
   });
 
@@ -356,7 +356,7 @@ describe("Task 5 Part 3: 7-day analytics-proof gate", () => {
       const { clip } = await svc.submitClip("c1", campX, tiktok(), { fetchImpl: failFetch, sleep });
       expect(clip.postedAt).toBeNull();
       await expect(svc.attachVideoProof("c1", campX, clip.id, "https://youtu.be/aaaaaaaaaaa")).rejects.toThrow(
-        /post date isn't available/,
+        /date isn't available/,
       );
 
       await svc.unlockAnalyticsEarly("admin", campX, clip.id);
@@ -655,7 +655,7 @@ describe("reviewClip", () => {
       // roleCanOverride alone would allow this (modA made the last decision) -- the extra
       // canReverseRejection gate blocks it anyway.
       await expect(svc.reviewClip("modA", camp, clip.id, { action: "approve" })).rejects.toThrow(
-        /only an Admin or Owner can approve a previously rejected clip/,
+        /only an Admin or Owner can approve a previously rejected post/,
       );
       await svc.reviewClip("admin", camp, clip.id, { action: "approve" });
       const [c] = await db.select().from(clips).where(eq(clips.id, clip.id));
@@ -1263,6 +1263,25 @@ describe("filterable clip history (getReviewerClipHistory / getMyClipHistory)", 
     expect((await svc.getMyClipHistory("c1", campX)).summary).toMatchObject({ paidAmount: fixed(p1), owedAmount: fixed(o1) });
   });
 
+  it("the home page's total views (getClipHistory) counts every post on THIS campaign, any status, manual override winning, never a deleted post or another campaign's", async () => {
+    const campX = await freshCampaign("Home total views X");
+    const campY = await freshCampaign("Home total views Y");
+    await makeClip("c1", campX, 1000);
+    const rejected = await makeClip("c1", campX, 2000);
+    await svc.reviewClip("owner", campX, rejected.id, { action: "reject", reason: "spam" });
+    await approvedWithPayout(campX, "c1", 60, 4000);
+    const manual = await makeClip("c2", campX, 5000);
+    await db.update(clips).set({ manualViews: 42 }).where(eq(clips.id, manual.id)); // override wins: 42, not 5000
+    const deleted = await makeClip("c1", campX, 9000);
+    await svc.deleteClip("owner", campX, deleted.id);
+    await makeClip("c1", campY, 7000); // another campaign
+
+    const home = await svc.getClipHistory("owner", campX);
+    expect(home.totals.views).toBe(1000 + 2000 + 4000 + 42);
+    // same definition as the Dashboard's Total Views tile
+    expect((await svc.getReviewerClipHistory("owner", campX)).summary.totalViews).toBe(home.totals.views);
+  });
+
   it("getCampaignCreator resolves only real members of THIS campaign, with the username looked up server-side", async () => {
     const campX = await freshCampaign("History creator lookup X");
     const campY = (await campaignSvc.createCampaign("owner", { ...validCampaign, name: "History creator lookup Y" })).id;
@@ -1483,7 +1502,7 @@ describe("getClipHistory (Paid / Rejected lists + totals)", () => {
     await makeClip("c1", h); // pending: counts toward neither total
 
     const hist = await svc.getClipHistory("admin", h);
-    expect(hist.totals).toEqual({ paid: "10.00", owed: "20.00" });
+    expect(hist.totals).toEqual({ paid: "10.00", owed: "20.00", views: 10_000 + 20_000 + 5000 + 5000 }); // paid + owed + rejected + pending, any status
     expect(hist.paid).toHaveLength(1);
     expect(hist.paid[0]).toMatchObject({ creatorUsername: "c1", paidByUsername: "admin" });
     expect(hist.paid[0].clip.id).toBe(paidClip.id);
@@ -1495,7 +1514,7 @@ describe("getClipHistory (Paid / Rejected lists + totals)", () => {
   it("is scoped to one campaign and gated to that campaign's reviewers", async () => {
     // camp/campB/small hold plenty of other data; none of it may leak into a fresh campaign
     const empty = (await campaignSvc.createCampaign("owner", { ...validCampaign, name: "Empty" })).id;
-    expect(await svc.getClipHistory("owner", empty)).toEqual({ paid: [], rejected: [], totals: { paid: "0.00", owed: "0.00" } });
+    expect(await svc.getClipHistory("owner", empty)).toEqual({ paid: [], rejected: [], totals: { paid: "0.00", owed: "0.00", views: 0 } });
     await expect(svc.getClipHistory("modOther", camp)).rejects.toThrow(/Access denied/);
     await expect(svc.getClipHistory("c1", camp)).rejects.toThrow(/Access denied/);
     expect((await svc.getClipHistory("modA", camp)).paid.every((r) => r.clip.campaignId === camp)).toBe(true);

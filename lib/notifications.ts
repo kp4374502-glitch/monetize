@@ -73,7 +73,7 @@ export async function sendProofReminders(now: Date = new Date()): Promise<number
           campaignId: c.campaignId,
           clipId: c.id,
           type: "proof_reminder",
-          message: `A clip is ${PROOF_REMINDER_AFTER_DAYS}+ days old and still has no analytics proof.`,
+          message: `A post is ${PROOF_REMINDER_AFTER_DAYS}+ days old and still has no analytics proof.`,
         });
       }
       await tx

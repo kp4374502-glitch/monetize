@@ -137,7 +137,7 @@ export function ReviewQueue({
       <section>
         <SectionHeader title="Analytics Approved — awaiting payment" count={awaitingPayment.length} />
         {awaitingPayment.length === 0 && (
-          <Card innerClassName="py-8 text-center text-sm text-text-secondary">No approved clips waiting to be paid.</Card>
+          <Card innerClassName="py-8 text-center text-sm text-text-secondary">No approved posts waiting to be paid.</Card>
         )}
         <ul className="grid grid-cols-1 gap-3">
           {awaitingPayment.map(({ clip: c, creatorUsername }) => (

@@ -8,7 +8,7 @@ import type { ActionState } from "@/components/action-form";
 
 /**
  * Turns thrown business-rule errors into a message the form can show. If `fn` resolves with a
- * string, it's shown as a success message (e.g. "Refreshed 12 of 14 clips.").
+ * string, it's shown as a success message (e.g. "Refreshed 12 of 14 posts.").
  */
 async function run(campaignId: string, fn: (userId: string) => Promise<unknown>): Promise<ActionState> {
   let result: unknown;
@@ -44,9 +44,9 @@ export const refreshViewsAction = async (campaignId: string, clipId: string, _p:
 export const refreshCampaignViewsAction = async (campaignId: string, _p: ActionState, _fd: FormData) =>
   run(campaignId, async (u) => {
     const r = await svc.refreshCampaignClips(u, campaignId);
-    if (r.attempted === 0) return "No pending or approved-unpaid clips to refresh.";
+    if (r.attempted === 0) return "No pending or approved-unpaid posts to refresh.";
     const failedNote = r.failed ? ` ${r.failed} could not be refreshed right now — ScrapeCreators may be rate-limited or low on credits.` : "";
-    return `Refreshed ${r.updated} of ${r.attempted} clip${r.attempted === 1 ? "" : "s"}.${failedNote}`;
+    return `Refreshed ${r.updated} of ${r.attempted} post${r.attempted === 1 ? "" : "s"}.${failedNote}`;
   });
 
 export const setPctAction = async (campaignId: string, clipId: string, _p: ActionState, fd: FormData) =>

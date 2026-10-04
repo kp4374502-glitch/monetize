@@ -94,17 +94,18 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
 
       {role === "creator" && (
         <div className="grid grid-cols-3 gap-3" data-testid="totals">
-          <StatCard label="Clips" value={myClips.length.toLocaleString()} />
+          <StatCard label="Posts" value={myClips.length.toLocaleString()} />
           <StatCard label="Total views" value={myViews.toLocaleString()} />
           <StatCard label="Earned" value={money(myEarned)} emphasis />
         </div>
       )}
       {history && queue && (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="totals">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5" data-testid="totals">
           <StatCard label="Paid so far" value={money(history.totals.paid)} valueTestId="total-paid" emphasis />
           <StatCard label="Owed" value={money(history.totals.owed)} valueTestId="total-owed" hint="approved, unpaid" />
-          <StatCard label="Waiting on you" value={queue.pending.length} hint="clips to review" />
-          <StatCard label="Awaiting payment" value={queue.awaitingPayment.length} hint="approved clips" />
+          <StatCard label="Waiting on you" value={queue.pending.length} hint="posts to review" />
+          <StatCard label="Awaiting payment" value={queue.awaitingPayment.length} hint="approved posts" />
+          <StatCard label="Total views" value={history.totals.views.toLocaleString()} valueTestId="total-views" hint="every post, any status" />
         </div>
       )}
 
@@ -174,7 +175,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
         <section>
           <SectionHeader
             title="Brand viewers"
-            description="Read-only access for this campaign's brand — sees every clip and aggregate stats, never who submitted it."
+            description="Read-only access for this campaign's brand — sees every post and aggregate stats, never who submitted it."
             action={
               <form action={addBrandAction.bind(null, id)} className="flex items-center gap-2">
                 <Input name="username" placeholder="Username" required className="w-40" />

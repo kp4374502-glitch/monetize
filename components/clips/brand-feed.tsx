@@ -14,17 +14,17 @@ export function BrandFeed({
 }) {
   return (
     <section className="space-y-4">
-      <SectionHeader title="Campaign clips" description="Every clip submitted to this campaign." />
+      <SectionHeader title="Campaign posts" description="Every post submitted to this campaign." />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="brand-stats">
-        <StatCard label="Clips posted" value={stats.totalClips.toLocaleString()} valueTestId="brand-total-clips" emphasis />
+        <StatCard label="Posts" value={stats.totalClips.toLocaleString()} valueTestId="brand-total-clips" emphasis />
         <StatCard label="Total views" value={stats.totalViews.toLocaleString()} valueTestId="brand-total-views" />
         <StatCard label="Approved views" value={stats.approvedViews.toLocaleString()} valueTestId="brand-approved-views" />
         <StatCard label="Paid so far" value={money(stats.paidSoFar)} valueTestId="brand-paid-so-far" />
       </div>
 
       {rows.length === 0 ? (
-        <Card innerClassName="py-10 text-center text-sm text-text-secondary">No clips submitted yet.</Card>
+        <Card innerClassName="py-10 text-center text-sm text-text-secondary">No posts submitted yet.</Card>
       ) : (
         <ul className="grid grid-cols-1 gap-2.5" data-testid="brand-clip-list">
           {rows.map((c) => (

@@ -32,7 +32,7 @@ function SetPostedAtForm({ campaignId, clipId }: { campaignId: string; clipId: s
   return (
     <div className="mt-1.5 space-y-1" data-testid="set-posted-at">
       <p className="text-xs text-text-secondary">
-        ScrapeCreators never returned a post date for this clip, so the 7-day window hasn't started. Confirm the real
+        ScrapeCreators never returned a post date for this post, so the 7-day window hasn't started. Confirm the real
         publish date to unlock it.
       </p>
       <ActionForm action={setPostedAtAction.bind(null, campaignId, clipId)} className="flex flex-wrap items-center gap-2">
@@ -100,7 +100,7 @@ export function ClipHistoryBrowser({
     <section className="space-y-4">
       <SectionHeader
         title="Dashboard"
-        description={showCreator ? "Every clip ever submitted to this campaign." : "Your submissions to this campaign."}
+        description={showCreator ? "Every post ever submitted to this campaign." : "Your submissions to this campaign."}
       />
 
       {creator && (
@@ -153,13 +153,13 @@ export function ClipHistoryBrowser({
         <StatCard label="Pending" value={summary.pending.toLocaleString()} />
         <StatCard label="Analytics Approved" value={summary.approved.toLocaleString()} />
         <StatCard label="Rejected" value={summary.rejected.toLocaleString()} />
-        <StatCard label="Paid" value={summary.paid.toLocaleString()} hint="clips" />
-        <StatCard label="Total Views" value={summary.totalViews.toLocaleString()} valueTestId="history-total-views" hint="Every submitted clip, any status" />
+        <StatCard label="Paid" value={summary.paid.toLocaleString()} hint="posts" />
+        <StatCard label="Total Views" value={summary.totalViews.toLocaleString()} valueTestId="history-total-views" hint="Every submitted post, any status" />
         <StatCard
           label="Approved Views"
           value={summary.approvedViews.toLocaleString()}
           valueTestId="history-approved-views"
-          hint="Clips that passed review (approved or paid)"
+          hint="Posts that passed review (approved or paid)"
         />
       </div>
 
@@ -180,7 +180,7 @@ export function ClipHistoryBrowser({
       </div>
 
       {rows.length === 0 ? (
-        <Card innerClassName="py-10 text-center text-sm text-text-secondary">No clips match this filter.</Card>
+        <Card innerClassName="py-10 text-center text-sm text-text-secondary">No posts match this filter.</Card>
       ) : (
         <ul className="grid grid-cols-1 gap-2.5" data-testid="history-list">
           {rows.map(({ clip: c, creatorUsername }) => {

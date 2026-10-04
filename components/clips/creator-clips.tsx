@@ -26,8 +26,8 @@ export function CreatorClips({
     <>
       <Card>
         <SectionHeader
-          title="Add a clip"
-          description={`Clips earn once they pass ${viewMinimum.toLocaleString()} views and are approved with analytics proof.`}
+          title="Add a post"
+          description={`Posts earn once they pass ${viewMinimum.toLocaleString()} views and are approved with analytics proof.`}
         />
         <ActionForm action={submitClipAction.bind(null, campaignId)} className="flex flex-wrap items-start gap-2">
           <Input name="url" placeholder="Paste a TikTok, Instagram or YouTube link" required className="min-w-72 flex-1" />
@@ -36,10 +36,10 @@ export function CreatorClips({
       </Card>
 
       <section>
-        <SectionHeader title="Your clips" count={clips.length} />
+        <SectionHeader title="Your posts" count={clips.length} />
         {clips.length === 0 && (
           <Card innerClassName="py-10 text-center text-sm text-text-secondary">
-            No clips yet — paste a link above to submit your first one.
+            No posts yet — paste a link above to submit your first one.
           </Card>
         )}
         {/* grid-cols-1 = minmax(0,1fr): without it a long unbreakable URL widens the whole column on phones */}
@@ -104,7 +104,7 @@ export function CreatorClips({
                         <div className="min-w-0 space-y-1">
                           {gate.reason === "unknown_posted_at" ? (
                             <p>
-                              We don't have a confirmed post date for this clip yet, so the 7-day analytics window hasn't started. A
+                              We don't have a confirmed post date for this post yet, so the 7-day analytics window hasn't started. A
                               reviewer needs to confirm it before you can submit proof — check back soon.
                             </p>
                           ) : (
@@ -120,7 +120,7 @@ export function CreatorClips({
                         <Callout tone="warning">
                           <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
                           <div className="min-w-0 space-y-2">
-                            <p>Analytics proof needed — this clip earns $0 until you attach it.</p>
+                            <p>Analytics proof needed — this post earns $0 until you attach it.</p>
                             <div data-testid="proof-instructions" className="space-y-1.5 text-sm text-amber-100/90">
                               <p className="font-semibold">To fix this:</p>
                               <ol className="list-decimal space-y-1 pl-5">
