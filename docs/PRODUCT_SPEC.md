@@ -421,6 +421,7 @@ No public REST API is needed — this isn't consumed by external clients. Use **
 ### Security
 
 - **Password hashing & sessions:** handled natively by Clerk — no custom crypto code needed.
+- **Devices (signed-in sessions):** the header's account menu → Manage account has a "Devices" tab (a Clerk custom profile page: `components/account-menu.tsx` + `devices-panel.tsx`). It lists every device signed in to the account (device, browser, location/IP, last active, "This device" marker) and lets the user sign any other one out, or all others at once, via Clerk's own `user.getSessions()`/`session.revoke()`. Clerk scopes both calls to the signed-in user, so it can only ever touch their own sessions. Shown to every signed-in user, not only admins; the current device has no button there (use the menu's Sign out).
 - **API-level rate limiting** (distinct from the business-level 100/day submission cap): throttle login attempts and invite-link redemption attempts, e.g. via Upstash Redis or Vercel Edge Middleware.
 - **Input validation:** `zod` on every Server Action; submitted clip URLs are validated against expected TikTok/Instagram/YouTube URL patterns before a ScrapeCreators call is made, rejecting anything malformed up front.
 

@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+import { SignedIn, SignedOut } from "@clerk/nextjs";
+import { AccountMenu } from "@/components/account-menu";
 import { Logo } from "@/components/logo";
 import { BrandRequestsLink } from "@/components/brand-requests-link";
 import { CampaignSwitcher } from "@/components/campaign-switcher";
@@ -17,10 +18,8 @@ export function AppHeader() {
             <BrandRequestsLink />
             <CampaignSwitcher />
             <NotificationBell />
-            {/* UserButton's menu carries "Sign out" */}
-            <UserButton
-              appearance={{ elements: { avatarBox: "h-8 w-8 ring-1 ring-gold-border/60" } }}
-            />
+            {/* The account menu carries "Sign out", and Manage account has a Devices tab */}
+            <AccountMenu />
           </SignedIn>
           <SignedOut>
             <Link href="/sign-in" className={buttonVariants({ variant: "primary", size: "sm" })}>
