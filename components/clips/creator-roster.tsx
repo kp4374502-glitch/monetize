@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import type { getCreatorRoster } from "@/lib/clips/service";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +11,7 @@ type Roster = Awaited<ReturnType<typeof getCreatorRoster>>;
  * Collapsible "Creators (N)" section: one row per creator with their clips, views, earned and owed.
  * A native <details> keeps it collapsible without client JS; it starts open for small rosters.
  */
-export function CreatorRoster({ roster, limit }: { roster: Roster; limit: number }) {
+export function CreatorRoster({ roster, limit, campaignId }: { roster: Roster; limit: number; campaignId: string }) {
   return (
     <section data-testid="creators-section">
       <Card innerClassName="p-0">
@@ -45,10 +46,14 @@ export function CreatorRoster({ roster, limit }: { roster: Roster; limit: number
                   {roster.map((c) => (
                     <tr key={c.userId} data-testid="creator-row" className="hover:bg-white/[0.03]">
                       <td className="px-5 py-3 font-semibold">
-                        <span className="inline-flex items-center gap-2">
+                        <Link
+                          href={`/campaigns/${campaignId}/history?creator=${encodeURIComponent(c.userId)}`}
+                          className="inline-flex items-center gap-2 hover:underline"
+                          data-testid="creator-link"
+                        >
                           {c.username}
                           {c.suspended && <Badge status="paused">suspended</Badge>}
-                        </span>
+                        </Link>
                       </td>
                       <td className="px-3 py-3 text-right tabular-nums">{c.clips.toLocaleString()}</td>
                       <td className="px-3 py-3 text-right tabular-nums">{c.views.toLocaleString()}</td>

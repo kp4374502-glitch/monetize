@@ -819,6 +819,9 @@ export interface ClipHistoryFilters {
   status?: ClipHistoryStatusFilter;
   from?: Date;
   to?: Date;
+  // Narrows to one creator's clips. Always ANDed with the caller's campaign scope, so it can only
+  // ever narrow within this campaign, never reach another one.
+  creatorId?: string;
 }
 const CLIP_HISTORY_LIMIT = 500;
 
@@ -857,6 +860,8 @@ async function filteredClipHistory(scope: SQL, filters: ClipHistoryFilters) {
   const rangeParts = [scope];
   if (filters.from) rangeParts.push(gte(clips.submittedAt, filters.from));
   if (filters.to) rangeParts.push(lte(clips.submittedAt, filters.to));
+  // In rangeParts (not just the row query) so the summary tiles narrow together with the list.
+  if (filters.creatorId) rangeParts.push(eq(clips.creatorUserId, filters.creatorId));
   const dateScope = rangeParts.length > 1 ? and(...rangeParts) : scope;
 
   const [summaryRow] = await db
@@ -996,3 +1001,19 @@ export async function getCreatorRoster(actorId: string, campaignId: string) {
 }
 
 export const CREATOR_ROSTER_LIMIT = ROSTER_LIMIT;
+
+/**
+ * Resolves a creator id (e.g. from a URL) to a verified member of THIS campaign, with the username
+ * looked up here rather than trusted from the caller. Null if they aren't a creator on this
+ * campaign. Mod/Admin/Owner only.
+ */
+export async function getCampaignCreator(actorId: string, campaignId: string, creatorId: string) {
+  await requireRole(actorId, campaignId, "mod");
+  const [row] = await db
+    .select({ userId: campaignCreators.userId, username: users.username })
+    .from(campaignCreators)
+    .innerJoin(users, eq(users.id, campaignCreators.userId))
+    .where(and(eq(campaignCreators.campaignId, campaignId), eq(campaignCreators.userId, creatorId)))
+    .limit(1);
+  return row ?? null;
+}

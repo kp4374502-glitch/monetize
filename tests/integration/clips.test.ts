@@ -1205,6 +1205,48 @@ describe("filterable clip history (getReviewerClipHistory / getMyClipHistory)", 
     expect(row).toMatchObject({ status: "rejected", rejectionReason: "fake views", paidStatus: "unpaid" });
   });
 
+  it("the creatorId filter narrows both the list and the summary tiles to one creator, within this campaign only", async () => {
+    const campX = await freshCampaign("History creator scope X");
+    const campY = await freshCampaign("History creator scope Y");
+    const c1a = await makeClip("c1", campX, 1000);
+    const c1b = await makeClip("c1", campX, 2000);
+    const c2a = await makeClip("c2", campX, 9000);
+    await makeClip("c1", campY, 5000); // same creator, different campaign -- must never appear
+
+    const mine = await svc.getReviewerClipHistory("owner", campX, { creatorId: "c1" });
+    expect(mine.rows.map((r) => r.clip.id).sort()).toEqual([c1a.id, c1b.id].sort());
+    expect(mine.summary.total).toBe(2);
+    expect(mine.summary.totalViews).toBe(3000); // tiles narrow with the list, not just the rows
+
+    const theirs = await svc.getReviewerClipHistory("owner", campX, { creatorId: "c2" });
+    expect(theirs.rows.map((r) => r.clip.id)).toEqual([c2a.id]);
+    expect(theirs.summary.totalViews).toBe(9000);
+
+    // composes with the other filters
+    const filtered = await svc.getReviewerClipHistory("owner", campX, { creatorId: "c1", status: "paid" });
+    expect(filtered.rows).toEqual([]);
+
+    // an id that isn't on this campaign (or doesn't exist) just yields nothing -- never another campaign's data
+    expect((await svc.getReviewerClipHistory("owner", campX, { creatorId: "nobody" })).rows).toEqual([]);
+    // no creatorId -> unchanged
+    expect((await svc.getReviewerClipHistory("owner", campX)).summary.total).toBe(3);
+  });
+
+  it("getCampaignCreator resolves only real members of THIS campaign, with the username looked up server-side", async () => {
+    const campX = await freshCampaign("History creator lookup X");
+    const campY = (await campaignSvc.createCampaign("owner", { ...validCampaign, name: "History creator lookup Y" })).id;
+    await db.insert(users).values({ id: "c3", username: "c3" });
+    await db.insert(campaignCreators).values({ campaignId: campY, userId: "c3" });
+
+    expect(await svc.getCampaignCreator("owner", campX, "c1")).toMatchObject({ userId: "c1" });
+    expect((await svc.getCampaignCreator("owner", campX, "c1"))!.username).toEqual(expect.any(String));
+    expect(await svc.getCampaignCreator("owner", campX, "c3")).toBeNull(); // a creator, but of a different campaign
+    expect(await svc.getCampaignCreator("owner", campX, "nobody")).toBeNull();
+
+    await expect(svc.getCampaignCreator("c1", campX, "c2")).rejects.toThrow(/Access denied/); // a creator can't look up creators
+    await expect(svc.getCampaignCreator("outsider", campX, "c1")).rejects.toThrow(/Access denied/);
+  });
+
   it("the date range narrows both the list and the summary counts", async () => {
     const campX = await freshCampaign("History date range");
     const old = await makeClip("c1", campX, 1000);

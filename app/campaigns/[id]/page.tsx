@@ -65,7 +65,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
 
         <div className="flex flex-wrap items-center gap-2">
           <Link href={`/campaigns/${id}/history`} className={buttonVariants({ variant: "outline", size: "sm" })}>
-            History
+            Dashboard
           </Link>
           {isAdmin &&
             (["pause", "reopen"] as const).map((a) => {
@@ -110,7 +110,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
 
       {role === "creator" && <CreatorClips campaignId={id} clips={myClips} viewMinimum={campaign.viewMinimum} campaignStatus={campaign.status} />}
       {brandFeed && <BrandFeed rows={brandFeed.rows} stats={brandFeed.stats} />}
-      {roster && <CreatorRoster roster={roster} limit={CREATOR_ROSTER_LIMIT} />}
+      {roster && <CreatorRoster roster={roster} limit={CREATOR_ROSTER_LIMIT} campaignId={id} />}
       {queue && (
         <>
           <div className="flex flex-col items-end gap-1">

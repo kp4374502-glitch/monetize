@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { requireUserId } from "@/lib/auth/ensure-user";
 import { getCampaignForUser, getRoleForCampaign } from "@/lib/auth/roles";
-import { getMyClipHistory, getReviewerClipHistory, type ClipHistoryStatusFilter } from "@/lib/clips/service";
+import { getCampaignCreator, getMyClipHistory, getReviewerClipHistory, type ClipHistoryStatusFilter } from "@/lib/clips/service";
 import { ClipHistoryBrowser } from "@/components/clips/clip-history-browser";
 import { Badge } from "@/components/ui/badge";
 
@@ -31,7 +31,7 @@ export default async function ClipHistoryPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ status?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ status?: string; from?: string; to?: string; creator?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
@@ -50,9 +50,14 @@ export default async function ClipHistoryPage({
   const to = parseDate(sp.to, true);
 
   const isCreator = role === "creator";
+  // Reviewers only. The URL's creator id is never trusted: it must resolve to a real creator on THIS
+  // campaign (username looked up server-side), otherwise it's silently ignored. A creator's own
+  // view is already scoped to themselves, so the param means nothing there.
+  const scopedCreator =
+    !isCreator && typeof sp.creator === "string" && sp.creator ? await getCampaignCreator(userId, id, sp.creator) : null;
   const { summary, rows } = isCreator
     ? await getMyClipHistory(userId, id, { status, from, to })
-    : await getReviewerClipHistory(userId, id, { status, from, to });
+    : await getReviewerClipHistory(userId, id, { status, from, to, creatorId: scopedCreator?.userId });
 
   return (
     <main className="mx-auto max-w-4xl space-y-6 px-4 py-8 sm:px-6">
@@ -72,6 +77,7 @@ export default async function ClipHistoryPage({
         summary={summary}
         rows={rows}
         showCreator={!isCreator}
+        creator={scopedCreator ? { id: scopedCreator.userId, username: scopedCreator.username } : undefined}
         canDelete={role === "owner" || role === "admin"}
         canReview={!isCreator}
         canClipApprove={role === "owner" || role === "admin"}

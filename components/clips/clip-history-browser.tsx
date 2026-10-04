@@ -59,6 +59,7 @@ export function ClipHistoryBrowser({
   summary,
   rows,
   showCreator,
+  creator,
   canDelete = false,
   canReview = false,
   canClipApprove = false,
@@ -81,6 +82,8 @@ export function ClipHistoryBrowser({
   };
   rows: Row[];
   showCreator: boolean;
+  /** Set only when the page already verified this is a real creator on this campaign (never straight from the URL). */
+  creator?: { id: string; username: string };
   /** Owner/Admin only — the server re-checks this regardless of what's rendered. */
   canDelete?: boolean;
   /** Mod/Admin/Owner — gates the manual post-date form and the Mark paid button. Server re-checks regardless (Mod threshold, budget cap). */
@@ -94,12 +97,24 @@ export function ClipHistoryBrowser({
   return (
     <section className="space-y-4">
       <SectionHeader
-        title="Clip history"
+        title="Dashboard"
         description={showCreator ? "Every clip ever submitted to this campaign." : "Your submissions to this campaign."}
       />
 
+      {creator && (
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm" data-testid="creator-scope">
+          <span>
+            Viewing: <span className="font-bold text-gold-light">{creator.username}</span>
+          </span>
+          <a href={basePath} className="text-text-secondary underline-offset-2 hover:text-gold-light hover:underline" data-testid="view-all-creators">
+            View all creators
+          </a>
+        </p>
+      )}
+
       <Card innerClassName="p-4">
         <form method="get" action={basePath} className="flex flex-wrap items-end gap-3">
+          {creator && <input type="hidden" name="creator" value={creator.id} />}
           <Field label="Status" className="w-full sm:w-56">
             <AutoSubmitSelect name="status" defaultValue={status}>
               {STATUS_OPTIONS.map((o) => (
@@ -119,7 +134,10 @@ export function ClipHistoryBrowser({
             Filter
           </Button>
           {filtered && (
-            <a href={basePath} className="text-sm text-text-secondary underline-offset-2 hover:text-gold-light hover:underline">
+            <a
+              href={creator ? `${basePath}?creator=${encodeURIComponent(creator.id)}` : basePath}
+              className="text-sm text-text-secondary underline-offset-2 hover:text-gold-light hover:underline"
+            >
               Clear filters
             </a>
           )}
