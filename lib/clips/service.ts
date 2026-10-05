@@ -489,7 +489,8 @@ const rejectionReasonSchema = z.string().trim().min(1, "A reason is required");
  * wrote it" is the actor of the latest reject OR edit event, so once an Admin rewords a Mod's reason
  * the Mod can't quietly put theirs back. Changes only the reason: the rejection itself, status,
  * payout and everything else stay as they are. Audited (new reason on the event; earlier wording is
- * the previous reject/edit event) and the creator is told, since it's the text they see on their post.
+ * the previous reject/edit event). Deliberately sends NO notification: the creator just sees the new
+ * wording on their post.
  */
 export async function updateRejectionReason(actorId: string, campaignId: string, clipId: string, rawReason: unknown) {
   const role = await requireRole(actorId, campaignId, "mod");
@@ -514,13 +515,6 @@ export async function updateRejectionReason(actorId: string, campaignId: string,
       .update(clips)
       .set({ rejectionReason: reason })
       .where(and(eq(clips.id, clipId), eq(clips.campaignId, campaignId)));
-    await notify(tx, {
-      userId: clip.creatorUserId,
-      campaignId,
-      clipId,
-      type: "clip_rejected",
-      message: `The reason your post was rejected was updated: ${reason}`,
-    });
   });
 }
 

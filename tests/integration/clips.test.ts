@@ -655,7 +655,7 @@ describe("reviewClip", () => {
     }
     const row = async (id: string) => (await db.select().from(clips).where(eq(clips.id, id)))[0];
 
-    it("changes only the reason, logs it, and tells the creator", async () => {
+    it("changes only the reason and logs it, without sending the creator a notification", async () => {
       const clip = await rejectedBy("modA");
       const before = await row(clip.id);
       await svc.updateRejectionReason("modA", camp, clip.id, "  clearer reason  ");
@@ -668,10 +668,10 @@ describe("reviewClip", () => {
       expect(events.map((e) => e.action).sort()).toEqual(["edit_rejection_reason", "reject"]); // the rejection itself stays on record
       expect(events.find((e) => e.action === "edit_rejection_reason")).toMatchObject({ actorUserId: "modA", reason: "clearer reason" });
 
+      // only the original rejection notified the creator; the edit sent nothing
       const notes = await db.select().from(notifications).where(eq(notifications.clipId, clip.id));
-      const update = notes.find((n) => n.message.includes("updated"))!;
-      expect(update).toMatchObject({ userId: "c1", type: "clip_rejected" });
-      expect(update.message).toContain("clearer reason");
+      expect(notes).toHaveLength(1);
+      expect(notes[0].message).toBe("Your post was rejected: original reason");
     });
 
     it("a Mod can edit only a reason they wrote; Admin/Owner can edit anyone's, and then the Mod can't put theirs back", async () => {
