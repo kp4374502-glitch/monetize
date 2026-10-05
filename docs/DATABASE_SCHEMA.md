@@ -124,7 +124,7 @@ Read-only per-campaign viewer role ("Brand" — unrelated to the `brand_requests
 - `id` (pk)
 - `clip_id` (fk clips)
 - `actor_user_id` (fk users)
-- `action` (approve | reject | delete | set_posted_at | clip_approve | unlock_analytics_early)
+- `action` (approve | reject | delete | set_posted_at | clip_approve | unlock_analytics_early | edit_rejection_reason)
 - `reason` (nullable; for a delete, records the clip's prior status)
 - `created_at`
 

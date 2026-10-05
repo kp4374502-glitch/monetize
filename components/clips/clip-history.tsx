@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, SectionHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DeleteClipButton } from "./delete-clip-button";
-import { CreatorPostNumber, PostNumber, Thumb, money } from "./clip-parts";
+import { CreatorPostNumber, EditReasonForm, PostNumber, Thumb, money } from "./clip-parts";
 
 type History = Awaited<ReturnType<typeof getClipHistory>>;
 
@@ -17,6 +17,7 @@ export function ClipHistory({
   campaignId,
   canDelete = false,
   canReverseRejection = false,
+  canEditReason = false,
 }: {
   history: History;
   campaignId: string;
@@ -24,6 +25,8 @@ export function ClipHistory({
   canDelete?: boolean;
   /** Admin/Owner only — gates reversing a Rejected clip back to Approved. Server re-checks regardless. */
   canReverseRejection?: boolean;
+  /** Mod/Admin/Owner -- gates the Edit reason control. Server re-checks (a Mod only for a reason they wrote). */
+  canEditReason?: boolean;
 }) {
   return (
     <>
@@ -80,6 +83,7 @@ export function ClipHistory({
                   <p className="mt-1 text-xs text-red-300">
                     Rejected{rejectedBy ? ` by ${rejectedBy}` : ""}: {c.rejectionReason ?? "no reason recorded"}
                   </p>
+                  {canEditReason && <EditReasonForm campaignId={campaignId} clipId={c.id} reason={c.rejectionReason} />}
                   {canReverseRejection && (
                     <ActionForm action={reviewAction.bind(null, campaignId, c.id)} className="mt-1.5 flex flex-wrap items-center gap-2">
                       <input type="hidden" name="intent" value="approve" />

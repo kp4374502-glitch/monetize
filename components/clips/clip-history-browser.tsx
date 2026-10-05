@@ -7,7 +7,7 @@ import { analyticsGateState, canRejectInline } from "@/lib/clips/rules";
 import type { ClipHistoryStatusFilter } from "@/lib/clips/service";
 import { AutoSubmitSelect } from "./auto-submit-select";
 import { DeleteClipButton } from "./delete-clip-button";
-import { AnalyticsProof, ClipApprovedBadge, CreatorPostNumber, InlineRejectForm, PctForm, PostNumber, Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
+import { AnalyticsProof, ClipApprovedBadge, CreatorPostNumber, EditReasonForm, InlineRejectForm, PctForm, PostNumber, Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
 
 type Row = { clip: ClipRow; creatorUsername: string; postNumber: number; creatorPostNumber: number | null };
 
@@ -209,6 +209,9 @@ export function ClipHistoryBrowser({
                   <p className="mt-1 text-xs text-text-secondary">Submitted {submittedOn(c.submittedAt)}</p>
                   {c.status === "rejected" && c.rejectionReason && (
                     <p className="mt-1 text-xs text-red-300">Rejected: {c.rejectionReason}</p>
+                  )}
+                  {c.status === "rejected" && canReview && (
+                    <EditReasonForm campaignId={campaignId} clipId={c.id} reason={c.rejectionReason} />
                   )}
                   {c.status === "rejected" && canReverseRejection && (
                     <ActionForm action={reviewAction.bind(null, campaignId, c.id)} className="mt-1.5 flex flex-wrap items-center gap-2">

@@ -74,7 +74,11 @@ export const reviewAction = async (campaignId: string, clipId: string, _p: Actio
     ),
   );
 
-export const markPaidAction = async (campaignId: string, clipId: string, _p: ActionState, _fd: FormData) =>
+/** Change the reason on an already-rejected post. Mod/Admin/Owner; a Mod only for a reason they wrote (see svc.updateRejectionReason). */
+export const editRejectionReasonAction = async (campaignId: string, clipId: string, _p: ActionState, fd: FormData) =>
+  run(campaignId, (u) => svc.updateRejectionReason(u, campaignId, clipId, text(fd, "reason")));
+
+export const markPaidAction =async (campaignId: string, clipId: string, _p: ActionState, _fd: FormData) =>
   run(campaignId, (u) => svc.markPaid(u, campaignId, clipId));
 
 /** Owner/Admin only, any status — soft delete (see svc.deleteClip). The frontend confirms before submitting. */

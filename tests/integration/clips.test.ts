@@ -647,6 +647,64 @@ describe("reviewClip", () => {
     expect(notes.every((x) => x.userId === "c1")).toBe(true);
   });
 
+  describe("editing a rejection reason", () => {
+    async function rejectedBy(reviewer: string, reason = "original reason") {
+      const clip = await makeClip("c1");
+      await svc.reviewClip(reviewer, camp, clip.id, { action: "reject", reason });
+      return clip;
+    }
+    const row = async (id: string) => (await db.select().from(clips).where(eq(clips.id, id)))[0];
+
+    it("changes only the reason, logs it, and tells the creator", async () => {
+      const clip = await rejectedBy("modA");
+      const before = await row(clip.id);
+      await svc.updateRejectionReason("modA", camp, clip.id, "  clearer reason  ");
+
+      const after = await row(clip.id);
+      expect(after.rejectionReason).toBe("clearer reason"); // trimmed
+      expect(after).toMatchObject({ status: "rejected", paidStatus: "unpaid", payout: before.payout });
+
+      const events = await db.select().from(clipReviewEvents).where(eq(clipReviewEvents.clipId, clip.id));
+      expect(events.map((e) => e.action).sort()).toEqual(["edit_rejection_reason", "reject"]); // the rejection itself stays on record
+      expect(events.find((e) => e.action === "edit_rejection_reason")).toMatchObject({ actorUserId: "modA", reason: "clearer reason" });
+
+      const notes = await db.select().from(notifications).where(eq(notifications.clipId, clip.id));
+      const update = notes.find((n) => n.message.includes("updated"))!;
+      expect(update).toMatchObject({ userId: "c1", type: "clip_rejected" });
+      expect(update.message).toContain("clearer reason");
+    });
+
+    it("a Mod can edit only a reason they wrote; Admin/Owner can edit anyone's, and then the Mod can't put theirs back", async () => {
+      const clip = await rejectedBy("modA");
+      await expect(svc.updateRejectionReason("modB", camp, clip.id, "modB's version")).rejects.toThrow(/Admin or Owner/);
+      await svc.updateRejectionReason("admin", camp, clip.id, "admin's version");
+      expect((await row(clip.id)).rejectionReason).toBe("admin's version");
+      // the admin's edit is now the latest word -- the original Mod can't overwrite it
+      await expect(svc.updateRejectionReason("modA", camp, clip.id, "modA's version")).rejects.toThrow(/Admin or Owner/);
+      await svc.updateRejectionReason("owner", camp, clip.id, "owner's version");
+      expect((await row(clip.id)).rejectionReason).toBe("owner's version");
+    });
+
+    it("only works on a rejected post, needs a real new reason, and is refused for creators and outsiders", async () => {
+      const pending = await makeClip("c1");
+      await expect(svc.updateRejectionReason("admin", camp, pending.id, "x")).rejects.toThrow(/Only a rejected post/);
+
+      const rejected = await rejectedBy("modA", "same text");
+      await expect(svc.updateRejectionReason("modA", camp, rejected.id, "   ")).rejects.toThrow(/reason is required/);
+      await expect(svc.updateRejectionReason("modA", camp, rejected.id, "same text")).rejects.toThrow(/already the rejection reason/);
+
+      await expect(svc.updateRejectionReason("c1", camp, rejected.id, "my version")).rejects.toThrow(/Access denied/);
+      await expect(svc.updateRejectionReason("outsider", camp, rejected.id, "x")).rejects.toThrow(/Access denied/);
+      expect((await row(rejected.id)).rejectionReason).toBe("same text");
+    });
+
+    it("a post from another campaign is 'not found' when addressed through this one", async () => {
+      const other = await makeClip("c1", campB);
+      await svc.reviewClip("owner", campB, other.id, { action: "reject", reason: "r" });
+      await expect(svc.updateRejectionReason("owner", camp, other.id, "new")).rejects.toThrow(/not found/);
+    });
+  });
+
   describe("reversing a rejection back to Approved (Admin/Owner only)", () => {
     it("refuses a Mod even when they're reversing their own rejection; Admin/Owner can", async () => {
       const clip = await makeClip("c1");

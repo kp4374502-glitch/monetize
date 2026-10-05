@@ -4,7 +4,7 @@ import { ActionForm } from "@/components/action-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { reviewAction, setPctAction } from "@/app/campaigns/clip-actions";
+import { editRejectionReasonAction, reviewAction, setPctAction } from "@/app/campaigns/clip-actions";
 import { effectiveViews, hasAnalyticsProof } from "@/lib/clips/rules";
 
 export type ClipRow = typeof clips.$inferSelect;
@@ -181,5 +181,26 @@ export function CreatorPostNumber({ n }: { n: number | null | undefined }) {
     <span className="text-xs text-text-secondary" data-testid="creator-post-number">
       their #{n}
     </span>
+  );
+}
+
+/**
+ * Reviewer-only: change the reason on a rejected post. A native <details> keeps the (often long)
+ * list of rejected posts uncluttered without any client JS. The server decides who may edit (a Mod
+ * only a reason they wrote; Admin/Owner any) and shows the error here if not.
+ */
+export function EditReasonForm({ campaignId, clipId, reason }: { campaignId: string; clipId: string; reason: string | null }) {
+  return (
+    <details className="mt-1.5" data-testid="edit-reason">
+      <summary className="cursor-pointer text-xs text-text-secondary underline-offset-2 hover:text-gold-light hover:underline">
+        Edit reason
+      </summary>
+      <ActionForm action={editRejectionReasonAction.bind(null, campaignId, clipId)} className="mt-1.5 flex flex-wrap items-center gap-2">
+        <Input name="reason" defaultValue={reason ?? ""} placeholder="Reason for rejection" required className="min-w-56 flex-1" data-testid="edit-reason-input" />
+        <Button type="submit" variant="outline" size="sm" data-testid="edit-reason-save">
+          Save reason
+        </Button>
+      </ActionForm>
+    </details>
   );
 }

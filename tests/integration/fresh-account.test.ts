@@ -115,6 +115,7 @@ describe("a brand-new account (users row with no roles) and one that never logge
       await denied(clipSvc.getClipHistory(who, camp));
       await denied(clipSvc.getCreatorRoster(who, camp));
       await denied(clipSvc.getCampaignCreator(who, camp, "c1")); // exposes a username -- reviewers only
+      await denied(clipSvc.updateRejectionReason(who, camp, clipId, "new reason")); // Mod/Admin/Owner only
       await denied(clipSvc.refreshViews(who, camp, clipId));
       await denied(clipSvc.deleteClip(who, camp, clipId)); // Owner/Admin only, per Task 5
       await denied(clipSvc.setPostedAt(who, camp, clipId, "2020-01-01")); // Mod/Admin/Owner only, per Task 5 Part 3
@@ -219,6 +220,7 @@ describe("campaign_brands (read-only Brand role)", () => {
     await denied(clipSvc.getClipHistory("brandviewer", camp));
     await denied(clipSvc.getCreatorRoster("brandviewer", camp));
     await denied(clipSvc.getCampaignCreator("brandviewer", camp, "c1")); // exposes a creator username -- brand must never reach it
+    await denied(clipSvc.updateRejectionReason("brandviewer", camp, clipId, "new reason"));
     await denied(clipSvc.refreshViews("brandviewer", camp, clipId));
     await denied(clipSvc.getProofImage("brandviewer", camp, clipId));
     await denied(campaignSvc.generateInviteLink("brandviewer", camp));

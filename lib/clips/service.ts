@@ -481,6 +481,49 @@ export async function reviewClip(actorId: string, campaignId: string, clipId: st
   });
 }
 
+const rejectionReasonSchema = z.string().trim().min(1, "A reason is required");
+
+/**
+ * Change the reason shown on an already-rejected post. Mod/Admin/Owner, under the same override rule
+ * as reviews: a Mod may edit a reason they wrote themselves; an Admin/Owner may edit anyone's. "Who
+ * wrote it" is the actor of the latest reject OR edit event, so once an Admin rewords a Mod's reason
+ * the Mod can't quietly put theirs back. Changes only the reason: the rejection itself, status,
+ * payout and everything else stay as they are. Audited (new reason on the event; earlier wording is
+ * the previous reject/edit event) and the creator is told, since it's the text they see on their post.
+ */
+export async function updateRejectionReason(actorId: string, campaignId: string, clipId: string, rawReason: unknown) {
+  const role = await requireRole(actorId, campaignId, "mod");
+  const reason = rejectionReasonSchema.parse(rawReason);
+  const clip = await loadClip(campaignId, clipId);
+  if (clip.status !== "rejected") throw new Error("Only a rejected post has a rejection reason to edit.");
+  if (clip.rejectionReason === reason) throw new Error("That is already the rejection reason.");
+
+  const [last] = await db
+    .select({ actorUserId: clipReviewEvents.actorUserId })
+    .from(clipReviewEvents)
+    .where(and(eq(clipReviewEvents.clipId, clipId), inArray(clipReviewEvents.action, ["reject", "edit_rejection_reason"])))
+    .orderBy(desc(clipReviewEvents.createdAt))
+    .limit(1);
+  if (!roleCanOverride(role, actorId, last?.actorUserId ?? null)) {
+    throw new Error("Access denied: only an Admin or Owner can edit a rejection reason another reviewer wrote.");
+  }
+
+  await db.transaction(async (tx) => {
+    await tx.insert(clipReviewEvents).values({ clipId, actorUserId: actorId, action: "edit_rejection_reason", reason });
+    await tx
+      .update(clips)
+      .set({ rejectionReason: reason })
+      .where(and(eq(clips.id, clipId), eq(clips.campaignId, campaignId)));
+    await notify(tx, {
+      userId: clip.creatorUserId,
+      campaignId,
+      clipId,
+      type: "clip_rejected",
+      message: `The reason your post was rejected was updated: ${reason}`,
+    });
+  });
+}
+
 /**
  * "Post Approve" in the UI — a pure content/eligibility check (guidelines, brand integration, CTA),
  * independent of `status` and the 7-day gate. Admin/Owner only. Never a payout signal by itself:

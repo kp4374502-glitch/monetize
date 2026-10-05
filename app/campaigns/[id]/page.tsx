@@ -136,7 +136,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
           <ReviewQueue campaignId={id} pending={queue.pending} awaitingPayment={queue.awaitingPayment} canDelete={isAdmin} canClipApprove={isAdmin} />
         </>
       )}
-      {history && <ClipHistory history={history} campaignId={id} canDelete={isAdmin} canReverseRejection={isAdmin} />}
+      {history && <ClipHistory history={history} campaignId={id} canDelete={isAdmin} canReverseRejection={isAdmin} canEditReason />}
 
       {canInvite && (
         <section>

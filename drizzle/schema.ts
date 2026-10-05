@@ -39,6 +39,7 @@ export const reviewActionEnum = pgEnum("review_action", [
   "set_posted_at",
   "clip_approve",
   "unlock_analytics_early",
+  "edit_rejection_reason",
 ]);
 
 export const notificationTypeEnum = pgEnum("notification_type", [
