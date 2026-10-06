@@ -263,6 +263,10 @@ export const clips = pgTable(
     // Non-null only if a reviewer (or a one-time ops action) explicitly granted an early unlock.
     analyticsUnlockedEarlyAt: timestamp("analytics_unlocked_early_at", { withTimezone: true }),
     analyticsUnlockedEarlyBy: text("analytics_unlocked_early_by").references(() => users.id),
+    // Optional per-post Base Rate that wins over campaigns.base_rate. Null = follow the campaign's
+    // current rate (the normal case). Used to pin posts to the rate they were submitted under when
+    // a campaign's rate later changes, so a rate change applies going forward only (see PRODUCT_SPEC).
+    baseRateOverride: numeric("base_rate_override", { precision: 10, scale: 4 }),
     // Two-step approval: a pure content/eligibility check (guidelines, brand integration, CTA) —
     // independent of `status`, the 7-day analytics gate, and payout math. Settable any time,
     // including while still `awaiting_analytics` and before any proof exists. Never reset by a

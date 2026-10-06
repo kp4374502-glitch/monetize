@@ -55,7 +55,7 @@ async function loadClip(campaignId: string, clipId: string): Promise<Clip> {
 
 /** cpm/earnings/payout columns for a clip's current state; nulls when not (yet) earning. */
 function economicsColumns(
-  clip: Pick<Clip, "views" | "manualViews" | "qualifyingAudiencePct" | "videoProofUrl" | "analyticsScreenshotPathname">,
+  clip: Pick<Clip, "views" | "manualViews" | "qualifyingAudiencePct" | "videoProofUrl" | "analyticsScreenshotPathname" | "baseRateOverride">,
   campaign: Campaign,
 ) {
   const e = computeEconomics({
@@ -64,7 +64,8 @@ function economicsColumns(
     videoProofUrl: clip.videoProofUrl,
     analyticsScreenshotPathname: clip.analyticsScreenshotPathname,
     campaign: {
-      baseRate: Number(campaign.baseRate),
+      // The post's own pinned rate, if it has one, else the campaign's current rate.
+      baseRate: Number(clip.baseRateOverride ?? campaign.baseRate),
       divisor: Number(campaign.divisor),
       maxPayPerPost: Number(campaign.maxPayPerPost),
       viewMinimum: campaign.viewMinimum,

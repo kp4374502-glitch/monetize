@@ -118,6 +118,9 @@ Read-only per-campaign viewer role ("Brand" — unrelated to the `brand_requests
   otherwise touches it, so real post-age data stays accurate. Mod/Admin/Owner only; not inherited by
   future clips. `analytics_unlocked_early_by` (fk users, nullable) records who granted it — see
   PRODUCT_SPEC.md "7-day gate" → "Early-unlock override".
+- `base_rate_override` (numeric(10,4), nullable) — pins this post to its own Base Rate, winning over
+  `campaigns.base_rate` in the payout formula. Null = follow the campaign's current rate. Set only by
+  a one-time ops script — see PRODUCT_SPEC.md "Payout formula" → "Per-post Base Rate override".
 
 ## clip\_review\_events
 

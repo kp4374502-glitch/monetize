@@ -334,6 +334,8 @@ Each campaign sets its own three parameters; the formula shape is fixed platform
 
 The Owner can edit a campaign's Base Rate, Divisor, and Max Pay Per Post at any time; changes apply only to clips reviewed/paid going forward and are not applied retroactively to already-earned amounts.
 
+**Per-post Base Rate override.** A post's earnings are recalculated from the campaign's *current* Base Rate whenever its views refresh or its audience % is saved, so changing a campaign's rate would otherwise re-price older posts too. `clips.base_rate_override` (nullable) pins a post to its own rate: the formula uses it when set, else the campaign's rate. Null is the normal case. It's an operations tool, set only by a one-time script, not through the UI. First use: Hair u moved from $1.00 to $0.50 for posts submitted (to the app, UTC) on/after 2026-09-24; the campaign's Base Rate became $0.50 and every older post was pinned at $1.00.
+
 ```
 CPM      = min(Qualifying Audience % ÷ Divisor, 1) × Base Rate
 Earnings = CPM × (Views ÷ 1000)

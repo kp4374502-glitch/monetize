@@ -1046,6 +1046,52 @@ describe("deleteClip (soft delete — Owner/Admin only)", () => {
   });
 });
 
+describe("per-post base rate override", () => {
+  async function rateCampaign(name: string) {
+    const c = (await campaignSvc.createCampaign("owner", { ...validCampaign, name })).id; // base rate $1.00, divisor 50
+    await db.insert(campaignCreators).values({ campaignId: c, userId: "c1" });
+    return c;
+  }
+  async function earning(campId: string, views = 10_000) {
+    const clip = await makeClip("c1", campId, views);
+    await svc.attachVideoProof("c1", campId, clip.id, "https://youtu.be/aaaaaaaaaaa");
+    await svc.setQualifyingAudiencePct("owner", campId, clip.id, 50); // 50% of divisor 50 -> CPM = base rate
+    return clip;
+  }
+  const row = async (id: string) => (await db.select().from(clips).where(eq(clips.id, id)))[0];
+
+  it("a pinned post keeps its rate when the campaign's rate changes; an unpinned post follows the campaign", async () => {
+    const campX = await rateCampaign("Rate pin A");
+    const pinned = await earning(campX);
+    const floating = await earning(campX);
+    expect(await row(pinned.id)).toMatchObject({ cpm: "1.0000", payout: "10.00" });
+
+    await db.update(clips).set({ baseRateOverride: "1.0000" }).where(eq(clips.id, pinned.id));
+    await campaignSvc.updateCampaignSettings("owner", campX, { ...validCampaign, name: "Rate pin A", baseRate: 0.5 });
+
+    // a views refresh recomputes from the campaign + any override
+    await svc.refreshViews("owner", campX, pinned.id, opts(10_000));
+    await svc.refreshViews("owner", campX, floating.id, opts(10_000));
+    expect(await row(pinned.id)).toMatchObject({ cpm: "1.0000", earnings: "10.00", payout: "10.00" }); // still the old $1.00
+    expect(await row(floating.id)).toMatchObject({ cpm: "0.5000", earnings: "5.00", payout: "5.00" }); // follows the new $0.50
+  });
+
+  it("the override also wins when a reviewer saves the audience %", async () => {
+    const campX = await rateCampaign("Rate pin B");
+    const clip = await earning(campX);
+    await db.update(clips).set({ baseRateOverride: "2.0000" }).where(eq(clips.id, clip.id)); // pinned ABOVE the campaign's $1.00
+    await svc.setQualifyingAudiencePct("owner", campX, clip.id, 50);
+    expect(await row(clip.id)).toMatchObject({ cpm: "2.0000", payout: "20.00" });
+  });
+
+  it("a post with no override uses the campaign's rate, exactly as before", async () => {
+    const campX = await rateCampaign("Rate pin C");
+    const clip = await earning(campX);
+    expect((await row(clip.id)).baseRateOverride).toBeNull();
+    expect(await row(clip.id)).toMatchObject({ cpm: "1.0000", payout: "10.00" });
+  });
+});
+
 describe("refreshViews", () => {
   it("updates views/likes and recomputes the payout for unpaid clips", async () => {
     const clip = await makeClip("c1", camp, 10_000);
