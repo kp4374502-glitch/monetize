@@ -16,14 +16,18 @@ export function AppHeader() {
         <nav className="flex items-center gap-2.5" aria-label="Main">
           <SignedIn>
             <BrandRequestsLink />
+            <Link href="/explore" className={buttonVariants({ variant: "ghost", size: "sm", className: "hidden sm:inline-flex" })}>
+              Explore
+            </Link>
             <CampaignSwitcher />
             <NotificationBell />
             {/* The account menu carries "Sign out", and Manage account has a Devices tab */}
             <AccountMenu />
           </SignedIn>
           <SignedOut>
-            <Link href="/sign-in" className={buttonVariants({ variant: "primary", size: "sm" })}>
-              Sign in
+            {/* Creators sign in / sign up from the homepage buttons; this one is for Owners and Admins. */}
+            <Link href="/sign-in?as=admin" className={buttonVariants({ variant: "primary", size: "sm" })}>
+              Owner / Admin Sign In
             </Link>
           </SignedOut>
         </nav>

@@ -161,6 +161,20 @@ Supports multi-round review (a clip can be approved, later reverted, re-approved
 - `clips` 1—< `clip_review_events`
 - `clips` 1—1 `creator_user_id`
 
+## creator_profiles
+
+Self-serve creator onboarding answers (one row per user, NOT campaign-scoped — it describes the person). Accounts created before self-signup have no row.
+
+- `user_id` (pk, fk users)
+- `first_name`, `last_name`, `birthday` (date), `gender`, `country`, `phone_country_code`, `phone_number`
+- `creator_type` (faceless | face)
+- `socials` (jsonb: [{ platform, handle, language }])
+- `showcase_urls` (text[], up to 3)
+- `terms_accepted_at`
+- `discord_join_clicked_at` (the "Join Community" click — not verified membership)
+- `onboarding_completed_at` (null = unfinished; the app routes the user back to /onboarding)
+- `created_at`, `updated_at`
+
 ## Business-rule notes
 
 - **Daily submission limit:** enforced with a rolling count against `clips.submitted_at` per `(campaign_id, creator_user_id)`, compared to `campaigns.daily_submission_limit`.

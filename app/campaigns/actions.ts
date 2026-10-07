@@ -75,3 +75,10 @@ export async function removeBrandAction(campaignId: string, brandRowId: string) 
   await svc.removeBrand(userId, campaignId, brandRowId);
   revalidatePath(`/campaigns/${campaignId}`);
 }
+
+/** One-click join from the /explore directory of active campaigns. */
+export async function joinCampaignAction(campaignId: string) {
+  const userId = await requireUserId();
+  const campaign = await svc.joinActiveCampaign(userId, campaignId);
+  redirect(`/campaigns/${campaign.id}`);
+}

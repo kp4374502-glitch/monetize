@@ -5,6 +5,7 @@ import { ArrowRight, BadgeCheck, Film, Wallet } from "lucide-react";
 import { requireUserId } from "@/lib/auth/ensure-user";
 import { getCampaignsForUser, isPlatformOwner } from "@/lib/auth/roles";
 import { getBrandRequestForUser } from "@/lib/brand/service";
+import { needsOnboarding } from "@/lib/creators/gate";
 import { BrandRequestStatus } from "@/components/brand-request-status";
 import { LogoMark } from "@/components/logo";
 import { Badge } from "@/components/ui/badge";
@@ -37,18 +38,21 @@ function Landing() {
           Monetize is where brands run clipping campaigns: creators submit, reviewers verify, and what everyone is owed
           is always one page away.
         </p>
-        {/* "Sign in" is for anyone with an existing account (creators, Owners, Admins, Mods: the app resolves
-            the right view from each person's role after login). The outlined button leads to the
-            access-code-gated brand request flow at /brand-signup, NOT to the sign-in page. */}
+        {/* Creators: sign in, or start the self-serve sign-up + onboarding (/sign-up -> /onboarding).
+            Owners/Admins use the header's "Owner / Admin Sign In". Brands still request access at the
+            access-code-gated /brand-signup via the small link underneath. */}
         <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-          <Link href="/sign-in" className={buttonVariants({ variant: "primary", size: "lg" })}>
-            Sign in <ArrowRight className="h-4 w-4" />
+          <Link href="/sign-in" className={buttonVariants({ variant: "outline", size: "lg" })}>
+            Sign In as Existing Creator
           </Link>
-          <Link href="/brand-signup" className={buttonVariants({ variant: "outline", size: "lg" })}>
-            Owner / Agency sign in
+          <Link href="/sign-up" className={buttonVariants({ variant: "primary", size: "lg" })}>
+            Sign Up as a New Creator <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
-        <p className="mt-4 text-sm text-text-secondary">New creator? Use the invite link your campaign team sent you.</p>
+        <p className="mt-4 text-sm text-text-secondary">
+          Running a brand?{" "}
+          <Link href="/brand-signup" className="font-semibold text-gold-light hover:underline">Request access</Link>
+        </p>
       </section>
 
       <section className="mx-auto grid max-w-5xl gap-4 px-4 pb-24 sm:grid-cols-3">
@@ -71,6 +75,8 @@ export default async function Home() {
   if (!userId) return <Landing />;
 
   await requireUserId(); // mirror the Clerk user into `users` on first visit
+  // A self-serve creator who hasn't finished onboarding (profile + Discord) goes back to it first.
+  if (await needsOnboarding(userId)) redirect("/onboarding");
   const [list, owner, brandRequest] = await Promise.all([
     getCampaignsForUser(userId),
     isPlatformOwner(userId),
@@ -100,8 +106,13 @@ export default async function Home() {
           <p className="mx-auto mt-1 max-w-sm text-sm text-text-secondary">
             {owner
               ? "Create your first campaign to get started."
-              : "Ask a campaign team for an invite link — opening it will add the campaign here."}
+              : "Browse the active campaigns and join one, or open an invite link from a campaign team."}
           </p>
+          {!owner && (
+            <Link href="/explore" className={buttonVariants({ variant: "primary", className: "mt-6" })}>
+              Browse active campaigns
+            </Link>
+          )}
           {owner && (
             <Link href="/campaigns/new" className={buttonVariants({ variant: "primary", className: "mt-6" })}>
               Create a campaign

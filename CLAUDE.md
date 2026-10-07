@@ -37,7 +37,7 @@ Quick summary:
 - **Admin** — platform-wide, automatically active on every campaign, strict superset of Mod.
 - **Mod** — explicitly assigned per campaign, one campaign at a time, capped Mark-Paid authority
   (`campaigns.mod_mark_paid_threshold`).
-- **Creator** — joins campaigns via reusable invite links, fully isolated from other creators'
+- **Creator** — self-serve sign-up + onboarding (/sign-up -> /onboarding -> /explore), then joins active campaigns in one click or via reusable invite links, fully isolated from other creators'
   data.
 
 ## Payout formula (fixed shape, per-campaign parameters)

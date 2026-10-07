@@ -203,3 +203,47 @@ export async function redeemInvite(userId: string, code: string) {
     .onConflictDoNothing({ target: [campaignCreators.campaignId, campaignCreators.userId] });
   return found.campaign;
 }
+
+/**
+ * The creator-facing directory of joinable campaigns (/explore): every ACTIVE campaign, with whether the
+ * caller already joined it. Exposes only what a creator needs to choose (names + platforms) — never
+ * budgets, rates or other campaigns' creators/clips.
+ */
+export async function listActiveCampaigns(userId: string) {
+  const rows = await db
+    .select({
+      id: campaigns.id,
+      name: campaigns.name,
+      brandName: campaigns.brandName,
+      eligiblePlatforms: campaigns.eligiblePlatforms,
+    })
+    .from(campaigns)
+    .where(eq(campaigns.status, "active"))
+    .orderBy(campaigns.name);
+  if (rows.length === 0) return [];
+  const joined = await db
+    .select({ campaignId: campaignCreators.campaignId })
+    .from(campaignCreators)
+    .where(and(eq(campaignCreators.userId, userId), inArray(campaignCreators.campaignId, rows.map((r) => r.id))));
+  const joinedIds = new Set(joined.map((j) => j.campaignId));
+  return rows.map((r) => ({ ...r, joined: joinedIds.has(r.id) }));
+}
+
+/**
+ * One-click join from /explore — the self-serve equivalent of opening the campaign's invite link, so it
+ * lands in the same campaign_creators row (invite_link_id null). Only ACTIVE campaigns can be joined, and
+ * the same ON CONFLICT DO NOTHING keeps a repeat click (or a previously suspended creator) unchanged.
+ */
+export async function joinActiveCampaign(userId: string, campaignId: string) {
+  const [campaign] = await db
+    .select({ id: campaigns.id, name: campaigns.name, status: campaigns.status })
+    .from(campaigns)
+    .where(eq(campaigns.id, campaignId))
+    .limit(1);
+  if (!campaign || campaign.status !== "active") throw new Error("This campaign isn't open for new creators.");
+  await db
+    .insert(campaignCreators)
+    .values({ campaignId: campaign.id, userId })
+    .onConflictDoNothing({ target: [campaignCreators.campaignId, campaignCreators.userId] });
+  return campaign;
+}

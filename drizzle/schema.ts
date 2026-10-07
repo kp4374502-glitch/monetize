@@ -10,6 +10,8 @@ import {
   unique,
   uniqueIndex,
   index,
+  date,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -399,3 +401,36 @@ export const brandSignupAttempts = pgTable(
     ipTimeIdx: index("brand_signup_attempts_ip_created_idx").on(t.ip, t.createdAt),
   }),
 );
+
+// ---------------------------------------------------------------------------
+// creator_profiles — filled in by the self-serve creator onboarding (/sign-up -> /onboarding). One row
+// per user, NOT campaign-scoped: it describes the person, not their work on any campaign. Accounts made
+// before self-signup existed (or through an invite link before onboarding shipped) have no row.
+// ---------------------------------------------------------------------------
+export const creatorTypeEnum = pgEnum("creator_type", ["faceless", "face"]);
+
+export type CreatorSocial = { platform: string; handle: string; language: string };
+
+export const creatorProfiles = pgTable("creator_profiles", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  birthday: date("birthday").notNull(),
+  gender: text("gender").notNull(),
+  country: text("country").notNull(),
+  phoneCountryCode: text("phone_country_code").notNull(),
+  phoneNumber: text("phone_number").notNull(),
+  creatorType: creatorTypeEnum("creator_type").notNull(),
+  socials: jsonb("socials").$type<CreatorSocial[]>().notNull().default([]),
+  showcaseUrls: text("showcase_urls").array().notNull().default(sql`'{}'::text[]`),
+  termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }).notNull(),
+  // Set when the creator clicks "Join Community". The app can't see Discord, so this records the click,
+  // not a confirmed membership.
+  discordJoinClickedAt: timestamp("discord_join_clicked_at", { withTimezone: true }),
+  // Set by the final onboarding step; null means onboarding is unfinished and / sends them back to it.
+  onboardingCompletedAt: timestamp("onboarding_completed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
