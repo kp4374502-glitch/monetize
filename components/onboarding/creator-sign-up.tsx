@@ -6,13 +6,27 @@ import { useRouter } from "next/navigation";
 import { useSignUp } from "@clerk/nextjs";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Callout, Card } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/input";
 import { CREATOR_SIGNUP_FLOW, SIGNUP_FLOW_KEY } from "@/lib/creators/flow";
 
 function clerkMessage(err: unknown): string {
   if (isClerkAPIResponseError(err)) return err.errors[0]?.longMessage ?? err.errors[0]?.message ?? "Something went wrong.";
   return err instanceof Error ? err.message : "Something went wrong. Please try again.";
+}
+
+// How long to wait for Clerk's script before telling the creator something is wrong instead of leaving a dead button.
+const CLERK_LOAD_TIMEOUT_MS = 6000;
+
+/** True once Clerk has failed to finish loading for CLERK_LOAD_TIMEOUT_MS; goes false again if it loads late. */
+function useClerkLoadFailed(isLoaded: boolean): boolean {
+  const [timedOut, setTimedOut] = React.useState(false);
+  React.useEffect(() => {
+    if (isLoaded) return;
+    const t = setTimeout(() => setTimedOut(true), CLERK_LOAD_TIMEOUT_MS);
+    return () => clearTimeout(t);
+  }, [isLoaded]);
+  return !isLoaded && timedOut;
 }
 
 /**
@@ -23,6 +37,7 @@ function clerkMessage(err: unknown): string {
  */
 export function CreatorSignUp({ next }: { next?: string }) {
   const { isLoaded, signUp, setActive } = useSignUp();
+  const loadFailed = useClerkLoadFailed(isLoaded);
   const router = useRouter();
   const [stage, setStage] = React.useState<"details" | "code">("details");
   const [email, setEmail] = React.useState("");
@@ -107,8 +122,19 @@ export function CreatorSignUp({ next }: { next?: string }) {
           {/* Clerk's bot protection renders its challenge here when it needs one */}
           <div id="clerk-captcha" />
           {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
+          {loadFailed && (
+            <Callout tone="danger" data-testid="signup-load-error">
+              <div className="space-y-1.5">
+                <p className="font-semibold">Sign-up couldn&apos;t load</p>
+                <p>Please check your connection and try again in a moment. If it keeps happening, let the Monetize team know.</p>
+                <button type="button" onClick={() => window.location.reload()} className="font-semibold underline underline-offset-2">
+                  Reload the page
+                </button>
+              </div>
+            </Callout>
+          )}
           <Button type="submit" size="lg" disabled={!isLoaded || busy}>
-            {busy ? "Sending code…" : "Continue"}
+            {busy ? "Sending code…" : !isLoaded ? "Loading…" : "Continue"}
           </Button>
           <p className="text-center text-sm text-text-secondary">
             Already have an account?{" "}
