@@ -63,6 +63,17 @@ function isPlausibleBirthday(value: string): boolean {
   return d.getUTCFullYear() >= 1900 && d.getTime() < Date.now();
 }
 
+/**
+ * A Discord handle: 2-32 letters, numbers, dots or underscores (a leading @ is dropped); the old
+ * "name#1234" form is still accepted. Required so the team can find the creator in the server.
+ */
+export const discordUsernameSchema = z
+  .string()
+  .trim()
+  .min(1, "Discord username is required")
+  .transform((s) => s.replace(/^@+/, ""))
+  .pipe(z.string().regex(/^[A-Za-z0-9._]{2,32}(#\d{4})?$/, "Enter your Discord username (letters, numbers, dots and underscores)"));
+
 export const aboutSchema = z.object({
   firstName: z.string().trim().min(1, "First name is required").max(60),
   lastName: z.string().trim().min(1, "Last name is required").max(60),
@@ -74,6 +85,7 @@ export const aboutSchema = z.object({
     .string()
     .transform((s) => s.replace(/[\s()-]/g, ""))
     .pipe(z.string().regex(/^\d{4,15}$/, "Enter a valid phone number (digits only)")),
+  discordUsername: discordUsernameSchema,
   termsAccepted: z.literal(true, { error: "You must accept the terms and conditions" }),
 });
 

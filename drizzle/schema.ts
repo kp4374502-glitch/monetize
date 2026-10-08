@@ -422,6 +422,9 @@ export const creatorProfiles = pgTable("creator_profiles", {
   country: text("country").notNull(),
   phoneCountryCode: text("phone_country_code").notNull(),
   phoneNumber: text("phone_number").notNull(),
+  // Their Discord handle, so the team can find them in the server. Nullable only because profiles saved before
+  // this field existed have none; the onboarding form requires it for every new save.
+  discordUsername: text("discord_username"),
   creatorType: creatorTypeEnum("creator_type").notNull(),
   socials: jsonb("socials").$type<CreatorSocial[]>().notNull().default([]),
   showcaseUrls: text("showcase_urls").array().notNull().default(sql`'{}'::text[]`),

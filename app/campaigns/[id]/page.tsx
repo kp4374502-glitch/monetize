@@ -111,7 +111,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
 
       {role === "creator" && <CreatorClips campaignId={id} clips={myClips} viewMinimum={campaign.viewMinimum} campaignStatus={campaign.status} />}
       {brandFeed && <BrandFeed rows={brandFeed.rows} stats={brandFeed.stats} />}
-      {roster && <CreatorRoster roster={roster} limit={CREATOR_ROSTER_LIMIT} campaignId={id} />}
+      {roster && <CreatorRoster roster={roster} limit={CREATOR_ROSTER_LIMIT} campaignId={id} canViewDetails={isAdmin} />}
       {queue && (
         <>
           <div className="flex flex-col items-end gap-1">

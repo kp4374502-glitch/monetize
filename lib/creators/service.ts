@@ -1,6 +1,7 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "../db/client";
-import { creatorProfiles } from "../../drizzle/schema";
+import { campaignCreators, creatorProfiles, users } from "../../drizzle/schema";
+import { requireRole } from "../auth/roles";
 import { creatorProfileSchema } from "./schemas";
 
 /**
@@ -27,6 +28,7 @@ export async function saveCreatorProfile(userId: string, input: unknown) {
     country: data.country,
     phoneCountryCode: data.phoneCountryCode,
     phoneNumber: data.phoneNumber,
+    discordUsername: data.discordUsername,
     creatorType: data.creatorType,
     socials: data.socials,
     showcaseUrls: data.showcaseUrls.filter(Boolean),
@@ -39,6 +41,32 @@ export async function saveCreatorProfile(userId: string, input: unknown) {
     .onConflictDoUpdate({ target: creatorProfiles.userId, set: values })
     .returning();
   return row;
+}
+
+/**
+ * Owner/Admin only: one creator's onboarding form details (username + Discord username + everything
+ * else they filled in), for a creator who is a member of THIS campaign. A profile is the person's own
+ * record, but this VIEW is campaign-scoped: it reaches the profile only through campaign_creators, so
+ * an admin can't pull up someone who isn't on this campaign. Mods never see it (phone, birthday).
+ * Returns null if they aren't a member; "profile" is null for accounts with no form on file (they
+ * joined by invite link before self-serve sign-up existed).
+ */
+export async function getCreatorDetailsForAdmin(actorId: string, campaignId: string, creatorId: string) {
+  await requireRole(actorId, campaignId, "admin");
+  const [row] = await db
+    .select({
+      userId: campaignCreators.userId,
+      username: users.username,
+      joinedAt: campaignCreators.joinedAt,
+      suspended: campaignCreators.suspended,
+      profile: creatorProfiles,
+    })
+    .from(campaignCreators)
+    .innerJoin(users, eq(users.id, campaignCreators.userId))
+    .leftJoin(creatorProfiles, eq(creatorProfiles.userId, campaignCreators.userId))
+    .where(and(eq(campaignCreators.campaignId, campaignId), eq(campaignCreators.userId, creatorId)))
+    .limit(1);
+  return row ?? null;
 }
 
 /** "Join Community" was clicked. The app can't see Discord, so this records the click, not membership. */

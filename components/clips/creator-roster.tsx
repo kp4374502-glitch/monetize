@@ -11,7 +11,18 @@ type Roster = Awaited<ReturnType<typeof getCreatorRoster>>;
  * Collapsible "Creators (N)" section: one row per creator with their clips, views, earned and owed.
  * A native <details> keeps it collapsible without client JS; it starts open for small rosters.
  */
-export function CreatorRoster({ roster, limit, campaignId }: { roster: Roster; limit: number; campaignId: string }) {
+export function CreatorRoster({
+  roster,
+  limit,
+  campaignId,
+  canViewDetails = false,
+}: {
+  roster: Roster;
+  limit: number;
+  campaignId: string;
+  /** Owner/Admin only: shows the "Details" link to a creator's onboarding form. The page itself re-checks. */
+  canViewDetails?: boolean;
+}) {
   return (
     <section data-testid="creators-section">
       <Card innerClassName="p-0">
@@ -54,6 +65,15 @@ export function CreatorRoster({ roster, limit, campaignId }: { roster: Roster; l
                           {c.username}
                           {c.suspended && <Badge status="paused">suspended</Badge>}
                         </Link>
+                        {canViewDetails && (
+                          <Link
+                            href={`/campaigns/${campaignId}/creators/${encodeURIComponent(c.userId)}`}
+                            className="ml-3 text-xs font-medium text-text-secondary underline-offset-2 hover:text-gold-light hover:underline"
+                            data-testid="creator-details-link"
+                          >
+                            Details
+                          </Link>
+                        )}
                       </td>
                       <td className="px-3 py-3 text-right tabular-nums">{c.clips.toLocaleString()}</td>
                       <td className="px-3 py-3 text-right tabular-nums">{c.views.toLocaleString()}</td>

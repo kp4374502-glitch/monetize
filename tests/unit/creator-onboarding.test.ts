@@ -3,6 +3,7 @@ import {
   aboutSchema,
   ageFromBirthday,
   creatorProfileSchema,
+  discordUsernameSchema,
   isShowcaseUrl,
   socialSchema,
 } from "@/lib/creators/schemas";
@@ -16,13 +17,37 @@ const about = {
   country: "India",
   phoneCountryCode: "+91",
   phoneNumber: "98765 43210",
+  discordUsername: "johndoe",
   termsAccepted: true,
 };
+
+describe("discordUsernameSchema", () => {
+  it("accepts normal handles, drops a leading @, trims, and keeps the legacy #1234 form", () => {
+    expect(discordUsernameSchema.parse("johndoe")).toBe("johndoe");
+    expect(discordUsernameSchema.parse("  @john.doe_99  ")).toBe("john.doe_99");
+    expect(discordUsernameSchema.parse("@@ab")).toBe("ab");
+    expect(discordUsernameSchema.parse("OldName#1234")).toBe("OldName#1234");
+  });
+
+  it("rejects empty, too short, too long, and anything with spaces or other symbols", () => {
+    for (const bad of ["", "   ", "@", "a", "x".repeat(33), "john doe", "john-doe", "john!", "name#12", "name#12345", "#1234"]) {
+      expect(discordUsernameSchema.safeParse(bad).success, JSON.stringify(bad)).toBe(false);
+    }
+    expect(discordUsernameSchema.safeParse("x".repeat(32)).success).toBe(true);
+  });
+});
 
 describe("aboutSchema", () => {
   it("accepts a complete form and strips spaces from the phone number", () => {
     const parsed = aboutSchema.parse(about);
     expect(parsed.phoneNumber).toBe("9876543210");
+  });
+
+  it("requires a Discord username, and normalises it", () => {
+    expect(aboutSchema.safeParse({ ...about, discordUsername: "" }).success).toBe(false);
+    const { discordUsername: _omit, ...withoutDiscord } = about;
+    expect(aboutSchema.safeParse(withoutDiscord).success).toBe(false);
+    expect(aboutSchema.parse({ ...about, discordUsername: "@JohnDoe" }).discordUsername).toBe("JohnDoe");
   });
 
   it("requires the terms to be accepted", () => {

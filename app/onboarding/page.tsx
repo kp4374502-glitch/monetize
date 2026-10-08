@@ -31,6 +31,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
           country: profile?.country ?? "",
           phoneCountryCode: profile?.phoneCountryCode ?? "",
           phoneNumber: profile?.phoneNumber ?? "",
+          discordUsername: profile?.discordUsername ?? "",
           creatorType: profile?.creatorType ?? "",
           socials: profile?.socials ?? [],
           showcaseUrls: profile?.showcaseUrls ?? [],

@@ -167,6 +167,7 @@ Self-serve creator onboarding answers (one row per user, NOT campaign-scoped —
 
 - `user_id` (pk, fk users)
 - `first_name`, `last_name`, `birthday` (date), `gender`, `country`, `phone_country_code`, `phone_number`
+- `discord_username` (text, nullable) — their Discord handle (leading @ dropped), so the team can find them in the server. Required by the onboarding form for every new save; null only on profiles saved before it existed. Shown to Owner/Admin on the creator details page.
 - `creator_type` (faceless | face)
 - `socials` (jsonb: [{ platform, handle, language }])
 - `showcase_urls` (text[], up to 3)

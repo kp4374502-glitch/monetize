@@ -36,6 +36,7 @@ export type OnboardingInitial = {
   country: string;
   phoneCountryCode: string;
   phoneNumber: string;
+  discordUsername: string;
   creatorType: string;
   socials: Social[];
   showcaseUrls: string[];
@@ -106,6 +107,7 @@ export function OnboardingWizard({ initial, next }: { initial: OnboardingInitial
     country: initial.country,
     phoneCountryCode: initial.phoneCountryCode,
     phoneNumber: initial.phoneNumber,
+    discordUsername: initial.discordUsername,
     termsAccepted: initial.profileSaved,
   });
   const [creatorType, setCreatorType] = React.useState(initial.creatorType);
@@ -285,6 +287,9 @@ export function OnboardingWizard({ initial, next }: { initial: OnboardingInitial
                   <Input type="tel" autoComplete="tel-national" aria-label="Phone number" placeholder="Phone number" value={about.phoneNumber} onChange={(e) => setAbout({ ...about, phoneNumber: e.target.value })} />
                 </div>
               </div>
+              <Field label="Discord username" hint="Your Discord handle, so the team can find you in our server." className="sm:col-span-2">
+                <Input autoComplete="off" autoCapitalize="none" spellCheck={false} placeholder="yourname" value={about.discordUsername} onChange={(e) => setAbout({ ...about, discordUsername: e.target.value })} />
+              </Field>
               <label className="flex items-center gap-2.5 text-sm text-text-secondary sm:col-span-2">
                 <input
                   type="checkbox"
@@ -425,6 +430,7 @@ export function OnboardingWizard({ initial, next }: { initial: OnboardingInitial
                 <p className="text-sm text-text-secondary">
                   {ageFromBirthday(about.birthday)} · {GENDER_LABELS[about.gender as keyof typeof GENDER_LABELS]} · {about.country}
                 </p>
+                <p className="truncate text-sm text-text-secondary">Discord: @{about.discordUsername.trim().replace(/^@+/, "")}</p>
               </div>
             </div>
             <div className="mb-5 flex flex-wrap gap-2">

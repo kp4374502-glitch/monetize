@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { createTestDb, validCampaign } from "./helpers";
-import { campaignCreators, campaigns, creatorProfiles, users } from "../../drizzle/schema";
+import { campaignCreators, campaignMods, campaigns, creatorProfiles, platformAdmins, users } from "../../drizzle/schema";
 
 const holder = vi.hoisted(() => ({ db: undefined as unknown }));
 vi.mock("@/lib/db/client", () => ({
@@ -23,6 +23,7 @@ const profile = {
   country: "India",
   phoneCountryCode: "+91",
   phoneNumber: "9876543210",
+  discordUsername: "@john.doe",
   termsAccepted: true,
   creatorType: "faceless",
   socials: [{ platform: "tiktok", handle: "@glowlarp", language: "English" }],
@@ -44,6 +45,13 @@ beforeAll(async () => {
 });
 
 describe("creator onboarding", () => {
+  it("requires a valid Discord username to save", async () => {
+    const { discordUsername: _omit, ...withoutDiscord } = profile;
+    await expect(creatorSvc.saveCreatorProfile("newbie", withoutDiscord)).rejects.toThrow();
+    await expect(creatorSvc.saveCreatorProfile("newbie", { ...profile, discordUsername: "not valid!" })).rejects.toThrow();
+    expect(await creatorSvc.getCreatorProfile("newbie")).toBeNull();
+  });
+
   it("rejects an invalid profile without writing anything", async () => {
     await expect(creatorSvc.saveCreatorProfile("newbie", { ...profile, termsAccepted: false })).rejects.toThrow();
     expect(await creatorSvc.getCreatorProfile("newbie")).toBeNull();
@@ -57,6 +65,7 @@ describe("creator onboarding", () => {
   it("saves the profile, normalising the social handle", async () => {
     const row = await creatorSvc.saveCreatorProfile("newbie", profile);
     expect(row.socials).toEqual([{ platform: "tiktok", handle: "glowlarp", language: "English" }]);
+    expect(row.discordUsername).toBe("john.doe"); // the leading @ is dropped
     expect(row.onboardingCompletedAt).toBeNull();
   });
 
@@ -116,5 +125,43 @@ describe("active campaign directory", () => {
       .from(campaignCreators)
       .where(and(eq(campaignCreators.campaignId, active), eq(campaignCreators.userId, "banned")));
     expect(row.suspended).toBe(true);
+  });
+});
+
+describe("creator details for Owner/Admin", () => {
+  // By now: "newbie" is a member of `active` with a saved profile (Discord "john.doe"), "banned" is a member with
+  // NO profile (joined by invite before self-serve sign-up), and "other" is not a member of `active` at all.
+  beforeAll(async () => {
+    await db.insert(users).values([
+      { id: "admin1", username: "admin1" },
+      { id: "mod1", username: "mod1" },
+    ]);
+    await db.insert(platformAdmins).values({ userId: "admin1" });
+    await db.insert(campaignMods).values({ campaignId: active, userId: "mod1", addedBy: "owner" });
+  });
+
+  it("shows an Owner and an Admin the creator's username, Discord username and form details", async () => {
+    for (const actor of ["owner", "admin1"]) {
+      const d = await creatorSvc.getCreatorDetailsForAdmin(actor, active, "newbie");
+      expect(d).toMatchObject({ userId: "newbie", username: "newbie", suspended: false });
+      expect(d?.profile).toMatchObject({ discordUsername: "john.doe", firstName: "Jon", country: "India", phoneNumber: "9876543210" });
+    }
+  });
+
+  it("returns the account with no form for a creator who joined before self-serve sign-up", async () => {
+    const d = await creatorSvc.getCreatorDetailsForAdmin("owner", active, "banned");
+    expect(d).toMatchObject({ username: "banned", suspended: true, profile: null });
+  });
+
+  it("is refused for a Mod, a creator and an outsider -- phone numbers and birthdays are Owner/Admin only", async () => {
+    await expect(creatorSvc.getCreatorDetailsForAdmin("mod1", active, "newbie")).rejects.toThrow(/Access denied/);
+    await expect(creatorSvc.getCreatorDetailsForAdmin("newbie", active, "newbie")).rejects.toThrow(/Access denied/);
+    await expect(creatorSvc.getCreatorDetailsForAdmin("other", active, "newbie")).rejects.toThrow(/Access denied/);
+  });
+
+  it("only reaches creators who are members of THIS campaign", async () => {
+    expect(await creatorSvc.getCreatorDetailsForAdmin("owner", active, "other")).toBeNull(); // exists, but not on this campaign
+    expect(await creatorSvc.getCreatorDetailsForAdmin("owner", active, "nobody-at-all")).toBeNull();
+    expect(await creatorSvc.getCreatorDetailsForAdmin("owner", paused, "newbie")).toBeNull(); // a member of `active`, not of `paused`
   });
 });
