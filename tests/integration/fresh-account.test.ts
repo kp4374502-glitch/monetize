@@ -4,6 +4,8 @@ import type { PgTable } from "drizzle-orm/pg-core";
 import { createTestDb, validCampaign } from "./helpers";
 import {
   brandRequests,
+  campaignChannelPosts,
+  campaignChannelReads,
   campaignCreators,
   campaignMods,
   campaigns,
@@ -22,6 +24,7 @@ import * as campaignSvc from "@/lib/campaigns/service";
 import * as clipSvc from "@/lib/clips/service";
 import * as creatorSvc from "@/lib/creators/service";
 import * as brand from "@/lib/brand/service";
+import * as channelSvc from "@/lib/channels/service";
 import { getCampaignForUser, getCampaignsForUser, getRoleForCampaign, isPlatformAdmin, isPlatformOwner, requireRole } from "@/lib/auth/roles";
 
 /**
@@ -48,6 +51,8 @@ async function snapshot() {
     admins: await n(platformAdmins),
     creators: await n(campaignCreators),
     links: await n(inviteLinks),
+    channelPosts: await n(campaignChannelPosts),
+    channelReads: await n(campaignChannelReads),
     requests: await n(brandRequests),
     owners: (await db.select().from(users).where(eq(users.isPlatformOwner, true))).map((u) => u.id),
     campaignRows: (await db.select().from(campaigns)).map((c) => `${c.id}:${c.status}:${c.ownerUserId}:${c.budgetSpent}`),
@@ -122,6 +127,12 @@ describe("a brand-new account (users row with no roles) and one that never logge
       await denied(clipSvc.deleteClip(who, camp, clipId)); // Owner/Admin only, per Task 5
       await denied(clipSvc.setPostedAt(who, camp, clipId, "2020-01-01")); // Mod/Admin/Owner only, per Task 5 Part 3
       await denied(clipSvc.unlockAnalyticsEarly(who, camp, clipId)); // Mod/Admin/Owner only
+      // campaign channels: not a member, so neither readable nor writable
+      await denied(channelSvc.getCampaignChannels(who, camp));
+      await denied(channelSvc.markChannelRead(who, camp, "announcements"));
+      await denied(channelSvc.createChannelPost(who, camp, { channel: "announcements", title: "hi", body: "hi", links: [] }));
+      await denied(channelSvc.updateChannelPost(who, camp, "00000000-0000-0000-0000-000000000000", { title: "hi", body: "hi", links: [] }));
+      await denied(channelSvc.deleteChannelPost(who, camp, "00000000-0000-0000-0000-000000000000"));
       // creator-only actions need a campaign_creators row they don't have
       await denied(clipSvc.submitClip(who, camp, "https://www.tiktok.com/@u/video/222"));
       await denied(clipSvc.attachVideoProof(who, camp, clipId, "https://youtu.be/aaaaaaaaaaa"));
@@ -226,6 +237,9 @@ describe("campaign_brands (read-only Brand role)", () => {
     await denied(clipSvc.updateRejectionReason("brandviewer", camp, clipId, "new reason"));
     await denied(clipSvc.refreshViews("brandviewer", camp, clipId));
     await denied(clipSvc.getProofImage("brandviewer", camp, clipId));
+    await denied(channelSvc.getCampaignChannels("brandviewer", camp)); // Brand never sees the channels
+    await denied(channelSvc.markChannelRead("brandviewer", camp, "announcements"));
+    await denied(channelSvc.createChannelPost("brandviewer", camp, { channel: "announcements", title: "hi", body: "hi", links: [] }));
     await denied(campaignSvc.generateInviteLink("brandviewer", camp));
     await denied(campaignSvc.revokeInviteLink("brandviewer", camp, linkId));
     await denied(campaignSvc.listInviteLinks("brandviewer", camp));

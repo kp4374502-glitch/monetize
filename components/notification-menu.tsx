@@ -21,6 +21,7 @@ const dot: Record<string, string> = {
   payout_paid: "bg-gold-light",
   proof_reminder: "bg-amber-400",
   budget_low: "bg-amber-400",
+  announcement: "bg-gold-light",
 };
 
 /** Bell with unread-count badge and a dropdown list; the ✓ dismisses (marks read) a notification. */

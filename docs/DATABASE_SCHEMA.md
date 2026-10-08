@@ -138,10 +138,30 @@ Supports multi-round review (a clip can be approved, later reverted, re-approved
 - `id` (pk)
 - `user_id` (fk users, recipient)
 - `campaign_id`, `clip_id` (nullable)
-- `type` (clip\_approved | clip\_rejected | payout\_paid | proof\_reminder | budget\_low | analytics\_unlocked)
+- `type` (clip\_approved | clip\_rejected | payout\_paid | proof\_reminder | budget\_low | analytics\_unlocked | announcement)
 - `message`
 - `read` (boolean)
 - `created_at`
+
+## campaign\_channel\_posts
+
+Posts in a campaign's "Campaign channels" panel. Written by Owner/Admin only.
+
+- `id` (pk)
+- `campaign_id` (fk campaigns) — every query filters by it
+- `channel` (campaign_channel enum: announcements | post_requirements | cpm_calculation | bonus | link_in_bio_cta | content_brief | content_example | assets | how_to_submit_posts)
+- `title` (1–120 chars), `body` (1–4000 chars, plain text)
+- `links` (jsonb, `[{url, label}]`, at most 3, http/https only)
+- `author_user_id` (fk users)
+- `created_at`, `updated_at`
+- Index on `(campaign_id, channel, created_at)`
+
+## campaign\_channel\_reads
+
+When each person last opened each channel; drives the per-viewer "N new" badges.
+
+- `id` (pk), `campaign_id` (fk), `user_id` (fk users), `channel` (campaign_channel enum), `last_read_at`
+- unique(`user_id`, `campaign_id`, `channel`)
 
 ## scrapecreators\_cache (cost-saving, optional)
 
@@ -160,6 +180,7 @@ Supports multi-round review (a clip can be approved, later reverted, re-approved
 - `campaigns` 1—< `clips`
 - `clips` 1—< `clip_review_events`
 - `clips` 1—1 `creator_user_id`
+- `campaigns` 1—< `campaign_channel_posts`, `campaigns` 1—< `campaign_channel_reads` (both removed when a campaign is deleted)
 
 ## creator_profiles
 

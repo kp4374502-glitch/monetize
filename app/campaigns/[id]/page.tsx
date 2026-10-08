@@ -12,6 +12,8 @@ import { ClipHistory } from "@/components/clips/clip-history";
 import { BrandFeed } from "@/components/clips/brand-feed";
 import { money } from "@/components/clips/clip-parts";
 import { effectiveViews } from "@/lib/clips/rules";
+import { getCampaignChannels } from "@/lib/channels/service";
+import { ChannelsPanel } from "@/components/channels/channels-panel";
 import {
   addBrandAction,
   generateInviteLinkAction,
@@ -45,13 +47,19 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
   const history = canInvite ? await getClipHistory(userId, id) : null;
   const roster = canInvite ? await getCreatorRoster(userId, id) : null;
   const brands = isAdmin ? await listBrands(userId, id) : [];
+  // The channels panel is for everyone on the campaign except Brand viewers.
+  const channelData = role !== "brand" ? await getCampaignChannels(userId, id) : null;
+  const panelChannels = channelData?.channels.map((c) => ({
+    ...c,
+    posts: c.posts.map((p) => ({ ...p, createdAt: p.createdAt.toISOString(), updatedAt: p.updatedAt.toISOString() })),
+  }));
 
   // Creator stat cards come from their own clip list (no extra query).
   const myViews = myClips.reduce((n, c) => n + effectiveViews(c), 0);
   const myEarned = myClips.filter((c) => c.status === "approved").reduce((n, c) => n + Number(c.payout ?? 0), 0);
 
   return (
-    <main className="mx-auto max-w-4xl space-y-8 px-4 py-8 sm:px-6">
+    <main className={"mx-auto space-y-8 px-4 py-8 sm:px-6 " + (panelChannels ? "max-w-6xl" : "max-w-4xl")}>
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm font-semibold text-gold-light">{campaign.brandName}</p>
@@ -92,6 +100,8 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
         </div>
       </header>
 
+      <div className={panelChannels ? "grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]" : "space-y-8"}>
+      <div className={panelChannels ? "space-y-8 lg:col-start-1" : "contents"}>
       {role === "creator" && (
         <div className="grid grid-cols-3 gap-3" data-testid="totals">
           <StatCard label="Posts" value={myClips.length.toLocaleString()} />
@@ -100,7 +110,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
         </div>
       )}
       {history && queue && (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5" data-testid="totals">
+        <div className={"grid grid-cols-2 gap-3 " + (panelChannels ? "sm:grid-cols-3" : "lg:grid-cols-5")} data-testid="totals">
           <StatCard label="Paid so far" value={money(history.totals.paid)} valueTestId="total-paid" emphasis />
           <StatCard label="Owed" value={money(history.totals.owed)} valueTestId="total-owed" hint="approved, unpaid" />
           <StatCard label="Waiting on you" value={queue.pending.length} hint="posts to review" />
@@ -108,7 +118,17 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
           <StatCard label="Total views" value={history.totals.views.toLocaleString()} valueTestId="total-views" hint="every post, any status" />
         </div>
       )}
+      </div>
 
+      {panelChannels && channelData && (
+        <aside className="lg:col-start-2 lg:row-start-1 lg:row-span-2" aria-label="Campaign channels">
+          <div className="lg:sticky lg:top-6">
+            <ChannelsPanel campaignId={id} canPost={channelData.canPost} channels={panelChannels} />
+          </div>
+        </aside>
+      )}
+
+      <div className={panelChannels ? "min-w-0 space-y-8 lg:col-start-1" : "contents"}>
       {role === "creator" && <CreatorClips campaignId={id} clips={myClips} viewMinimum={campaign.viewMinimum} campaignStatus={campaign.status} />}
       {brandFeed && <BrandFeed rows={brandFeed.rows} stats={brandFeed.stats} />}
       {roster && <CreatorRoster roster={roster} limit={CREATOR_ROSTER_LIMIT} campaignId={id} canViewDetails={isAdmin} />}
@@ -198,6 +218,8 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
           </Card>
         </section>
       )}
+      </div>
+      </div>
     </main>
   );
 }

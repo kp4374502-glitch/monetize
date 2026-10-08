@@ -264,7 +264,7 @@ Only once both are true does the `status` column itself move from `awaiting_anal
 
 **Early-unlock override.** A Mod/Admin/Owner can also unlock one specific gate-locked clip for proof submission immediately, regardless of `posted_at` math or whether `posted_at` is even known — `clips.analytics_unlocked_early_at`/`analytics_unlocked_early_by`, set via `unlockAnalyticsEarly`. This is a separate column from `posted_at`, which it never touches or backdates, so real post-age data stays accurate everywhere else it's used. It fires the same "you can now submit your Analytics proof" notification the daily cron sends on a natural unlock, and logs a `unlock_analytics_early` `clip_review_events` row. It refuses if the clip isn't actually gate-locked, or was already unlocked early, to avoid redundant notifications. The override applies only to the clip it's set on — it is never inherited by future clips or automatically re-applied, so every new submission still waits the full 7 days by default. (Used once, 2026-10-01, as a one-time ops action to unlock all 54 clips that were gate-locked platform-wide at the time.)
 
-**Notification.** Once the 7 days elapse and the creator still hasn't submitted proof, a daily cron notifies them ("...you can now submit your Analytics proof"), sent at most once per clip. A clip that already has proof (the retroactive case below, or a race with the cron) instead flows straight into `pending` silently — no notification, since the creator already did their part.
+**Notification.** Once the 7 days elapse and the creator still hasn't submitted proof, a daily cron notifies them ("...you can now submit your Analytics proof"), sent at most once per clip, and a new announcement in a campaign's channels (see "Campaign channels"). A clip that already has proof (the retroactive case below, or a race with the cron) instead flows straight into `pending` silently — no notification, since the creator already did their part.
 
 **Retroactive handling.** Every clip that was already `pending` before this gate existed already has proof (the old flow required link+proof together). A one-time migration backfilled each one's `posted_at` and re-bucketed by post age: 7+ days old stayed `pending` untouched; younger than 7 days moved to `awaiting_analytics` even though proof is already attached — no resubmission needed, it flows back into `pending` automatically once the window clears. A handful where ScrapeCreators couldn't return a date at all were also moved to `awaiting_analytics`, flagged for manual confirmation, per the same "never guess" rule above.
 
@@ -395,6 +395,19 @@ New capability (the original Monetize build had none). **In-app only** — no em
 **Delivery:** a bell icon with a dropdown list, notifications persist until the user dismisses them (standard SaaS pattern) — not a disappearing toast.
 
 **Events that trigger a notification** (kept to the essentials): clip approved, clip rejected (with reason), payout marked paid, a reviewer reminder when a clip's proof is still missing 7 days after submission, and (Task 5 Part 3) a creator notification once their clip's 7-day analytics window clears and they haven't submitted proof yet — sent at most once per clip.
+
+## Campaign channels
+
+A Discord-style panel on every campaign page, in the right-hand column (on a phone it is a collapsed card between the stats and the "Add a post" card). Clicking a channel expands it; one channel is open at a time.
+
+**Nine channels, fixed:** announcements, post-requirements, cpm-calculation, bonus, link-in-bio-cta, content-brief, content-example, assets, how-to-submit-posts. There is deliberately no chat channel and no "submit your posts" channel (submission already has its own card).
+
+- **Who posts:** Owner and Admin only (create, edit, delete). Mods do not post.
+- **Who reads:** creators on the campaign, its Mods, Admin and Owner. **Brand viewers never see the channels** (the service refuses them).
+- **Content:** a title, a plain-text message (links in the text are clickable; nothing is rendered as HTML) and up to 3 http/https links (e.g. Drive, Dropbox). Links only, no file uploads.
+- **Notifications:** a new post in **announcements** (only) sends every creator on that campaign a bell notification (type `announcement`). Editing a post never re-notifies.
+- **Unread:** each channel shows an "N new" badge per viewer (other people's posts newer than the viewer's last open of that channel); opening the channel clears it.
+- Everything is scoped by `campaign_id`; deleting a campaign deletes its channel posts and read markers.
 
 ## Payouts
 

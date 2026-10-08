@@ -4,6 +4,8 @@ import { db } from "../db/client";
 import {
   campaigns,
   campaignBrands,
+  campaignChannelPosts,
+  campaignChannelReads,
   campaignCreators,
   campaignMods,
   clipReviewEvents,
@@ -98,6 +100,8 @@ export async function deleteCampaign(actorId: string, campaignId: string) {
       await tx.delete(clipReviewEvents).where(inArray(clipReviewEvents.clipId, clipIds));
     }
     await tx.delete(notifications).where(eq(notifications.campaignId, campaignId));
+    await tx.delete(campaignChannelReads).where(eq(campaignChannelReads.campaignId, campaignId));
+    await tx.delete(campaignChannelPosts).where(eq(campaignChannelPosts.campaignId, campaignId));
     await tx.delete(clips).where(eq(clips.campaignId, campaignId));
     await tx.delete(campaignCreators).where(eq(campaignCreators.campaignId, campaignId));
     await tx.delete(campaignMods).where(eq(campaignMods.campaignId, campaignId));

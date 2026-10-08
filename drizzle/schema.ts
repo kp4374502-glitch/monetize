@@ -51,6 +51,7 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "proof_reminder",
   "budget_low",
   "analytics_unlocked",
+  "announcement",
 ]);
 
 // ---------------------------------------------------------------------------
@@ -437,3 +438,65 @@ export const creatorProfiles = pgTable("creator_profiles", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ---------------------------------------------------------------------------
+// campaign_channel_posts / campaign_channel_reads — the Discord-style "Campaign channels" panel on a
+// campaign's page (announcements, assets, brief...). The channels themselves are a fixed list (see
+// lib/channels/schemas.ts); each campaign has its own posts. Both tables are campaign-scoped: every
+// query filters by campaign_id. Only Owner/Admin write; creators, Mods, Admin and Owner read; Brand never.
+// ---------------------------------------------------------------------------
+export const campaignChannelEnum = pgEnum("campaign_channel", [
+  "announcements",
+  "post_requirements",
+  "cpm_calculation",
+  "bonus",
+  "link_in_bio_cta",
+  "content_brief",
+  "content_example",
+  "assets",
+  "how_to_submit_posts",
+]);
+
+export type ChannelLink = { url: string; label: string };
+
+export const campaignChannelPosts = pgTable(
+  "campaign_channel_posts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    campaignId: uuid("campaign_id")
+      .notNull()
+      .references(() => campaigns.id),
+    channel: campaignChannelEnum("channel").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    // Up to 3 http(s) links (Drive, Dropbox, example posts...). Links only for now: no file uploads.
+    links: jsonb("links").$type<ChannelLink[]>().notNull().default([]),
+    authorUserId: text("author_user_id")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    channelIdx: index("campaign_channel_posts_campaign_channel_idx").on(t.campaignId, t.channel, t.createdAt),
+  }),
+);
+
+// When a person last opened a channel, so the panel can show "N new". One row per (user, campaign, channel).
+export const campaignChannelReads = pgTable(
+  "campaign_channel_reads",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    campaignId: uuid("campaign_id")
+      .notNull()
+      .references(() => campaigns.id),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    channel: campaignChannelEnum("channel").notNull(),
+    lastReadAt: timestamp("last_read_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    onePerUserChannel: unique("campaign_channel_reads_user_campaign_channel_unique").on(t.userId, t.campaignId, t.channel),
+  }),
+);
