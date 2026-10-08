@@ -30,10 +30,10 @@ function useClerkLoadFailed(isLoaded: boolean): boolean {
 }
 
 /**
- * Step 1 of self-serve creator sign-up: email + username + password, then the 6-digit code Clerk emails.
- * Clerk requires all three on this instance (email for the code, username because campaign teams add
- * people by username, password so the existing username+password sign-in keeps working). The
- * signupFlow flag routes the new account into /onboarding until the profile + Discord steps are done.
+ * Step 1 of self-serve creator sign-up: email + username, then the 6-digit code Clerk emails. There is
+ * no password: the email code is also how the creator signs in later (the Clerk instance has Password
+ * turned off). Username stays because campaign teams add people by it. The signupFlow flag routes the
+ * new account into /onboarding until the profile + Discord steps are done.
  */
 export function CreatorSignUp({ next }: { next?: string }) {
   const { isLoaded, signUp, setActive } = useSignUp();
@@ -42,7 +42,6 @@ export function CreatorSignUp({ next }: { next?: string }) {
   const [stage, setStage] = React.useState<"details" | "code">("details");
   const [email, setEmail] = React.useState("");
   const [username, setUsername] = React.useState("");
-  const [password, setPassword] = React.useState("");
   const [code, setCode] = React.useState("");
   const [error, setError] = React.useState("");
   const [busy, setBusy] = React.useState(false);
@@ -59,7 +58,6 @@ export function CreatorSignUp({ next }: { next?: string }) {
       await signUp.create({
         emailAddress: email.trim(),
         username: username.trim(),
-        password,
         unsafeMetadata: { [SIGNUP_FLOW_KEY]: CREATOR_SIGNUP_FLOW },
       });
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
@@ -108,16 +106,13 @@ export function CreatorSignUp({ next }: { next?: string }) {
         <form onSubmit={submitDetails} className="grid gap-4" data-testid="creator-signup-details">
           <div>
             <h2 className="text-xl font-bold tracking-tight">Continue as a Creator</h2>
-            <p className="mt-1 text-sm text-text-secondary">Enter your email and we&apos;ll send you a code.</p>
+            <p className="mt-1 text-sm text-text-secondary">Enter your email and a username. We&apos;ll email you a 6-digit code, so there&apos;s no password to remember.</p>
           </div>
           <Field label="Email">
             <Input type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </Field>
           <Field label="Username" hint="Campaign teams see this. It can't be changed later.">
             <Input autoComplete="username" placeholder="yourname" value={username} onChange={(e) => setUsername(e.target.value)} required />
-          </Field>
-          <Field label="Password" hint="You can sign in with this or with an email code.">
-            <Input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
           </Field>
           {/* Clerk's bot protection renders its challenge here when it needs one */}
           <div id="clerk-captcha" />

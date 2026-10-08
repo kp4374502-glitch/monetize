@@ -3,8 +3,8 @@ import { AuthShell } from "@/components/auth-shell";
 
 /**
  * One Clerk sign-in for everyone; the app resolves each person's role after login. ?as=admin (the header's
- * "Owner / Admin Sign In") only changes the wording and hides the creator sign-up link. Clerk offers
- * email + code and username + password, as enabled on the Clerk instance.
+ * "Owner / Admin Sign In") only changes the wording and hides the creator sign-up link. Sign-in is by
+ * email + 6-digit code only; what Clerk shows follows the instance settings (Password turned off).
  */
 export default async function Page({ searchParams }: { searchParams: Promise<{ as?: string }> }) {
   const { as } = await searchParams;
@@ -16,7 +16,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ a
       <SignIn appearance={{ elements: { footerAction: "!hidden" } }} />
     </AuthShell>
   ) : (
-    <AuthShell title="Welcome" accent="back" subtitle="Sign in to your Monetize creator account.">
+    <AuthShell title="Welcome" accent="back" subtitle="Enter your email and we'll send you a sign-in code.">
       <SignIn signUpUrl="/sign-up" />
     </AuthShell>
   );

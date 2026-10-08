@@ -14,7 +14,8 @@ moves money).
 - **Framework:** Next.js, deployed on Vercel
 - **Database:** Postgres, provisioned through Vercel's Storage/Marketplace tab (Neon-backed) — do
   not set up a separate Neon or Supabase account
-- **Auth:** Clerk — username + password login (no email required), with forgot-password/reset
+- **Auth:** Clerk — sign in and sign up with an emailed 6-digit code (no passwords); username is kept
+  as the display name
 - **External data:** ScrapeCreators API (https://scrapecreators.com/) for views/likes/post
   metadata on TikTok/Instagram/YouTube — public-data lookups only, no OAuth, no creator
   account-connect flow. See docs/PRODUCT_SPEC.md → "Clip data layer" for scope limits.
@@ -99,7 +100,7 @@ Actions before merge.
 ## Technical operations (defaults — see docs/PRODUCT_SPEC.md → "Technical operations" for detail)
 - **No public REST API.** Use Next.js Server Actions, colocated by domain, validated with `zod` on
   every input.
-- **Auth/security:** Clerk handles password hashing and sessions natively. Add separate API-level
+- **Auth/security:** Clerk handles the emailed sign-in codes and sessions natively (no passwords). Add separate API-level
   rate limiting (login attempts, invite-link redemption) distinct from the business-level 100/day
   submission cap. Validate clip URLs against TikTok/Instagram/YouTube patterns before any
   ScrapeCreators call.

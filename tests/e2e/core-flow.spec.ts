@@ -69,14 +69,13 @@ test.describe("core flow", () => {
     const stamp = Date.now();
     const username = `e2e_${stamp}`;
     await creator.getByLabel(/username/i).fill(username);
-    // Spec: username+password only. If the Clerk instance still asks for an email (its config
-    // has required one before), use a +clerk_test address: dev instances accept the fixed code 424242.
+    // Email + code sign-up: use a +clerk_test address, which dev instances accept with the fixed code 424242.
     const emailField = creator.getByLabel(/email address/i);
     const needsEmail = await emailField.isVisible();
     if (needsEmail) await emailField.fill(`${username}+clerk_test@example.com`);
+    // Sign-in is by emailed code, so Clerk's Password is normally off; fill it only if this instance still asks.
     const creatorPass = creator.locator('input[name="password"]');
-    await expect(creatorPass).toBeEnabled();
-    await creatorPass.fill(`Pw-${stamp}-xZ!`);
+    if (await creatorPass.isVisible()) await creatorPass.fill(`Pw-${stamp}-xZ!`);
     await creator.getByRole("button", { name: /continue/i }).click();
     if (needsEmail) {
       // Verification code screen. UNVERIFIED selector: Clerk renders the OTP as a single/segmented input.
