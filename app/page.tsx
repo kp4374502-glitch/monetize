@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
@@ -7,7 +8,6 @@ import { getCampaignsForUser, isPlatformOwner } from "@/lib/auth/roles";
 import { getBrandRequestForUser } from "@/lib/brand/service";
 import { needsOnboarding } from "@/lib/creators/gate";
 import { BrandRequestStatus } from "@/components/brand-request-status";
-import { LogoMark } from "@/components/logo";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, SectionHeader } from "@/components/ui/card";
@@ -25,23 +25,31 @@ function Landing() {
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[32rem] bg-[radial-gradient(ellipse_at_top,rgba(240,197,114,0.16),transparent_70%)]"
       />
-      <section className="mx-auto max-w-4xl px-4 pb-16 pt-6 text-center sm:pt-28">
-        <LogoMark size={96} priority className="mx-auto mb-6 drop-shadow-[0_0_28px_rgba(240,197,114,0.3)]" />
-        <p className="mx-auto mb-6 w-fit rounded-full border border-gold-border/40 bg-gold-light/10 px-4 py-1 text-xs font-semibold uppercase tracking-widest text-gold-light">
+      <section className="mx-auto max-w-4xl px-4 pb-10 pt-3 text-center sm:pb-16 sm:pt-28">
+        {/* Compact on phones so the whole hero (buttons included) fits one screen; 96px from sm up. */}
+        <Image
+          src="/logo.png"
+          alt=""
+          width={96}
+          height={96}
+          priority
+          className="mx-auto mb-3 h-14 w-14 object-contain drop-shadow-[0_0_28px_rgba(240,197,114,0.3)] sm:mb-6 sm:h-24 sm:w-24"
+        />
+        <p className="mx-auto mb-3 w-fit rounded-full sm:mb-6 border border-gold-border/40 bg-gold-light/10 px-4 py-1 text-xs font-semibold uppercase tracking-widest text-gold-light">
           Paid clipping campaigns
         </p>
-        <h1 className="text-5xl font-extrabold leading-[1.05] tracking-tight sm:text-7xl">
+        <h1 className="text-4xl font-extrabold leading-[1.08] tracking-tight sm:text-7xl sm:leading-[1.05]">
           Get every post <span className="font-serif font-medium italic text-gold-light">reviewed</span>,<br className="hidden sm:block" /> every payout{" "}
           <span className="font-serif font-medium italic text-gold-light">tracked</span>.
         </h1>
-        <p className="mx-auto mt-6 max-w-2xl text-lg text-text-secondary">
+        <p className="mx-auto mt-3 max-w-2xl text-balance text-base text-text-secondary sm:mt-6 sm:text-lg">
           Monetize is where brands run clipping campaigns: creators submit, reviewers verify, and what everyone is owed
           is always one page away.
         </p>
         {/* Creators: sign in, or start the self-serve sign-up + onboarding (/sign-up -> /onboarding).
             Owners/Admins use the header's "Owner / Admin Sign In". Brands still request access at the
             access-code-gated /brand-signup via the small link underneath. */}
-        <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5 sm:mt-10 sm:gap-3">
           <Link href="/sign-in" className={buttonVariants({ variant: "outline", size: "lg" })}>
             Sign In as Existing Creator
           </Link>
@@ -49,7 +57,7 @@ function Landing() {
             Sign Up as a New Creator <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
-        <p className="mt-4 text-sm text-text-secondary">
+        <p className="mt-3 text-sm text-text-secondary sm:mt-4">
           Running a brand?{" "}
           <Link href="/brand-signup" className="font-semibold text-gold-light hover:underline">Request access</Link>
         </p>
