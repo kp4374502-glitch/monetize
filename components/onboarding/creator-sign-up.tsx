@@ -46,6 +46,7 @@ export function CreatorSignUp({ next }: { next?: string }) {
   const [error, setError] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [resent, setResent] = React.useState(false);
+  const [incompleteSignUp, setIncompleteSignUp] = React.useState(false);
 
   const onboardingUrl = next ? `/onboarding?redirect_url=${encodeURIComponent(next)}` : "/onboarding";
 
@@ -69,9 +70,23 @@ export function CreatorSignUp({ next }: { next?: string }) {
     }
   }
 
+  /**
+   * The email is verified but Clerk won't finish the account (it still wants a field this form doesn't
+   * collect). Re-submitting the code can't fix that, so say so plainly instead of letting the next
+   * attempt answer "already been verified".
+   */
+  function incomplete(missing: string[] | undefined) {
+    setIncompleteSignUp(true);
+    setError(
+      "Your email is verified, but we couldn't finish creating your account" +
+        (missing?.length ? ` (still needed: ${missing.join(", ")})` : "") +
+        ". This is a setup problem on our side, not something you did. Please let the Monetize team know.",
+    );
+  }
+
   async function submitCode(e: React.FormEvent) {
     e.preventDefault();
-    if (!isLoaded) return;
+    if (!isLoaded || incompleteSignUp) return;
     setBusy(true);
     setError("");
     try {
@@ -81,9 +96,19 @@ export function CreatorSignUp({ next }: { next?: string }) {
         router.push(onboardingUrl);
         return;
       }
-      setError("We couldn't finish creating your account. Please check your details and try again.");
+      incomplete(result.missingFields);
     } catch (err) {
-      setError(clerkMessage(err));
+      if (isClerkAPIResponseError(err) && err.errors[0]?.code === "verification_already_verified") {
+        // A previous submit already verified the email: finish from the sign-up as it stands now.
+        if (signUp.status === "complete" && signUp.createdSessionId) {
+          await setActive({ session: signUp.createdSessionId });
+          router.push(onboardingUrl);
+          return;
+        }
+        incomplete(signUp.missingFields);
+      } else {
+        setError(clerkMessage(err));
+      }
     } finally {
       setBusy(false);
     }
@@ -154,7 +179,7 @@ export function CreatorSignUp({ next }: { next?: string }) {
             autoFocus
           />
           {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
-          <Button type="submit" size="lg" disabled={busy || code.length !== 6}>
+          <Button type="submit" size="lg" disabled={busy || code.length !== 6 || incompleteSignUp}>
             {busy ? "Checking…" : "Submit"}
           </Button>
           <p className="text-center text-sm text-text-secondary">
