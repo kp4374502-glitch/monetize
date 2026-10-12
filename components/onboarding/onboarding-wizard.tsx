@@ -76,7 +76,7 @@ function DiscordGlyph({ className }: { className?: string }) {
 
 function StepHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <div className="mb-6">
+    <div className="mb-4 sm:mb-6">
       <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">{title}</h1>
       <p className="mt-1 text-sm text-text-secondary">{subtitle}</p>
     </div>
@@ -242,8 +242,8 @@ export function OnboardingWizard({ initial, next }: { initial: OnboardingInitial
   );
 
   return (
-    <Card className="w-full" innerClassName="p-6 sm:p-8">
-      <div data-testid={`onboarding-step-${step}`} className="min-h-[24rem]">
+    <Card className="w-full" innerClassName="p-4 sm:p-8">
+      <div data-testid={`onboarding-step-${step}`} className="sm:min-h-[24rem]">
         {step === "about" && (
           <>
             <StepHeader title="Tell us about you" subtitle="Let's start with the essentials." />
@@ -497,7 +497,7 @@ export function OnboardingWizard({ initial, next }: { initial: OnboardingInitial
 
       {error && <p role="alert" className="mt-4 text-sm text-red-400">{error}</p>}
 
-      <div className="mt-6 flex gap-3">
+      <div className="mt-4 flex gap-3 sm:mt-6">
         {step === "about" && nextButton}
         {step === "type" && <>{backButton("about")}{nextButton}</>}
         {step === "socials" && <>{backButton("type")}{nextButton}</>}

@@ -139,7 +139,7 @@ export function CreatorSignUp({ next }: { next?: string }) {
   }
 
   return (
-    <Card className="w-full" innerClassName="p-6 sm:p-7">
+    <Card className="w-full" innerClassName="p-5 sm:p-7">
       {stage === "details" ? (
         <form onSubmit={submitDetails} className="grid gap-4" data-testid="creator-signup-details">
           <div>
