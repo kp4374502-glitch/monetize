@@ -47,6 +47,8 @@ export function CreatorSignUp({ next }: { next?: string }) {
   const [busy, setBusy] = React.useState(false);
   const [resent, setResent] = React.useState(false);
   const [incompleteSignUp, setIncompleteSignUp] = React.useState(false);
+  // Where a successful sign-up is up to, so a slow step is visible and the button can't be pressed twice.
+  const [progress, setProgress] = React.useState<"" | "verifying" | "signing-in" | "opening">("");
 
   const onboardingUrl = next ? `/onboarding?redirect_url=${encodeURIComponent(next)}` : "/onboarding";
 
@@ -89,10 +91,15 @@ export function CreatorSignUp({ next }: { next?: string }) {
     if (!isLoaded || incompleteSignUp) return;
     setBusy(true);
     setError("");
+    let navigating = false;
     try {
+      setProgress("verifying");
       const result = await signUp.attemptEmailAddressVerification({ code: code.trim() });
       if (result.status === "complete") {
+        setProgress("signing-in");
         await setActive({ session: result.createdSessionId });
+        setProgress("opening");
+        navigating = true; // keep the button locked: a second Submit would only answer "already verified"
         router.push(onboardingUrl);
         return;
       }
@@ -101,7 +108,10 @@ export function CreatorSignUp({ next }: { next?: string }) {
       if (isClerkAPIResponseError(err) && err.errors[0]?.code === "verification_already_verified") {
         // A previous submit already verified the email: finish from the sign-up as it stands now.
         if (signUp.status === "complete" && signUp.createdSessionId) {
+          setProgress("signing-in");
           await setActive({ session: signUp.createdSessionId });
+          setProgress("opening");
+          navigating = true;
           router.push(onboardingUrl);
           return;
         }
@@ -110,7 +120,10 @@ export function CreatorSignUp({ next }: { next?: string }) {
         setError(clerkMessage(err));
       }
     } finally {
-      setBusy(false);
+      if (!navigating) {
+        setBusy(false);
+        setProgress("");
+      }
     }
   }
 
@@ -180,7 +193,15 @@ export function CreatorSignUp({ next }: { next?: string }) {
           />
           {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
           <Button type="submit" size="lg" disabled={busy || code.length !== 6 || incompleteSignUp}>
-            {busy ? "Checking…" : "Submit"}
+            {progress === "verifying"
+              ? "Checking your code…"
+              : progress === "signing-in"
+                ? "Signing you in…"
+                : progress === "opening"
+                  ? "Opening your profile…"
+                  : busy
+                    ? "Checking…"
+                    : "Submit"}
           </Button>
           <p className="text-center text-sm text-text-secondary">
             {resent ? "A new code is on its way." : "Didn't get a code?"}{" "}
