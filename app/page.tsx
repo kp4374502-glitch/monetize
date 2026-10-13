@@ -21,10 +21,6 @@ const features = [
 function Landing() {
   return (
     <main className="relative overflow-hidden">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[32rem] bg-[radial-gradient(ellipse_at_top,rgba(240,197,114,0.16),transparent_70%)]"
-      />
       <section className="mx-auto max-w-4xl px-4 pb-10 pt-3 text-center sm:pb-16 sm:pt-28">
         {/* Compact on phones so the whole hero (buttons included) fits one screen; 96px from sm up. */}
         <Image
@@ -33,14 +29,15 @@ function Landing() {
           width={96}
           height={96}
           priority
-          className="mx-auto mb-3 h-14 w-14 object-contain drop-shadow-[0_0_28px_rgba(240,197,114,0.3)] sm:mb-6 sm:h-24 sm:w-24"
+          className="mx-auto mb-3 h-14 w-14 object-contain sm:mb-6 sm:h-24 sm:w-24"
         />
-        <p className="mx-auto mb-3 w-fit rounded-full sm:mb-6 border border-gold-border/40 bg-gold-light/10 px-4 py-1 text-xs font-semibold uppercase tracking-widest text-gold-light">
+        <p className="mx-auto mb-3 w-fit rounded-full sm:mb-6 border border-gold-border/40 bg-gold-light/10 px-4 py-1 text-xs font-medium tracking-[-0.01em] text-gold-light">
           Paid clipping campaigns
         </p>
-        <h1 className="text-4xl font-extrabold leading-[1.08] tracking-tight sm:text-7xl sm:leading-[1.05]">
-          Get every post <span className="font-serif font-medium italic text-gold-light">reviewed</span>,<br className="hidden sm:block" /> every payout{" "}
-          <span className="font-serif font-medium italic text-gold-light">tracked</span>.
+        <h1 className="text-4xl font-medium leading-[1.06] tracking-[-0.05em] text-[#c2c2c2] sm:text-7xl sm:leading-[1.02]">
+          Get every post{" "}
+          <span className="inline-block rounded-full border border-gold-border/70 px-[0.3em] pb-[0.06em] text-white">reviewed</span>,<br className="hidden sm:block" /> every payout{" "}
+          <span className="inline-block rounded-full border border-gold-border/70 px-[0.3em] pb-[0.06em] text-white">tracked</span>.
         </h1>
         <p className="mx-auto mt-3 max-w-2xl text-balance text-base text-text-secondary sm:mt-6 sm:text-lg">
           Monetize is where brands run clipping campaigns: creators submit, reviewers verify, and what everyone is owed
@@ -59,7 +56,7 @@ function Landing() {
         </div>
         <p className="mt-3 text-sm text-text-secondary sm:mt-4">
           Running a brand?{" "}
-          <Link href="/brand-signup" className="font-semibold text-gold-light hover:underline">Request access</Link>
+          <Link href="/brand-signup" className="font-medium text-gold-light hover:underline">Request access</Link>
         </p>
       </section>
 
@@ -69,10 +66,26 @@ function Landing() {
             <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-gold-gradient text-black">
               <Icon className="h-5 w-5" />
             </span>
-            <h3 className="font-bold">{title}</h3>
+            <h3 className="font-medium tracking-[-0.02em]">{title}</h3>
             <p className="mt-1.5 text-sm text-text-secondary">{body}</p>
           </Card>
         ))}
+      </section>
+
+      {/* Closing CTA: same block as the marketing site's footer ("Ready to launch your campaign?") */}
+      <section className="border-t border-white/[0.08] px-4 py-14 text-center sm:py-20">
+        <h2 className="mx-auto max-w-3xl text-[clamp(2rem,6.5vw,4.5rem)] font-medium leading-[1.02] tracking-[-0.05em]">
+          <span className="block">Ready to launch</span>
+          <span className="block">your campaign?</span>
+        </h2>
+        <div className="mx-auto mt-10 flex w-full max-w-2xl flex-col gap-3 sm:flex-row sm:justify-center">
+          <Link href="/brand-signup" className={buttonVariants({ variant: "primary", size: "lg", className: "min-h-14 flex-1" })}>
+            Launch a campaign
+          </Link>
+          <a href="https://usemonetize.co/#case-studies" className={buttonVariants({ variant: "outline", size: "lg", className: "min-h-14 flex-1" })}>
+            See a Demo
+          </a>
+        </div>
       </section>
     </main>
   );

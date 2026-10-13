@@ -52,7 +52,7 @@ export function ClipHistory({
                     Marked paid by {paidByUsername ?? "unknown"} · {when(c.paidAt)}
                   </p>
                 </div>
-                <span className="text-xl font-extrabold text-gold-light" data-testid="paid-amount">{money(c.payout)}</span>
+                <span className="text-xl font-medium tracking-[-0.03em] text-gold-light" data-testid="paid-amount">{money(c.payout)}</span>
                 {canDelete && <DeleteClipButton campaignId={campaignId} clipId={c.id} />}
               </Card>
             </li>

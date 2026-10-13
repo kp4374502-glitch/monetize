@@ -63,7 +63,7 @@ export default async function ClipHistoryPage({
     <main className="mx-auto max-w-4xl space-y-6 px-4 py-8 sm:px-6">
       <div>
         <p className="text-sm font-semibold text-gold-light">{campaign.brandName}</p>
-        <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">{campaign.name}</h1>
+        <h1 className="text-2xl font-medium tracking-[-0.045em] sm:text-3xl">{campaign.name}</h1>
         <p className="mt-2 flex items-center gap-2 text-sm text-text-secondary">
           Your role: <Badge status={role} />
         </p>

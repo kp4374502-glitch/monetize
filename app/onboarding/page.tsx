@@ -16,11 +16,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
   if (profile?.onboardingCompletedAt) redirect(next ?? "/explore");
 
   return (
-    <main className="relative mx-auto flex min-h-[calc(100vh-4rem)] max-w-2xl items-start px-4 py-4 sm:items-center sm:py-10">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 bg-[radial-gradient(ellipse_at_top,rgba(240,197,114,0.14),transparent_70%)]"
-      />
+    <main className="relative mx-auto flex min-h-[calc(100vh-4rem)] max-w-2xl items-start px-4 py-4 sm:items-center sm:py-10">
       <OnboardingWizard
         next={next}
         initial={{

@@ -2,8 +2,8 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * The one Card: black fill with a thin gold-gradient border (docs/PRODUCT_SPEC.md -> Design system).
- * The gradient is a 1px wrapper so the border stays crisp with rounded corners.
+ * The one Card: a hairline 8%-white border on a 3%-white fill, large radius (docs/PRODUCT_SPEC.md ->
+ * Design system). The inner div is kept so innerClassName keeps working everywhere.
  */
 export function Card({
   className,
@@ -12,8 +12,8 @@ export function Card({
   ...props
 }: React.HTMLAttributes<HTMLDivElement> & { innerClassName?: string }) {
   return (
-    <div className={cn("rounded-2xl bg-gradient-to-br from-gold-light/50 via-gold-border/25 to-gold-dark/40 p-px", className)} {...props}>
-      <div className={cn("h-full rounded-[15px] bg-bg-secondary p-5", innerClassName)}>{children}</div>
+    <div className={cn("rounded-[22px] border border-white/[0.08] bg-white/[0.03]", className)} {...props}>
+      <div className={cn("h-full rounded-[21px] p-5", innerClassName)}>{children}</div>
     </div>
   );
 }
@@ -35,7 +35,7 @@ export function SectionHeader({
   return (
     <div className={cn("mb-4 flex flex-wrap items-start justify-between gap-3", className)}>
       <div>
-        <h2 className="flex items-center gap-2 text-lg font-bold tracking-tight">
+        <h2 className="flex items-center gap-2 text-lg font-medium tracking-[-0.03em]">
           {title}
           {count !== undefined && (
             <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs font-semibold text-text-secondary">{count}</span>
@@ -67,7 +67,7 @@ export function StatCard({
       <p className="text-[11px] font-semibold uppercase tracking-widest text-text-secondary">{label}</p>
       <p
         className={cn(
-          "mt-1.5 text-3xl font-extrabold tracking-tight",
+          "mt-1.5 text-3xl font-medium tracking-[-0.045em]",
           emphasis && "bg-gold-gradient bg-clip-text text-transparent",
         )}
         data-testid={valueTestId}

@@ -39,7 +39,7 @@ export function CreatorDetailsView({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm font-semibold text-gold-light">{campaign.brandName}</p>
-          <h1 className="text-3xl font-extrabold tracking-tight" data-testid="creator-details-name">
+          <h1 className="text-3xl font-medium tracking-[-0.045em]" data-testid="creator-details-name">
             {d.username}
           </h1>
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-text-secondary">

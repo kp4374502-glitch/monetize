@@ -7,19 +7,20 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        bg: { primary: "#0a0a0a", secondary: "#000000" },
+        bg: { primary: "#000000", secondary: "#000000" },
         text: { primary: "#ffffff", secondary: "#a3a3a3" },
-        gold: { light: "#f0c572", dark: "#9c7a2e", border: "#c9a227" },
+        // "gold" tokens now carry the single amber accent (#FFB433); names kept so every usage follows.
+        gold: { light: "#ffb433", dark: "#c98a1c", border: "#ffb433" },
         subtle: "#2a2a2a",
       },
       backgroundImage: {
-        // --accent-gradient: linear-gradient(135deg, #F0C572, #9C7A2E)
-        "gold-gradient": "linear-gradient(135deg, #f0c572, #9c7a2e)",
+        // Flat amber on purpose (same stop twice): solid accent, no gradient fills.
+        "gold-gradient": "linear-gradient(135deg, #ffb433, #ffb433)",
       },
       fontFamily: {
         sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
-        // italic serif accent: marketing/auth headlines only, never dense data screens
-        serif: ["var(--font-serif)", "ui-serif", "Georgia", "serif"],
+        // No serif in the UI any more: the old serif slot resolves to the same sans (Manrope).
+        serif: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
       },
     },
   },

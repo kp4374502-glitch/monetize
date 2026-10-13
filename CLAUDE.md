@@ -74,21 +74,23 @@ changing this flow.
   approximating one is worse than asking.
 
 ## Design system (see docs/PRODUCT_SPEC.md → "Design system" for full detail)
-Brand reference: usemonetize.co — dark theme, gold accent. Built with Tailwind CSS + shadcn/ui,
-restyled to these tokens (wire into `tailwind.config.ts`, not hardcoded per component):
+Brand reference: usemonetize.co, restyled after propgda.com — calm editorial dark theme. Built with
+Tailwind CSS + shadcn/ui, restyled to these tokens (wire into `tailwind.config.ts`, not hardcoded per
+component; the `gold.*` token names are kept but now hold the single amber accent):
 ```css
---bg-primary: #0A0A0A;
+--bg-primary: #000000;
 --bg-secondary: #000000;
 --text-primary: #FFFFFF;
 --text-secondary: #A3A3A3;
---accent-gold-light: #F0C572;
---accent-gold-dark: #9C7A2E;
---accent-gradient: linear-gradient(135deg, #F0C572, #9C7A2E);
---border-gold: #C9A227;
+--accent-gold-light: #FFB433;
+--accent-gold-dark: #C98A1C;
+--accent-gradient: #FFB433;   /* flat — no gradient fills */
+--border-gold: #FFB433;
 --border-subtle: #2A2A2A;
 ```
-Pill-shaped buttons/badges, gold-gradient card borders on black fill, bold sans-serif UI text with
-an italic serif accent reserved for marketing/auth headlines (not dense data screens).
+Manrope everywhere, headlines at medium weight with tight tracking; no serif/italic accents. Flat amber
+pill buttons (secondary: amber outline), hairline 8%-white cards, no glows. A headline's key word goes in
+an amber-outlined pill with the rest of the line grey.
 
 ## Testing (see docs/PRODUCT_SPEC.md → "Testing strategy" for full detail)
 Full coverage expected: **Vitest** for unit tests (payout formula, role/permission resolution,

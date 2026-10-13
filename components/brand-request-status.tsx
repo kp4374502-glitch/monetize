@@ -17,7 +17,7 @@ export function BrandRequestStatus({ request }: { request: BrandRequest }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-text-secondary">Brand request</p>
-          <h2 className="text-xl font-extrabold tracking-tight">{request.brandName}</h2>
+          <h2 className="text-xl font-medium tracking-[-0.045em]">{request.brandName}</h2>
         </div>
         <Badge status={request.status} />
       </div>
