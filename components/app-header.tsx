@@ -12,7 +12,9 @@ export function AppHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-subtle bg-bg-primary/85 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Logo />
+        {/* The logo goes to the marketing site. In the app, signed-in users move between their campaigns with the
+            campaign switcher and reach active campaigns via Explore. */}
+        <Logo href="https://usemonetize.co/" label="Monetize website" />
         <nav className="flex items-center gap-2.5" aria-label="Main">
           <SignedIn>
             <BrandRequestsLink />

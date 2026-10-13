@@ -17,9 +17,9 @@ export function LogoMark({ size = 36, className, priority = false }: { size?: nu
   );
 }
 
-export function Logo({ className, href = "/" }: { className?: string; href?: string }) {
+export function Logo({ className, href = "/", label = "Monetize home" }: { className?: string; href?: string; label?: string }) {
   return (
-    <Link href={href} className={cn("group inline-flex items-center gap-2", className)} aria-label="Monetize home">
+    <Link href={href} className={cn("group inline-flex items-center gap-2", className)} aria-label={label}>
       <LogoMark size={36} priority />
       <span className="text-lg font-semibold tracking-tight">Monetize</span>
     </Link>
