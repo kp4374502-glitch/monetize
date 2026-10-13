@@ -37,7 +37,7 @@ export default async function BrandRequestsPage() {
             <Card innerClassName="p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 [overflow-wrap:anywhere]">
-                  <h2 className="text-lg font-extrabold tracking-tight">{r.brandName}</h2>
+                  <h2 className="text-lg font-medium tracking-[-0.045em]">{r.brandName}</h2>
                   <p className="text-sm text-text-secondary">
                     Account: <span className="font-semibold text-text-primary">{username}</span> · Discord:{" "}
                     <span className="font-semibold text-text-primary">{r.discord}</span>

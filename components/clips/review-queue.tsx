@@ -156,7 +156,7 @@ export function ReviewQueue({
                       {c.url}
                     </a>
                     <Stats clip={c} />
-                    <span className="text-base font-extrabold text-gold-light" data-testid="payment-amount">{money(c.payout)}</span>
+                    <span className="text-base font-medium tracking-[-0.03em] text-gold-light" data-testid="payment-amount">{money(c.payout)}</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     {canClipApprove && <ClipApproveButton campaignId={campaignId} clip={c} />}

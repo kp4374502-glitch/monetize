@@ -18,14 +18,10 @@ export default async function ExplorePage() {
   const list = await listActiveCampaigns(userId);
 
   return (
-    <main className="relative mx-auto max-w-5xl space-y-6 px-4 py-10 sm:px-6">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 bg-[radial-gradient(ellipse_at_top,rgba(240,197,114,0.12),transparent_70%)]"
-      />
+    <main className="relative mx-auto max-w-5xl space-y-6 px-4 py-10 sm:px-6">
       <div>
-        <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
-          Active <span className="font-serif font-medium italic text-gold-light">campaigns</span>
+        <h1 className="text-3xl font-medium tracking-[-0.045em] sm:text-4xl">
+          Active <span className="text-gold-light">campaigns</span>
         </h1>
         <p className="mt-2 text-text-secondary">Pick a campaign to join, then start submitting your posts.</p>
       </div>

@@ -77,7 +77,7 @@ function DiscordGlyph({ className }: { className?: string }) {
 function StepHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <div className="mb-4 sm:mb-6">
-      <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">{title}</h1>
+      <h1 className="text-2xl font-medium tracking-[-0.045em] sm:text-3xl">{title}</h1>
       <p className="mt-1 text-sm text-text-secondary">{subtitle}</p>
     </div>
   );
@@ -293,7 +293,7 @@ export function OnboardingWizard({ initial, next }: { initial: OnboardingInitial
               <label className="flex items-center gap-2.5 text-sm text-text-secondary sm:col-span-2">
                 <input
                   type="checkbox"
-                  className="h-4 w-4 accent-[#f0c572]"
+                  className="h-4 w-4 accent-[#ffb433]"
                   checked={about.termsAccepted}
                   onChange={(e) => setAbout({ ...about, termsAccepted: e.target.checked })}
                 />
@@ -426,7 +426,7 @@ export function OnboardingWizard({ initial, next }: { initial: OnboardingInitial
                 <img src={user.imageUrl} alt="" className="h-16 w-16 rounded-full border border-gold-border/50 object-cover" />
               )}
               <div className="min-w-0">
-                <h1 className="truncate text-2xl font-extrabold tracking-tight">{about.firstName} {about.lastName}</h1>
+                <h1 className="truncate text-2xl font-medium tracking-[-0.045em]">{about.firstName} {about.lastName}</h1>
                 <p className="text-sm text-text-secondary">
                   {ageFromBirthday(about.birthday)} · {GENDER_LABELS[about.gender as keyof typeof GENDER_LABELS]} · {about.country}
                 </p>
@@ -465,8 +465,8 @@ export function OnboardingWizard({ initial, next }: { initial: OnboardingInitial
             <span className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-[#5865F2] text-white shadow-[0_0_40px_rgba(88,101,242,0.35)]">
               <DiscordGlyph className="h-10 w-10" />
             </span>
-            <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
-              Join the <span className="font-serif font-medium italic text-gold-light">community</span>
+            <h1 className="text-2xl font-medium tracking-[-0.045em] sm:text-3xl">
+              Join the <span className="text-gold-light">community</span>
             </h1>
             <p className="mx-auto mt-2 max-w-md text-sm text-text-secondary">
               Campaign drops, payouts and support all happen in our Discord. Joining is required to finish setting up your account.

@@ -63,7 +63,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm font-semibold text-gold-light">{campaign.brandName}</p>
-          <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl" data-testid="campaign-name">{campaign.name}</h1>
+          <h1 className="text-3xl font-medium tracking-[-0.045em] sm:text-4xl" data-testid="campaign-name">{campaign.name}</h1>
           <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-text-secondary">
             Your role: <Badge status={role} data-testid="role" />
             <span className="text-subtle">·</span>

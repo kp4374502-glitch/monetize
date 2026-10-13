@@ -61,7 +61,7 @@ export function NewCampaignForm({ brands = [] }: { brands?: { userId: string; br
                   key={p}
                   className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-subtle px-4 py-1.5 text-sm capitalize transition hover:border-gold-border/60 has-[:checked]:border-gold-border has-[:checked]:bg-gold-light/10 has-[:checked]:text-gold-light"
                 >
-                  <input type="checkbox" name="eligiblePlatforms" value={p} defaultChecked={p === "tiktok"} className="h-4 w-4 accent-[#f0c572]" />
+                  <input type="checkbox" name="eligiblePlatforms" value={p} defaultChecked={p === "tiktok"} className="h-4 w-4 accent-[#ffb433]" />
                   {p}
                 </label>
               ))}

@@ -481,35 +481,36 @@ A lightweight privacy policy should exist at launch, covering stored usernames/p
 
 ## Design system
 
-Brand reference: [usemonetize.co](https://usemonetize.co/) — the real Monetize marketing site. Dark theme, gold accent, matching that brand rather than the old Liftly visual style.
+Brand reference: [usemonetize.co](https://usemonetize.co/), restyled (Oct 2026) after [propgda.com](https://www.propgda.com/): calm editorial dark theme — pure black, one amber accent, light-weight sans headlines, hairline cards, no glows or gradient fills.
 
-### Colors (visual estimate from a screenshot — spot-check against the live site's dev tools if pixel-perfect matching matters)
+### Colors
 
 ```css
---bg-primary: #0A0A0A;      /* near-black page background */
---bg-secondary: #000000;    /* pure black panels/cards */
+--bg-primary: #000000;       /* page background */
+--bg-secondary: #000000;     /* panels */
 --text-primary: #FFFFFF;
---text-secondary: #A3A3A3;  /* muted/secondary text */
---accent-gold-light: #F0C572;
---accent-gold-dark: #9C7A2E;
---accent-gradient: linear-gradient(135deg, #F0C572, #9C7A2E);
---border-gold: #C9A227;      /* metallic gold card/button borders */
+--text-secondary: #A3A3A3;   /* muted/secondary text */
+--accent-gold-light: #FFB433; /* the single amber accent (Tailwind `gold.light`; token names kept) */
+--accent-gold-dark: #C98A1C;
+--accent-gradient: #FFB433;  /* flat on purpose — no gradient fills */
+--border-gold: #FFB433;      /* used at reduced opacity for outlines/pills */
 --border-subtle: #2A2A2A;    /* low-contrast dividers */
 ```
 
 ### Shape & component language
 
-- Fully rounded pill-shaped buttons and badges, filled with the gold gradient on primary actions.
-- Cards on a black fill with a thin gold-gradient border (visible on the hero's stacked mockup cards).
+- Fully rounded pill-shaped buttons and badges: flat amber with black text on primary actions; secondary = white text on an amber outline.
+- Cards: a hairline 8%-white border on a 3%-white fill, ~22px radius. No glows, no gradient borders.
+- Emphasis word in a marketing headline: white text inside an amber-outlined pill, the rest of the line grey (#C2C2C2).
 - Toggle switches: dark track, white knob.
 
 ### Typography
 
-Bold sans-serif for most UI text; an italic serif face used selectively for emphasized words in headlines (a stylistic accent, not the body font) — keep this contrast for marketing-adjacent pages (landing/auth) but a plain bold sans is fine for dense data screens (the review queue, clip feed) where legibility matters more than flourish.
+Manrope everywhere. Headlines at medium weight (500) with tight tracking (≈ -0.045em to -0.05em, line-height ≈ 1.02–1.06); body 15–16px with slightly tight tracking. No serif or italic accents. Semibold/bold only where dense data needs it (numbers, table emphasis).
 
 ### Implementation
 
-Tailwind CSS + shadcn/ui, with the tokens above wired into Tailwind's theme config (`tailwind.config.ts`) rather than hardcoded per component, so the palette stays a single source of truth. shadcn components get restyled to the gold/black palette and pill shape rather than left at their default look.
+Tailwind CSS + shadcn/ui, with the tokens above wired into Tailwind's theme config (`tailwind.config.ts`) rather than hardcoded per component, so the palette stays a single source of truth. shadcn components get restyled to the amber/black palette and pill shape rather than left at their default look.
 
 ## Testing strategy
 

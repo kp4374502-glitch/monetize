@@ -22,7 +22,7 @@ export default async function InvitePage({ params }: { params: Promise<{ code: s
           <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-500/15 text-red-400">
             <ShieldAlert className="h-6 w-6" />
           </span>
-          <h1 className="text-2xl font-extrabold tracking-tight">Invite link unavailable</h1>
+          <h1 className="text-2xl font-medium tracking-[-0.045em]">Invite link unavailable</h1>
           <p data-testid="invite-error" className="mt-2 text-text-secondary">{messages[found.reason]}</p>
         </Card>
       </main>
@@ -34,17 +34,13 @@ export default async function InvitePage({ params }: { params: Promise<{ code: s
 
   return (
     <main className="relative mx-auto flex min-h-[calc(100vh-4rem)] max-w-md items-center px-4 py-12">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 bg-[radial-gradient(ellipse_at_top,rgba(240,197,114,0.14),transparent_70%)]"
-      />
       <Card className="w-full" innerClassName="text-center">
         <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gold-gradient text-black">
           <LinkIcon className="h-6 w-6" />
         </span>
         <p className="text-sm text-text-secondary">You&apos;ve been invited to</p>
         <p className="text-sm font-semibold text-gold-light">{found.campaign.brandName}</p>
-        <h1 className="mb-6 mt-1 text-3xl font-extrabold tracking-tight">Join {found.campaign.name}</h1>
+        <h1 className="mb-6 mt-1 text-3xl font-medium tracking-[-0.045em]">Join {found.campaign.name}</h1>
         {userId ? (
           <form action={redeemInviteAction.bind(null, code)}>
             <Button type="submit" size="lg" className="w-full">Join campaign</Button>

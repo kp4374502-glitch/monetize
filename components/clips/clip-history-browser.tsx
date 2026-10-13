@@ -255,7 +255,7 @@ export function ClipHistoryBrowser({
                     </div>
                   )}
                 </div>
-                <span className="text-base font-extrabold text-gold-light" data-testid="history-payout">
+                <span className="text-base font-medium tracking-[-0.03em] text-gold-light" data-testid="history-payout">
                   {money(c.payout)}
                 </span>
                 {canDelete && <DeleteClipButton campaignId={campaignId} clipId={c.id} />}
