@@ -853,9 +853,9 @@ async function approvedWithPayout(campaignId: string, creator: string, pct: numb
 }
 
 describe("markPaid", () => {
-  it("rejects a Mod above the threshold but lets Admin do it; increments budget_spent", async () => {
-    const clip = await approvedWithPayout(camp, "c1", 25, 4_000_000); // $500 > $50 threshold
-    await expect(svc.markPaid("modA", camp, clip.id)).rejects.toThrow(/threshold/);
+  it("refuses a Mod at any amount but lets Admin do it; increments budget_spent", async () => {
+    const clip = await approvedWithPayout(camp, "c1", 25, 4_000_000); // $500
+    await expect(svc.markPaid("modA", camp, clip.id)).rejects.toThrow(/Access denied/);
     const before = (await db.select().from(campaigns).where(eq(campaigns.id, camp)))[0].budgetSpent;
     await svc.markPaid("admin", camp, clip.id);
     const after = (await db.select().from(campaigns).where(eq(campaigns.id, camp)))[0].budgetSpent;
@@ -865,11 +865,14 @@ describe("markPaid", () => {
     expect((await db.select().from(notifications).where(eq(notifications.clipId, clip.id))).some((x) => x.type === "payout_paid")).toBe(true);
   });
 
-  it("lets a Mod mark paid at or under the threshold", async () => {
-    const clip = await approvedWithPayout(camp, "c2", 50, 10_000); // $10
-    await svc.markPaid("modB", camp, clip.id);
+  it("refuses a Mod even for a tiny payout, and leaves the post unpaid", async () => {
+    const clip = await approvedWithPayout(camp, "c2", 50, 10_000); // $10, far under any old threshold
+    await expect(svc.markPaid("modB", camp, clip.id)).rejects.toThrow(/Access denied/);
     const [c] = await db.select().from(clips).where(eq(clips.id, clip.id));
-    expect(c.paidBy).toBe("modB");
+    expect(c).toMatchObject({ paidStatus: "unpaid", paidBy: null });
+    await svc.markPaid("owner", camp, clip.id); // Owner can
+    const [after] = await db.select().from(clips).where(eq(clips.id, clip.id));
+    expect(after.paidBy).toBe("owner");
   });
 
   it("rejects a payout that would exceed the campaign budget and leaves state untouched", async () => {

@@ -3,6 +3,7 @@ import { SignedIn, SignedOut } from "@clerk/nextjs";
 import { AccountMenu } from "@/components/account-menu";
 import { Logo } from "@/components/logo";
 import { BrandRequestsLink } from "@/components/brand-requests-link";
+import { TeamLink } from "@/components/team-link";
 import { CampaignSwitcher } from "@/components/campaign-switcher";
 import { NotificationBell } from "@/components/notification-bell";
 import { buttonVariants } from "@/components/ui/button";
@@ -18,6 +19,7 @@ export function AppHeader() {
         <nav className="flex items-center gap-2.5" aria-label="Main">
           <SignedIn>
             <BrandRequestsLink />
+            <TeamLink />
             <Link href="/explore" className={buttonVariants({ variant: "ghost", size: "sm", className: "hidden sm:inline-flex" })}>
               Explore
             </Link>

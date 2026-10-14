@@ -53,6 +53,14 @@ async function loadClip(campaignId: string, clipId: string): Promise<Clip> {
   return c;
 }
 
+/**
+ * A Mod/CPE who is also a creator on this campaign can't review, price or otherwise act on their OWN
+ * posts. Admin/Owner aren't limited by this.
+ */
+function assertNotOwnPost(role: string | null, actorId: string, clip: Pick<Clip, "creatorUserId">) {
+  if (role === "mod" && clip.creatorUserId === actorId) throw new Error("Access denied: you can't review your own post.");
+}
+
 /** cpm/earnings/payout columns for a clip's current state; nulls when not (yet) earning. */
 function economicsColumns(
   clip: Pick<Clip, "views" | "manualViews" | "qualifyingAudiencePct" | "videoProofUrl" | "analyticsScreenshotPathname" | "baseRateOverride">,
@@ -431,6 +439,7 @@ export async function reviewClip(actorId: string, campaignId: string, clipId: st
   const role = await requireRole(actorId, campaignId, "mod");
   const decision = reviewSchema.parse(input);
   const clip = await loadClip(campaignId, clipId);
+  assertNotOwnPost(role, actorId, clip);
   if (clip.paidStatus === "paid") throw new Error("This post has already been paid; its review can't be changed.");
   if (clip.status === (decision.action === "approve" ? "approved" : "rejected")) {
     throw new Error(`This post is already ${clip.status}.`);
@@ -497,6 +506,7 @@ export async function updateRejectionReason(actorId: string, campaignId: string,
   const role = await requireRole(actorId, campaignId, "mod");
   const reason = rejectionReasonSchema.parse(rawReason);
   const clip = await loadClip(campaignId, clipId);
+  assertNotOwnPost(role, actorId, clip);
   if (clip.status !== "rejected") throw new Error("Only a rejected post has a rejection reason to edit.");
   if (clip.rejectionReason === reason) throw new Error("That is already the rejection reason.");
 
@@ -545,6 +555,7 @@ export async function setQualifyingAudiencePct(actorId: string, campaignId: stri
   const role = await requireRole(actorId, campaignId, "mod");
   const pct = pctSchema.parse(rawPct);
   const clip = await loadClip(campaignId, clipId);
+  assertNotOwnPost(role, actorId, clip);
   if (clip.paidStatus === "paid") throw new Error("This post has already been paid.");
   // CLAUDE.md verification flow: proof must exist before a % can be entered.
   if (!hasAnalyticsProof(clip)) throw new Error("Analytics proof is missing — the creator must attach it before a Qualifying Audience % can be entered.");
@@ -583,6 +594,7 @@ export async function setManualViews(actorId: string, campaignId: string, clipId
   const role = await requireRole(actorId, campaignId, "mod");
   const manualViews = manualViewsSchema.parse(rawViews);
   const clip = await loadClip(campaignId, clipId);
+  assertNotOwnPost(role, actorId, clip);
   if (clip.paidStatus === "paid") throw new Error("This post has already been paid.");
   if (!canSetManualViews(clip)) {
     throw new Error(
@@ -618,9 +630,10 @@ const postedAtSchema = z.coerce.date().refine((d) => d.getTime() <= Date.now(), 
  * it into "pending" immediately — no need to wait for the creator to resubmit or the next cron pass.
  */
 export async function setPostedAt(actorId: string, campaignId: string, clipId: string, rawDate: unknown) {
-  await requireRole(actorId, campaignId, "mod");
+  const role = await requireRole(actorId, campaignId, "mod");
   const postedAt = postedAtSchema.parse(rawDate);
   const clip = await loadClip(campaignId, clipId);
+  assertNotOwnPost(role, actorId, clip);
   if (clip.postedAt !== null) throw new Error("This post's date is already known.");
 
   const shouldUnlock = clip.status === "awaiting_analytics" && hasAnalyticsProof(clip) && !analyticsGateState({ ...clip, postedAt }).locked;
@@ -645,8 +658,9 @@ export async function setPostedAt(actorId: string, campaignId: string, clipId: s
  * events.
  */
 export async function unlockAnalyticsEarly(actorId: string, campaignId: string, clipId: string) {
-  await requireRole(actorId, campaignId, "mod");
+  const role = await requireRole(actorId, campaignId, "mod");
   const clip = await loadClip(campaignId, clipId);
+  assertNotOwnPost(role, actorId, clip);
   if (clip.analyticsUnlockedEarlyAt !== null) throw new Error("This post has already been unlocked early.");
   if (!analyticsGateState(clip).locked) throw new Error("This post isn't currently gate-locked.");
 
@@ -674,16 +688,15 @@ export async function unlockAnalyticsEarly(actorId: string, campaignId: string, 
 // ---------------------------------------------------------------------------------------------
 
 export async function markPaid(actorId: string, campaignId: string, clipId: string) {
-  const role = await requireRole(actorId, campaignId, "mod");
+  // Owner/Admin only. A Mod/CPE can review but never marks paid, so the role check comes first.
+  const role = await requireRole(actorId, campaignId, "admin");
   const clip = await loadClip(campaignId, clipId);
   if (clip.status !== "approved") throw new Error("Only approved posts can be marked paid.");
   if (clip.paidStatus === "paid") throw new Error("This post is already marked paid.");
   if (clip.payout === null || Number(clip.payout) <= 0) throw new Error("Nothing is owed on this post yet.");
 
   const campaign = await loadCampaign(campaignId);
-  if (!roleCanMarkPaid(role, clip.payout, campaign.modMarkPaidThreshold)) {
-    throw new Error("Access denied: this payout is above the Mod mark-paid threshold — an Admin or Owner must mark it paid.");
-  }
+  if (!roleCanMarkPaid(role)) throw new Error("Access denied: only an Admin or Owner can mark a post paid.");
   if (wouldExceedBudget(campaign.budgetSpent, clip.payout, campaign.totalBudget)) {
     throw new Error("Marking this paid would exceed the campaign's total budget.");
   }

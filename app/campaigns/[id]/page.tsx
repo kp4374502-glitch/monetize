@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUserId } from "@/lib/auth/ensure-user";
 import { getCampaignForUser, getRoleForCampaign } from "@/lib/auth/roles";
-import { listBrands, listInviteLinks } from "@/lib/campaigns/service";
+import { listAssignableUsernames, listBrands, listInviteLinks, listMods } from "@/lib/campaigns/service";
 import { CREATOR_ROSTER_LIMIT, getBrandClipFeed, getClipHistory, getCreatorClips, getCreatorRoster, getReviewQueue } from "@/lib/clips/service";
 import { CreatorRoster } from "@/components/clips/creator-roster";
 import { CreatorClips } from "@/components/clips/creator-clips";
@@ -14,19 +14,14 @@ import { money } from "@/components/clips/clip-parts";
 import { effectiveViews } from "@/lib/clips/rules";
 import { getCampaignChannels } from "@/lib/channels/service";
 import { ChannelsPanel } from "@/components/channels/channels-panel";
-import {
-  addBrandAction,
-  generateInviteLinkAction,
-  removeBrandAction,
-  revokeInviteLinkAction,
-  setLifecycleAction,
-} from "../actions";
+import { generateInviteLinkAction, revokeInviteLinkAction, setLifecycleAction } from "../actions";
+import { addBrandViewerAction, addModAction, removeBrandViewerAction, removeModAction } from "../team-actions";
+import { AssignForm, RemoveForm } from "@/components/team/assign-form";
 import { refreshCampaignViewsAction } from "../clip-actions";
 import { ActionForm } from "@/components/action-form";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, SectionHeader, StatCard } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 
 /** Campaign dashboard: creators see their own clips; Brand sees a read-only feed; Mods/Admins/Owner see the review queue. */
 export default async function CampaignPage({ params }: { params: Promise<{ id: string }> }) {
@@ -47,6 +42,8 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
   const history = canInvite ? await getClipHistory(userId, id) : null;
   const roster = canInvite ? await getCreatorRoster(userId, id) : null;
   const brands = isAdmin ? await listBrands(userId, id) : [];
+  const mods = isAdmin ? await listMods(userId, id) : [];
+  const assignable = isAdmin ? await listAssignableUsernames(userId, id) : [];
   // The channels panel is for everyone on the campaign except Brand viewers.
   const channelData = role !== "brand" ? await getCampaignChannels(userId, id) : null;
   const panelChannels = channelData?.channels.map((c) => ({
@@ -153,7 +150,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
               </p>
             )}
           </div>
-          <ReviewQueue campaignId={id} pending={queue.pending} awaitingPayment={queue.awaitingPayment} canDelete={isAdmin} canClipApprove={isAdmin} />
+          <ReviewQueue campaignId={id} pending={queue.pending} awaitingPayment={queue.awaitingPayment} canDelete={isAdmin} canClipApprove={isAdmin} canMarkPaid={isAdmin} />
         </>
       )}
       {history && <ClipHistory history={history} campaignId={id} canDelete={isAdmin} canReverseRejection={isAdmin} canEditReason />}
@@ -192,30 +189,44 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
       )}
 
       {isAdmin && (
-        <section>
-          <SectionHeader
-            title="Brand viewers"
-            description="Read-only access for this campaign's brand — sees every post and aggregate stats, never who submitted it."
-            action={
-              <form action={addBrandAction.bind(null, id)} className="flex items-center gap-2">
-                <Input name="username" placeholder="Username" required className="w-40" />
-                <Button type="submit" size="sm">Add</Button>
-              </form>
-            }
-          />
-          <Card>
-            {brands.length === 0 && <p className="text-sm text-text-secondary">No brand viewers yet.</p>}
-            <ul className="grid grid-cols-1 gap-2.5">
-              {brands.map((b) => (
-                <li key={b.id} className="flex flex-wrap items-center justify-between gap-3 text-sm" data-testid="brand-row">
-                  <span className="font-bold">{b.username}</span>
-                  <form action={removeBrandAction.bind(null, id, b.id)}>
-                    <Button variant="outline" size="sm" type="submit">Remove</Button>
-                  </form>
-                </li>
-              ))}
-            </ul>
-          </Card>
+        <section data-testid="team-section" className="space-y-8">
+          <div>
+            <SectionHeader
+              title="Mod / CPE"
+              description="Reviews posts on this campaign only. Can't mark paid, delete, Post Approve or change settings. One campaign at a time."
+              action={<AssignForm action={addModAction.bind(null, id)} usernames={assignable} listId="assignable-mods" submitLabel="Add Mod / CPE" />}
+            />
+            <Card>
+              {mods.length === 0 && <p className="text-sm text-text-secondary">No Mods or CPEs yet.</p>}
+              <ul className="grid grid-cols-1 gap-2.5">
+                {mods.map((m) => (
+                  <li key={m.id} className="flex flex-wrap items-center justify-between gap-3 text-sm" data-testid="mod-row">
+                    <span className="font-bold">{m.username}</span>
+                    <RemoveForm action={removeModAction.bind(null, id, m.id)} confirmText={`Remove ${m.username} as Mod / CPE?`} />
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </div>
+
+          <div>
+            <SectionHeader
+              title="Brand viewers"
+              description="Read-only access for this campaign's brand — sees every post and aggregate stats, never who submitted it."
+              action={<AssignForm action={addBrandViewerAction.bind(null, id)} usernames={assignable} listId="assignable-brands" submitLabel="Add Brand" />}
+            />
+            <Card>
+              {brands.length === 0 && <p className="text-sm text-text-secondary">No brand viewers yet.</p>}
+              <ul className="grid grid-cols-1 gap-2.5">
+                {brands.map((b) => (
+                  <li key={b.id} className="flex flex-wrap items-center justify-between gap-3 text-sm" data-testid="brand-row">
+                    <span className="font-bold">{b.username}</span>
+                    <RemoveForm action={removeBrandViewerAction.bind(null, id, b.id)} confirmText={`Remove ${b.username} as Brand viewer?`} />
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </div>
         </section>
       )}
       </div>

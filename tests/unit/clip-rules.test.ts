@@ -28,15 +28,15 @@ describe("budget cap", () => {
   });
 });
 
-describe("Mod mark-paid threshold", () => {
-  it("lets a Mod mark paid at or below the threshold only", () => {
-    expect(roleCanMarkPaid("mod", "50.00", "50")).toBe(true);
-    expect(roleCanMarkPaid("mod", "50.01", "50")).toBe(false);
+describe("who can mark a post paid", () => {
+  it("is Owner and Admin only", () => {
+    expect(roleCanMarkPaid("owner")).toBe(true);
+    expect(roleCanMarkPaid("admin")).toBe(true);
   });
-  it("has no limit for Admin/Owner, and never lets a Creator", () => {
-    expect(roleCanMarkPaid("admin", "99999", "50")).toBe(true);
-    expect(roleCanMarkPaid("owner", "99999", "50")).toBe(true);
-    expect(roleCanMarkPaid("creator", "1", "50")).toBe(false);
+  it("never lets a Mod/CPE, Brand or Creator", () => {
+    expect(roleCanMarkPaid("mod")).toBe(false);
+    expect(roleCanMarkPaid("brand")).toBe(false);
+    expect(roleCanMarkPaid("creator")).toBe(false);
   });
 });
 

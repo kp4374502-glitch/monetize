@@ -72,6 +72,7 @@ export function ReviewQueue({
   awaitingPayment,
   canDelete = false,
   canClipApprove = false,
+  canMarkPaid = false,
 }: {
   campaignId: string;
   pending: Row[];
@@ -80,6 +81,8 @@ export function ReviewQueue({
   canDelete?: boolean;
   /** Admin/Owner only — gates the Post Approve button. Mod keeps Analytics Approve and Reject, unchanged. */
   canClipApprove?: boolean;
+  /** Owner/Admin only. Server re-checks regardless. */
+  canMarkPaid?: boolean;
 }) {
   return (
     <>
@@ -160,9 +163,11 @@ export function ReviewQueue({
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     {canClipApprove && <ClipApproveButton campaignId={campaignId} clip={c} />}
-                    <ActionForm action={markPaidAction.bind(null, campaignId, c.id)}>
-                      <Button type="submit" size="sm" disabled={c.payout === null}>Mark paid</Button>
-                    </ActionForm>
+                    {canMarkPaid && (
+                      <ActionForm action={markPaidAction.bind(null, campaignId, c.id)}>
+                        <Button type="submit" size="sm" disabled={c.payout === null}>Mark paid</Button>
+                      </ActionForm>
+                    )}
                     {canRejectInline(c) && <InlineRejectForm campaignId={campaignId} clipId={c.id} />}
                     {canDelete && <DeleteClipButton campaignId={campaignId} clipId={c.id} />}
                   </div>

@@ -15,7 +15,8 @@ export const campaignFieldsSchema = z.object({
   maxPayPerPost: money("Max pay per post"),
   viewMinimum: z.coerce.number().int("View minimum must be a whole number").nonnegative().default(1000),
   totalBudget: money("Total budget"),
-  modMarkPaidThreshold: money("Mod mark-paid threshold"),
+  // Retired: only Owner/Admin mark paid now. The column stays (additive-only schema) and is always stored as 0.
+  modMarkPaidThreshold: money("Mod mark-paid threshold").default(0),
   dailySubmissionLimit: z.coerce.number().int().positive("Daily limit must be at least 1").default(100),
   eligiblePlatforms: z.array(z.enum(PLATFORMS)).min(1, "Select at least one platform"),
 });

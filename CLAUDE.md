@@ -35,9 +35,11 @@ Each role's exact permissions are fully enumerated in docs/PRODUCT_SPEC.md → "
 Quick summary:
 - **Owner** — exactly one platform-wide Owner; also one Owner per campaign (transferable). Top
   authority, no restrictions.
-- **Admin** — platform-wide, automatically active on every campaign, strict superset of Mod.
-- **Mod** — explicitly assigned per campaign, one campaign at a time, capped Mark-Paid authority
-  (`campaigns.mod_mark_paid_threshold`).
+- **Admin** — platform-wide, automatically active on every campaign, strict superset of Mod. Made by
+  the platform Owner only (header "Team" page).
+- **Mod / CPE** — assigned per campaign by Owner/Admin, one campaign at a time. Reviews posts but can
+  never mark paid, delete or Post Approve. **Only Owner and Admin mark paid.**
+- **Brand** — read-only viewer, assigned per campaign by Owner/Admin, one campaign at a time.
 - **Creator** — self-serve sign-up + onboarding (/sign-up -> /onboarding -> /explore), then joins active campaigns in one click or via reusable invite links, fully isolated from other creators'
   data.
 
@@ -47,8 +49,8 @@ CPM      = (Qualifying Audience % ÷ Divisor) × Base Rate
 Earnings = CPM × (Views ÷ 1000)
 Payout   = min(Earnings, Max Pay Per Post)
 ```
-`Base Rate`, `Divisor`, `Max Pay Per Post`, `View Minimum`, `Total Budget`, and
-`Mod Mark-Paid Threshold` all live on the `campaigns` row — never hardcode them. Full detail and a
+`Base Rate`, `Divisor`, `Max Pay Per Post`, `View Minimum` and `Total Budget` all live on the
+`campaigns` row — never hardcode them. (`mod_mark_paid_threshold` is retired and unused.) Full detail and a
 worked example are in docs/PRODUCT_SPEC.md → "Payout formula".
 
 ## Verification flow

@@ -46,11 +46,9 @@ export function wouldExceedBudget(budgetSpent: number | string, payout: number |
   return toCents(budgetSpent) + toCents(payout) > toCents(totalBudget);
 }
 
-/** A Mod may mark paid only up to the threshold; Admin/Owner are unlimited. Brand/Creator: never (requireRole("mod") already blocks them from reaching here). */
-export function roleCanMarkPaid(role: "owner" | "admin" | "mod" | "brand" | "creator", payout: number | string, threshold: number | string) {
-  if (role === "owner" || role === "admin") return true;
-  if (role === "mod") return toCents(payout) <= toCents(threshold);
-  return false;
+/** Only Owner and Admin may mark a post paid. Mod/CPE, Brand and Creator never can (the Mod threshold no longer exists). */
+export function roleCanMarkPaid(role: "owner" | "admin" | "mod" | "brand" | "creator") {
+  return role === "owner" || role === "admin";
 }
 
 /**

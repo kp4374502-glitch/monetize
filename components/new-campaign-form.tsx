@@ -50,7 +50,6 @@ export function NewCampaignForm({ brands = [] }: { brands?: { userId: string; br
           <h2 className="mb-4 text-sm font-bold uppercase tracking-widest text-text-secondary">Budget &amp; limits</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Total budget ($)"><Input name="totalBudget" type="number" step="0.01" min="0" required /></Field>
-            <Field label="Mod mark-paid threshold ($)"><Input name="modMarkPaidThreshold" type="number" step="0.01" min="0" required /></Field>
             <Field label="Daily submission limit"><Input name="dailySubmissionLimit" type="number" min="1" defaultValue={100} /></Field>
           </div>
           <fieldset className="mt-5">
