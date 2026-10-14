@@ -64,6 +64,7 @@ export function ClipHistoryBrowser({
   canReview = false,
   canClipApprove = false,
   canReverseRejection = false,
+  canMarkPaid = false,
 }: {
   campaignId: string;
   basePath: string;
@@ -88,12 +89,14 @@ export function ClipHistoryBrowser({
   creator?: { id: string; username: string };
   /** Owner/Admin only — the server re-checks this regardless of what's rendered. */
   canDelete?: boolean;
-  /** Mod/Admin/Owner — gates the manual post-date form and the Mark paid button. Server re-checks regardless (Mod threshold, budget cap). */
+  /** Mod/Admin/Owner — gates the manual post-date form and inline review actions. Server re-checks regardless. */
   canReview?: boolean;
   /** Admin/Owner only — gates the Post Approve button. Server re-checks regardless. */
   canClipApprove?: boolean;
   /** Admin/Owner only — gates reversing a Rejected clip back to Approved. Server re-checks regardless. */
   canReverseRejection?: boolean;
+  /** Owner/Admin only — gates the Mark paid button. Server re-checks regardless (role, budget cap). */
+  canMarkPaid?: boolean;
 }) {
   const filtered = status !== "all" || !!from || !!to;
   return (
@@ -242,7 +245,7 @@ export function ClipHistoryBrowser({
                       <PctForm campaignId={campaignId} clip={c} />
                     </div>
                   )}
-                  {canReview && c.status === "approved" && c.paidStatus !== "paid" && (
+                  {canMarkPaid && c.status === "approved" && c.paidStatus !== "paid" && (
                     <ActionForm action={markPaidAction.bind(null, campaignId, c.id)} className="mt-1.5">
                       <Button type="submit" size="sm" disabled={c.payout === null} data-testid="history-mark-paid">
                         Mark paid

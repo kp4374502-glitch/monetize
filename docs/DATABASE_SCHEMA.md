@@ -19,7 +19,7 @@ Every table holding campaign-specific data carries a `campaign_id` — this is t
 - `base_rate`, `divisor` (default 50), `max_pay_per_post`
 - `view_minimum`
 - `total_budget`, `budget_spent` (running total)
-- `mod_mark_paid_threshold`
+- `mod_mark_paid_threshold` — retired: always stored as 0 and not read anywhere (only Owner/Admin mark paid). Column kept so migrations stay additive.
 - `daily_submission_limit` (default 100)
 - `eligible_platforms` (array: tiktok, instagram, youtube)
 - `created_at`, `closed_at`
@@ -201,5 +201,5 @@ Self-serve creator onboarding answers (one row per user, NOT campaign-scoped —
 
 - **Daily submission limit:** enforced with a rolling count against `clips.submitted_at` per `(campaign_id, creator_user_id)`, compared to `campaigns.daily_submission_limit`.
 - **Budget cap:** before approving or marking a clip paid, check `campaigns.budget_spent + clip.payout <= campaigns.total_budget`.
-- **Mod pay threshold:** a Mod may set `paid_status = paid` only when `clip.payout <= campaigns.mod_mark_paid_threshold`; above it, the write is rejected unless the actor is Admin or Owner.
+- **Mark paid:** only Admin or Owner may set `paid_status = paid`; a Mod/CPE is refused at any amount. (`campaigns.mod_mark_paid_threshold` is retired.)
 - **Admin scope:** Admin authority is computed as "is this user in `platform_admins`?" — no join against `campaign_mods` needed, since it applies to every campaign implicitly.

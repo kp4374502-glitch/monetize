@@ -25,6 +25,7 @@ import * as clipSvc from "@/lib/clips/service";
 import * as creatorSvc from "@/lib/creators/service";
 import * as brand from "@/lib/brand/service";
 import * as channelSvc from "@/lib/channels/service";
+import * as teamSvc from "@/lib/team/service";
 import { getCampaignForUser, getCampaignsForUser, getRoleForCampaign, isPlatformAdmin, isPlatformOwner, requireRole } from "@/lib/auth/roles";
 
 /**
@@ -127,6 +128,15 @@ describe("a brand-new account (users row with no roles) and one that never logge
       await denied(clipSvc.deleteClip(who, camp, clipId)); // Owner/Admin only, per Task 5
       await denied(clipSvc.setPostedAt(who, camp, clipId, "2020-01-01")); // Mod/Admin/Owner only, per Task 5 Part 3
       await denied(clipSvc.unlockAnalyticsEarly(who, camp, clipId)); // Mod/Admin/Owner only
+      // role assignment: Mod/CPE and Brand are Owner/Admin only, Admin is platform-Owner only
+      await denied(campaignSvc.addMod(who, camp, "creator"));
+      await denied(campaignSvc.removeMod(who, camp, "00000000-0000-0000-0000-000000000000"));
+      await denied(campaignSvc.listMods(who, camp));
+      await denied(campaignSvc.listAssignableUsernames(who, camp));
+      await denied(campaignSvc.addBrand(who, camp, "creator"));
+      await denied(teamSvc.addPlatformAdmin(who, "creator"));
+      await denied(teamSvc.removePlatformAdmin(who, "admin"));
+      await denied(teamSvc.listPlatformAdmins(who));
       // campaign channels: not a member, so neither readable nor writable
       await denied(channelSvc.getCampaignChannels(who, camp));
       await denied(channelSvc.markChannelRead(who, camp, "announcements"));
@@ -237,6 +247,8 @@ describe("campaign_brands (read-only Brand role)", () => {
     await denied(clipSvc.updateRejectionReason("brandviewer", camp, clipId, "new reason"));
     await denied(clipSvc.refreshViews("brandviewer", camp, clipId));
     await denied(clipSvc.getProofImage("brandviewer", camp, clipId));
+    await denied(campaignSvc.addMod("brandviewer", camp, "creator")); // a Brand viewer can't assign roles
+    await denied(teamSvc.addPlatformAdmin("brandviewer", "creator"));
     await denied(channelSvc.getCampaignChannels("brandviewer", camp)); // Brand never sees the channels
     await denied(channelSvc.markChannelRead("brandviewer", camp, "announcements"));
     await denied(channelSvc.createChannelPost("brandviewer", camp, { channel: "announcements", title: "hi", body: "hi", links: [] }));

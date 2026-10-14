@@ -14,7 +14,6 @@ function parseCampaignForm(fd: FormData) {
     maxPayPerPost: fd.get("maxPayPerPost"),
     viewMinimum: fd.get("viewMinimum") || undefined,
     totalBudget: fd.get("totalBudget"),
-    modMarkPaidThreshold: fd.get("modMarkPaidThreshold"),
     dailySubmissionLimit: fd.get("dailySubmissionLimit") || undefined,
     eligiblePlatforms: fd.getAll("eligiblePlatforms"),
   };
@@ -62,18 +61,6 @@ export async function redeemInviteAction(code: string) {
   const userId = await requireUserId();
   const campaign = await svc.redeemInvite(userId, code);
   redirect(`/campaigns/${campaign.id}`);
-}
-
-export async function addBrandAction(campaignId: string, fd: FormData) {
-  const userId = await requireUserId();
-  await svc.addBrand(userId, campaignId, String(fd.get("username") ?? "").trim());
-  revalidatePath(`/campaigns/${campaignId}`);
-}
-
-export async function removeBrandAction(campaignId: string, brandRowId: string) {
-  const userId = await requireUserId();
-  await svc.removeBrand(userId, campaignId, brandRowId);
-  revalidatePath(`/campaigns/${campaignId}`);
 }
 
 /** One-click join from the /explore directory of active campaigns. */

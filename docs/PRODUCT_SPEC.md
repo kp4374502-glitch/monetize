@@ -48,11 +48,11 @@ A platform-wide **Admin is a strict superset of Mod** — anything a Mod can do,
 
 **People**
 
-- Can add or remove Mods.
-- Can add or remove other Admins.
+- Can add or remove Mods/CPEs and Brand viewers on any campaign, picking from everyone who has signed up (see "Role assignment" below).
+- **Cannot** make or remove other Admins — that is the platform Owner's call alone.
 - Can generate and revoke creator invite links.
 - Can remove/ban a creator from a campaign.
-- Can change anyone's role (promote/demote Creator ↔ Mod ↔ Admin).
+- Cannot change anyone's platform-wide role.
 - The **Owner**, in turn, can remove or demote an Admin.
 
 **Clip review**
@@ -102,7 +102,7 @@ Unlike Admin, a Mod is **not** automatic across campaigns — they must be expli
 
 - Cannot edit campaign payout settings (Base Rate, Divisor, Max Pay, View Minimum, Total Budget).
 - Cannot pause or close a campaign.
-- Can mark a clip "Mark paid" **only up to the campaign's Mod Mark-Paid Threshold**; above that dollar amount, only Admin/Owner can mark it paid.
+- **Cannot mark a clip paid, at any amount** — "Mark paid" is Owner/Admin only. (The old Mod Mark-Paid Threshold setting is retired.)
 - Can see the campaign's financial totals (earned/owed).
 - Can see the campaign's remaining Total Budget.
 
@@ -142,7 +142,7 @@ Unlike Admin, a Mod is **not** automatic across campaigns — they must be expli
 
 **Money**
 
-- Can mark any clip paid regardless of amount — the Mod Mark-Paid Threshold doesn't apply to Owner (or Admin).
+- Can mark any clip paid regardless of amount. Owner and Admin are the only roles that can.
 - Gets an alert when a campaign's Total Budget is close to running out.
 - Can reverse/undo a "Mark paid" status if it was marked by mistake.
 
@@ -324,7 +324,7 @@ A rejected clip is excluded from "Waiting for Post Approved" because it's a dead
 
 **Naming:** the status badge, the dashboard section ("Analytics Approved — awaiting payment") and the History "Analytics Approved" tile all say "Analytics Approved" for `status = approved`. "Post Approved" remains the separate step-1 badge.
 
-**Mark paid from History.** Every approved, unpaid History row (most usefully under "Waiting for Payment") has a "Mark paid" button for Mod/Admin/Owner, the same `markPaid` action as the dashboard's "Approved — awaiting payment" list, so the Mod threshold, budget cap, and approved + unpaid + payout > 0 rules apply identically (enforced server-side). Once paid, the row moves from "Waiting for Payment" to "Paid" on the next load.
+**Mark paid from History.** Every approved, unpaid History row (most usefully under "Waiting for Payment") has a "Mark paid" button for Admin/Owner only, the same `markPaid` action as the dashboard's "Approved — awaiting payment" list, so the role check, budget cap, and approved + unpaid + payout > 0 rules apply identically (enforced server-side). Once paid, the row moves from "Waiting for Payment" to "Paid" on the next load.
 
 **Backfill (existing clips, applied once on deploy):** clips already `approved` or `paid` → `clip_approved = true` retroactively (they already passed full review, so they clearly passed the content bar too). Clips `rejected` → left `false` (a past rejection stands; not implied to have been content-approved). Clips `pending`/`awaiting_analytics` → left `false` — genuinely not yet Post Approved; reviewers work through them going forward with the new button.
 
@@ -355,7 +355,7 @@ worth $1.56 CPM at a $1.00 Base Rate; it's worth $1.00, same as exactly 50% or a
 | Qualifying Audience % | Admin/Mod, per clip | — (manually entered from proof) |
 | View Minimum | Campaign | e.g. 1,000 views |
 | Total Budget | Campaign | e.g. $10,000 — approvals/payouts stop once spent |
-| Mod Mark-Paid Threshold | Campaign (Owner/Admin) | e.g. $50 — Mods can mark clips paid up to this amount; above it, only Admin/Owner can |
+| ~~Mod Mark-Paid Threshold~~ | retired | No longer used: only Admin/Owner mark paid. The column remains (always 0) but nothing reads it |
 
 **Worked example** (Divisor 50, Base Rate $1.00): a clip with 25% qualifying audience → CPM = (25÷50)×$1.00 = $0.50. At 4,000,000 views → Earnings = $0.50 × 4,000 = $2,000 → capped at the campaign's Max Pay Per Post (e.g. $500), so the clip pays out $500, not $2,000.
 
@@ -395,6 +395,22 @@ New capability (the original Monetize build had none). **In-app only** — no em
 **Delivery:** a bell icon with a dropdown list, notifications persist until the user dismisses them (standard SaaS pattern) — not a disappearing toast.
 
 **Events that trigger a notification** (kept to the essentials): clip approved, clip rejected (with reason), payout marked paid, a reviewer reminder when a clip's proof is still missing 7 days after submission, and (Task 5 Part 3) a creator notification once their clip's 7-day analytics window clears and they haven't submitted proof yet — sent at most once per clip.
+
+## Role assignment
+
+Every campaign has the same cast: **Owner, Admin, Brand, Mod/CPE, Creator**. Creators sign up themselves; everyone else is *promoted from signed-up accounts* (the person must have signed in once, which creates their account here).
+
+| Role | Scope | Who assigns | Where |
+| --- | --- | --- | --- |
+| Admin | Platform-wide, every campaign | **Platform Owner only** | Header "Team" page (`/team`) |
+| Mod / CPE | One campaign at a time | Owner or Admin | That campaign's page, "Mod / CPE" |
+| Brand viewer | One campaign at a time, read-only | Owner or Admin | That campaign's page, "Brand viewers" |
+
+- Each form is a username box with a dropdown of eligible signed-up accounts (the Owner, Admins, and people already holding that role on this campaign are left out).
+- **Mod/CPE** reviews posts on their one campaign. They can Analytics Approve, reject, enter the audience %, generate invite links and refresh views. They **cannot** mark paid, delete, Post Approve, change settings, or assign roles. "CPE" is an internal label; in the app it is the Mod role.
+- **Only Owner and Admin mark paid.**
+- A creator can also be made a Mod/CPE on a campaign they joined: both memberships are kept and the Mod role wins. A Mod/CPE can never review, price or otherwise act on their **own** posts (another Mod, an Admin or the Owner has to).
+- A person can't be both Mod/CPE and Brand viewer on the same campaign, and an Owner/Admin can't be given a campaign-scoped role (they already see every campaign).
 
 ## Campaign channels
 
@@ -516,7 +532,7 @@ Tailwind CSS + shadcn/ui, with the tokens above wired into Tailwind's theme conf
 
 Full coverage: unit + integration + e2e.
 
-- **Unit:** Vitest, covering business logic in isolation — the payout formula (CPM/Earnings/Payout math, including the Max Pay Per Post cap and Mod Mark-Paid Threshold), role/permission resolution, and the daily submission-limit calculation.
+- **Unit:** Vitest, covering business logic in isolation — the payout formula (CPM/Earnings/Payout math, including the Max Pay Per Post cap, and who may mark paid), role/permission resolution, and the daily submission-limit calculation.
 - **Integration:** Server Actions tested end-to-end against a real test database (a disposable Postgres schema or a tool like Testcontainers) — this is where the cross-tenant isolation tests from Task 1 belong, plus things like "a Mod above the pay threshold gets rejected."
 - **E2E:** Playwright, simulating real flows in a browser — at minimum: a creator signs up via invite link and submits a clip; an Admin/Mod reviews, sets Qualifying Audience %, and approves it; a payout appears and gets marked paid.
 - **CI:** tests run automatically on every pull request via GitHub Actions before merge — flag if a different CI setup is preferred.

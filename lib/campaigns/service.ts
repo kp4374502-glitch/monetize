@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, notInArray } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 import { db } from "../db/client";
 import {
@@ -8,13 +8,14 @@ import {
   campaignChannelReads,
   campaignCreators,
   campaignMods,
+  platformAdmins,
   clipReviewEvents,
   clips,
   inviteLinks,
   notifications,
   users,
 } from "../../drizzle/schema";
-import { getRoleForCampaign, isPlatformOwner, requireRole } from "../auth/roles";
+import { getRoleForCampaign, isPlatformAdmin, isPlatformOwner, requireRole } from "../auth/roles";
 import { isApprovedBrand } from "../brand/service";
 import { createCampaignSchema, updateCampaignSchema } from "./schemas";
 
@@ -144,19 +145,109 @@ export async function listInviteLinks(actorId: string, campaignId: string) {
 // enforced by campaign_brands' unique(user_id), same shape as campaign_mods.
 // ---------------------------------------------------------------------------------------------
 
+const isUniqueViolation = (e: unknown) =>
+  String((e as { cause?: { code?: string }; code?: string })?.cause?.code ?? (e as { code?: string })?.code) === "23505";
+
+/**
+ * Finds the person a Mod/Brand assignment is for, by username. They must have signed up and signed in
+ * once (that's what creates their users row). Owner/Admin already see every campaign, so assigning them
+ * a campaign-scoped role would be meaningless and is refused.
+ */
+async function resolveAssignee(username: string) {
+  const name = username.trim();
+  if (!name) throw new Error("Enter a username.");
+  const [user] = await db
+    .select({ id: users.id, username: users.username, isPlatformOwner: users.isPlatformOwner })
+    .from(users)
+    .where(eq(users.username, name))
+    .limit(1);
+  if (!user) throw new Error(`No user with username "${name}". They need to sign up and sign in once first.`);
+  if (user.isPlatformOwner || (await isPlatformAdmin(user.id))) {
+    throw new Error(`${user.username} is already an Owner/Admin and has access to every campaign.`);
+  }
+  return user;
+}
+
+/** Brand viewer: read-only, one campaign at a time. Owner/Admin assign. */
 export async function addBrand(actorId: string, campaignId: string, username: string) {
   await requireRole(actorId, campaignId, "admin");
-  const [user] = await db.select({ id: users.id }).from(users).where(eq(users.username, username)).limit(1);
-  if (!user) throw new Error(`No user with username "${username}".`);
+  const user = await resolveAssignee(username);
+  const [alsoMod] = await db
+    .select({ id: campaignMods.id })
+    .from(campaignMods)
+    .where(and(eq(campaignMods.campaignId, campaignId), eq(campaignMods.userId, user.id)))
+    .limit(1);
+  if (alsoMod) throw new Error(`${user.username} is a Mod/CPE on this campaign. Remove that first.`);
   try {
     const [row] = await db.insert(campaignBrands).values({ campaignId, userId: user.id, addedBy: actorId }).returning();
     return row;
   } catch (e) {
-    if (String((e as { cause?: { code?: string }; code?: string })?.cause?.code ?? (e as { code?: string })?.code) === "23505") {
-      throw new Error("That user is already the Brand viewer on another campaign (one campaign at a time).");
+    if (isUniqueViolation(e)) {
+      throw new Error("That user is already the Brand viewer on a campaign (one campaign at a time).");
     }
     throw e;
   }
+}
+
+/**
+ * Mod/CPE: reviews posts on this one campaign (one campaign at a time) but can never mark paid, delete,
+ * Post Approve or change settings. Owner/Admin assign.
+ */
+export async function addMod(actorId: string, campaignId: string, username: string) {
+  await requireRole(actorId, campaignId, "admin");
+  const user = await resolveAssignee(username);
+  const [alsoBrand] = await db
+    .select({ id: campaignBrands.id })
+    .from(campaignBrands)
+    .where(and(eq(campaignBrands.campaignId, campaignId), eq(campaignBrands.userId, user.id)))
+    .limit(1);
+  if (alsoBrand) throw new Error(`${user.username} is a Brand viewer on this campaign. Remove that first.`);
+  try {
+    const [row] = await db.insert(campaignMods).values({ campaignId, userId: user.id, addedBy: actorId }).returning();
+    return row;
+  } catch (e) {
+    if (isUniqueViolation(e)) {
+      throw new Error("That user is already a Mod/CPE on a campaign (one campaign at a time).");
+    }
+    throw e;
+  }
+}
+
+export async function removeMod(actorId: string, campaignId: string, modRowId: string) {
+  await requireRole(actorId, campaignId, "admin");
+  await db.delete(campaignMods).where(and(eq(campaignMods.id, modRowId), eq(campaignMods.campaignId, campaignId)));
+}
+
+export async function listMods(actorId: string, campaignId: string) {
+  await requireRole(actorId, campaignId, "admin");
+  return db
+    .select({ id: campaignMods.id, username: users.username, createdAt: campaignMods.createdAt })
+    .from(campaignMods)
+    .innerJoin(users, eq(users.id, campaignMods.userId))
+    .where(eq(campaignMods.campaignId, campaignId))
+    .orderBy(asc(users.username));
+}
+
+/**
+ * Usernames the Owner/Admin can pick from when assigning a Mod/CPE or Brand viewer on this campaign:
+ * everyone who has signed up, minus the Owner, Admins, and people already holding one of those two
+ * roles here. (A person already on another campaign is still listed; the one-campaign rule explains itself on add.)
+ */
+export async function listAssignableUsernames(actorId: string, campaignId: string, limit = 1000) {
+  await requireRole(actorId, campaignId, "admin");
+  const exclude = new Set<string>();
+  for (const r of await db.select({ id: platformAdmins.userId }).from(platformAdmins)) exclude.add(r.id);
+  for (const r of await db.select({ id: campaignMods.userId }).from(campaignMods).where(eq(campaignMods.campaignId, campaignId))) exclude.add(r.id);
+  for (const r of await db.select({ id: campaignBrands.userId }).from(campaignBrands).where(eq(campaignBrands.campaignId, campaignId))) exclude.add(r.id);
+  const notOwner = eq(users.isPlatformOwner, false);
+  const ids = [...exclude];
+  const rows = await db
+    .select({ username: users.username })
+    .from(users)
+    .where(ids.length ? and(notOwner, notInArray(users.id, ids)) : notOwner)
+    .orderBy(asc(users.username))
+    .limit(limit);
+  return rows.map((r) => r.username);
 }
 
 export async function removeBrand(actorId: string, campaignId: string, brandRowId: string) {
