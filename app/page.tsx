@@ -72,15 +72,15 @@ function Landing() {
         ))}
       </section>
 
-      {/* Closing CTA: same block as the marketing site's footer ("Ready to launch your campaign?") */}
+      {/* Closing CTA for creators: withdraw/view payouts (sign in first), or see the demo. */}
       <section className="border-t border-white/[0.08] px-4 py-14 text-center sm:py-20">
         <h2 className="mx-auto max-w-3xl text-[clamp(2rem,6.5vw,4.5rem)] font-medium leading-[1.02] tracking-[-0.05em]">
-          <span className="block">Ready to launch</span>
-          <span className="block">your campaign?</span>
+          <span className="block">Ready to withdraw</span>
+          <span className="block">your payout?</span>
         </h2>
         <div className="mx-auto mt-10 flex w-full max-w-2xl flex-col gap-3 sm:flex-row sm:justify-center">
-          <Link href="/brand-signup" className={buttonVariants({ variant: "primary", size: "lg", className: "min-h-14 flex-1" })}>
-            Launch a campaign
+          <Link href="/sign-in" className={buttonVariants({ variant: "primary", size: "lg", className: "min-h-14 flex-1" })}>
+            View your payouts
           </Link>
           <a href="https://usemonetize.co/#case-studies" className={buttonVariants({ variant: "outline", size: "lg", className: "min-h-14 flex-1" })}>
             See a Demo
