@@ -8,9 +8,11 @@ import { Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
 export function BrandFeed({
   rows,
   stats,
+  requireAnalyticsProof = true,
 }: {
   rows: ClipRow[];
   stats: { totalClips: number; totalViews: number; approvedViews: number; paidSoFar: string };
+  requireAnalyticsProof?: boolean;
 }) {
   return (
     <section className="space-y-4">
@@ -33,7 +35,7 @@ export function BrandFeed({
                 <Thumb clip={c} />
                 <div className="min-w-0 flex-1 text-sm">
                   <div className="flex flex-wrap items-center gap-2">
-                    <StatusBadge clip={c} />
+                    <StatusBadge clip={c} analytics={requireAnalyticsProof} />
                     <a
                       href={c.url}
                       target="_blank"

@@ -361,6 +361,15 @@ worth $1.56 CPM at a $1.00 Base Rate; it's worth $1.00, same as exactly 50% or a
 
 Nothing is owed until a clip is: (1) approved, (2) past the campaign's view minimum, and (3) has the analytics proof attached and a Qualifying Audience % entered.
 
+### Campaigns that don't use analytics
+
+A campaign can opt out of analytics (`campaigns.require_analytics_proof = false`; on by default for every campaign). It is paid on views alone:
+
+- **No proof, no 7-day wait, no Qualifying Audience %.** A new post goes straight to the review queue (`pending`), is priced from its views the moment it's submitted, and a reviewer approves it in one step ("Approve", not "Analytics Approve"). Creators see no proof prompts and can't submit proof; reviewers see no proof line or audience-% box, and the server refuses both.
+- **Every post is priced at a fixed 100% qualifying audience.** Because Base Rate is the CPM ceiling (above), 100% reaches the ceiling whenever the Divisor is 100 or less, so a post earns exactly the **Base Rate per 1,000 views** — e.g. Base Rate $0.10 → 100,000 views = $10.00. A Divisor above 100 would pay less than the Base Rate. Max Pay Per Post, View Minimum and Total Budget apply exactly as before.
+- **No proof reminders and no "you can now submit proof" notices** are sent for these campaigns.
+- Only the Owner can switch a campaign over (`disableAnalyticsProof`). It moves every post still stuck awaiting analytics into the review queue and re-prices the unpaid, non-rejected ones from their current views; **paid posts are never touched.** There is deliberately no switch back: re-enabling proof would zero the payout of any approved-but-unpaid post that never had proof, and that needs a business decision first.
+
 Once a campaign's Total Budget is fully spent, no further clips are approved or paid out on it — the Owner/Admin sees remaining budget and can raise the cap or close the campaign.
 
 ## Fraud prevention & rate limits

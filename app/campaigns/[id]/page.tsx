@@ -127,8 +127,8 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
       )}
 
       <div className={panelChannels ? "min-w-0 space-y-8 lg:col-start-1" : "contents"}>
-      {role === "creator" && <CreatorClips campaignId={id} clips={myClips} viewMinimum={campaign.viewMinimum} campaignStatus={campaign.status} />}
-      {brandFeed && <BrandFeed rows={brandFeed.rows} stats={brandFeed.stats} />}
+      {role === "creator" && <CreatorClips campaignId={id} clips={myClips} viewMinimum={campaign.viewMinimum} campaignStatus={campaign.status} requireAnalyticsProof={campaign.requireAnalyticsProof} />}
+      {brandFeed && <BrandFeed rows={brandFeed.rows} stats={brandFeed.stats} requireAnalyticsProof={campaign.requireAnalyticsProof} />}
       {roster && <CreatorRoster roster={roster} limit={CREATOR_ROSTER_LIMIT} campaignId={id} canViewDetails={isAdmin} />}
       {queue && (
         <>
@@ -151,10 +151,10 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
               </p>
             )}
           </div>
-          <ReviewQueue campaignId={id} pending={queue.pending} awaitingPayment={queue.awaitingPayment} canDelete={isAdmin} canClipApprove={isAdmin} canMarkPaid={isAdmin} />
+          <ReviewQueue campaignId={id} pending={queue.pending} awaitingPayment={queue.awaitingPayment} canDelete={isAdmin} canClipApprove={isAdmin} canMarkPaid={isAdmin} requireAnalyticsProof={campaign.requireAnalyticsProof} />
         </>
       )}
-      {history && <ClipHistory history={history} campaignId={id} canDelete={isAdmin} canReverseRejection={isAdmin} canEditReason />}
+      {history && <ClipHistory history={history} campaignId={id} canDelete={isAdmin} canReverseRejection={isAdmin} canEditReason requireAnalyticsProof={campaign.requireAnalyticsProof} />}
 
       {canInvite && (
         <section>

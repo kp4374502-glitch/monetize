@@ -56,6 +56,7 @@ export async function sendProofReminders(now: Date = new Date()): Promise<number
         ne(clips.status, "rejected"),
         ne(clips.status, "awaiting_analytics"),
         eq(campaigns.status, "active"),
+        eq(campaigns.requireAnalyticsProof, true), // a no-analytics campaign never has proof to chase
         lte(clips.submittedAt, cutoff),
       ),
     );

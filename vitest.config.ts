@@ -3,6 +3,9 @@ import path from "node:path";
 
 export default defineConfig({
   resolve: { alias: { "@": path.resolve(__dirname) } },
+  // tsconfig has jsx: "preserve" (Next compiles it), which Vite can't parse — only matters for tests
+  // that render a .tsx component.
+  oxc: { jsx: { runtime: "automatic" } },
   test: {
     include: ["tests/unit/**/*.test.ts", "tests/integration/**/*.test.ts"],
     testTimeout: 30000,

@@ -21,6 +21,19 @@ const STATUS_OPTIONS: { value: ClipHistoryStatusFilter; label: string }[] = [
   { value: "rejected", label: "Rejected" },
 ];
 
+/**
+ * A campaign without analytics has one approval and never collects a Qualifying Audience %, so the
+ * "waiting for audience %" stage doesn't exist and "waiting for analytics approved" is just "waiting
+ * for approval".
+ */
+function statusOptions(requireAnalyticsProof: boolean) {
+  if (requireAnalyticsProof) return STATUS_OPTIONS;
+  // No Post Approve step either, so "Waiting for Post Approved" would just list everything not yet rejected.
+  return STATUS_OPTIONS.filter((o) => o.value !== "waiting_audience_pct" && o.value !== "waiting_post_approved").map((o) =>
+    o.value === "waiting_analytics_approved" ? { ...o, label: "Waiting for Approval" } : o,
+  );
+}
+
 const onDate = (d: Date) => d.toISOString().slice(0, 10);
 const submittedOn = onDate;
 
@@ -65,7 +78,10 @@ export function ClipHistoryBrowser({
   canClipApprove = false,
   canReverseRejection = false,
   canMarkPaid = false,
+  requireAnalyticsProof = true,
 }: {
+  /** false = this campaign pays on views alone (see campaigns.require_analytics_proof). */
+  requireAnalyticsProof?: boolean;
   campaignId: string;
   basePath: string;
   status: ClipHistoryStatusFilter;
@@ -122,7 +138,7 @@ export function ClipHistoryBrowser({
           {creator && <input type="hidden" name="creator" value={creator.id} />}
           <Field label="Status" className="w-full sm:w-56">
             <AutoSubmitSelect name="status" defaultValue={status}>
-              {STATUS_OPTIONS.map((o) => (
+              {statusOptions(requireAnalyticsProof).map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
@@ -152,9 +168,9 @@ export function ClipHistoryBrowser({
       {/* The date range narrows this too, but the status tab never does — so it stays a stable overview while the list below is filtered by both. */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="history-summary">
         <StatCard label="Submitted" value={summary.total.toLocaleString()} valueTestId="history-total" emphasis />
-        <StatCard label="Waiting" value={summary.awaitingAnalytics.toLocaleString()} hint="for analytics" />
+        {requireAnalyticsProof && <StatCard label="Waiting" value={summary.awaitingAnalytics.toLocaleString()} hint="for analytics" />}
         <StatCard label="Pending" value={summary.pending.toLocaleString()} />
-        <StatCard label="Analytics Approved" value={summary.approved.toLocaleString()} />
+        <StatCard label={requireAnalyticsProof ? "Analytics Approved" : "Approved"} value={summary.approved.toLocaleString()} />
         <StatCard label="Rejected" value={summary.rejected.toLocaleString()} />
         <StatCard label="Paid" value={summary.paid.toLocaleString()} hint="posts" />
         <StatCard label="Total Views" value={summary.totalViews.toLocaleString()} valueTestId="history-total-views" hint="Every submitted post, any status" />
@@ -178,7 +194,7 @@ export function ClipHistoryBrowser({
           label="Owed"
           value={money(summary.owedAmount)}
           valueTestId="history-owed-amount"
-          hint="Analytics Approved, not yet paid"
+          hint={requireAnalyticsProof ? "Analytics Approved, not yet paid" : "Approved, not yet paid"}
         />
       </div>
 
@@ -195,7 +211,7 @@ export function ClipHistoryBrowser({
                 <div className="min-w-0 flex-1 text-sm">
                   <div className="flex flex-wrap items-center gap-2">
                     <PostNumber n={postNumber} />
-                    <StatusBadge clip={c} />
+                    <StatusBadge clip={c} analytics={requireAnalyticsProof} />
                     <ClipApprovedBadge clip={c} />
                     {showCreator && <span className="font-bold" data-testid="history-creator">{creatorUsername}</span>}
                     {showCreator && <CreatorPostNumber n={creatorPostNumber} />}
@@ -206,9 +222,11 @@ export function ClipHistoryBrowser({
                   <div className="mt-1">
                     <Stats clip={c} />
                   </div>
-                  <div className="mt-1">
-                    <AnalyticsProof clip={c} campaignId={campaignId} />
-                  </div>
+                  {requireAnalyticsProof && (
+                    <div className="mt-1">
+                      <AnalyticsProof clip={c} campaignId={campaignId} />
+                    </div>
+                  )}
                   <p className="mt-1 text-xs text-text-secondary">Submitted {submittedOn(c.submittedAt)}</p>
                   {c.status === "rejected" && c.rejectionReason && (
                     <p className="mt-1 text-xs text-red-300">Rejected: {c.rejectionReason}</p>
@@ -220,7 +238,7 @@ export function ClipHistoryBrowser({
                     <ActionForm action={reviewAction.bind(null, campaignId, c.id)} className="mt-1.5 flex flex-wrap items-center gap-2">
                       <input type="hidden" name="intent" value="approve" />
                       <Button type="submit" variant="outline" size="sm" data-testid="reverse-rejection">
-                        Analytics Approve
+                        {requireAnalyticsProof ? "Analytics Approve" : "Approve"}
                       </Button>
                       <span className="text-xs text-text-secondary">Reverses this rejection — Admin/Owner only.</span>
                     </ActionForm>
@@ -233,14 +251,14 @@ export function ClipHistoryBrowser({
                   {canReview && gate.locked && gate.reason === "unknown_posted_at" && (
                     <SetPostedAtForm campaignId={campaignId} clipId={c.id} />
                   )}
-                  {canClipApprove && !c.clipApproved && (
+                  {requireAnalyticsProof && canClipApprove && !c.clipApproved && (
                     <ActionForm action={clipApproveAction.bind(null, campaignId, c.id)} className="mt-1.5">
                       <Button type="submit" variant="outline" size="sm" data-testid="clip-approve">
                         Post Approve
                       </Button>
                     </ActionForm>
                   )}
-                  {canReview && c.status === "approved" && c.qualifyingAudiencePct === null && (
+                  {requireAnalyticsProof && canReview && c.status === "approved" && c.qualifyingAudiencePct === null && (
                     <div className="mt-1.5">
                       <PctForm campaignId={campaignId} clip={c} />
                     </div>

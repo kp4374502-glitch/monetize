@@ -83,6 +83,7 @@ export default async function ClipHistoryPage({
         canClipApprove={role === "owner" || role === "admin"}
         canReverseRejection={role === "owner" || role === "admin"}
         canMarkPaid={role === "owner" || role === "admin"}
+        requireAnalyticsProof={campaign.requireAnalyticsProof}
       />
     </main>
   );

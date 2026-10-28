@@ -11,7 +11,14 @@ export interface EconomicsInput {
   videoProofUrl: string | null;
   /** Private-blob pathname of an uploaded analytics screenshot; counts as proof just like a video link. */
   analyticsScreenshotPathname?: string | null;
-  campaign: { baseRate: number; divisor: number; maxPayPerPost: number; viewMinimum: number };
+  campaign: {
+    baseRate: number;
+    divisor: number;
+    maxPayPerPost: number;
+    viewMinimum: number;
+    /** campaigns.require_analytics_proof. Omitted = true (the original, proof-gated behaviour). */
+    requireAnalyticsProof?: boolean;
+  };
 }
 
 export type Economics =
@@ -19,18 +26,32 @@ export type Economics =
   | { eligible: true; cpm: string; earnings: string; payout: string };
 
 /**
+ * The Qualifying Audience % used when a campaign doesn't collect analytics (require_analytics_proof
+ * = false). There is no per-post audience data to enter, so every post is priced as 100% qualifying.
+ * Under the current formula (lib/payout.ts) Base Rate is the CPM ceiling: CPM = min(100 / Divisor, 1)
+ * x Base Rate, so for any Divisor up to 100 a no-analytics post earns exactly the Base Rate per 1,000
+ * views (Efootball: $0.10). Chosen by the Owner for the Efootball Diwali campaign.
+ */
+export const NO_ANALYTICS_QUALIFYING_PCT = 100;
+
+/**
  * Gating per docs/PRODUCT_SPEC.md ("Tier 1 audience verification" + "Payout formula"): no payout
  * until analytics proof is attached, a Qualifying Audience % is entered, and views clear the campaign's
  * View Minimum. (Approval is checked separately — it gates owing/paying, not the calculation.)
+ * A campaign with require_analytics_proof = false skips the first two gates and prices every post at
+ * NO_ANALYTICS_QUALIFYING_PCT; the View Minimum still applies.
  * cpm keeps 4 decimals; earnings and payout are rounded to cents.
  */
 export function computeEconomics(i: EconomicsInput): Economics {
-  if (!i.videoProofUrl && !i.analyticsScreenshotPathname) return { eligible: false, reason: "no_proof" };
-  if (i.qualifyingAudiencePct === null) return { eligible: false, reason: "no_pct" };
+  const needsAnalytics = i.campaign.requireAnalyticsProof !== false;
+  if (needsAnalytics) {
+    if (!i.videoProofUrl && !i.analyticsScreenshotPathname) return { eligible: false, reason: "no_proof" };
+    if (i.qualifyingAudiencePct === null) return { eligible: false, reason: "no_pct" };
+  }
   if (i.views < i.campaign.viewMinimum) return { eligible: false, reason: "below_view_minimum" };
 
   const r = calculatePayout({
-    qualifyingAudiencePct: i.qualifyingAudiencePct,
+    qualifyingAudiencePct: needsAnalytics ? i.qualifyingAudiencePct! : NO_ANALYTICS_QUALIFYING_PCT,
     divisor: i.campaign.divisor,
     baseRate: i.campaign.baseRate,
     views: i.views,

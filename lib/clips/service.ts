@@ -26,6 +26,8 @@ import {
 const OWN_DUPLICATE_MESSAGE = "You've already submitted this link to this campaign.";
 // Deliberately never says WHICH creator: creators must not see each other's activity.
 const OTHER_DUPLICATE_MESSAGE = "This link has already been submitted to this campaign by another creator and can't be added again.";
+const NO_ANALYTICS_MESSAGE =
+  "This campaign doesn't use analytics proof — posts are paid on views alone, so there is nothing to submit or enter.";
 
 /**
  * Every query here filters by campaign_id (CLAUDE.md's non-negotiable rule). The one exception is
@@ -77,6 +79,7 @@ function economicsColumns(
       divisor: Number(campaign.divisor),
       maxPayPerPost: Number(campaign.maxPayPerPost),
       viewMinimum: campaign.viewMinimum,
+      requireAnalyticsProof: campaign.requireAnalyticsProof,
     },
   });
   return e.eligible
@@ -135,6 +138,7 @@ export async function submitClip(actorId: string, campaignId: string, rawUrl: st
   if (matches.some((m) => m.url === parsed.url)) throw new Error(OTHER_DUPLICATE_MESSAGE);
 
   const meta = await fetchClipMetadata(parsed.url, parsed.platform, fetchOpts);
+  const views = meta.ok ? meta.data.views : 0;
 
   try {
     const [row] = await db
@@ -144,7 +148,7 @@ export async function submitClip(actorId: string, campaignId: string, rawUrl: st
         creatorUserId: actorId,
         platform: parsed.platform,
         url: parsed.url,
-        views: meta.ok ? meta.data.views : 0,
+        views,
         likes: meta.ok ? meta.data.likes : 0,
         thumbnailUrl: meta.ok ? meta.data.thumbnailUrl : null,
         caption: meta.ok ? meta.data.caption : null,
@@ -155,8 +159,15 @@ export async function submitClip(actorId: string, campaignId: string, rawUrl: st
         flaggedReason: flag.reason,
         // Task 5 Part 3: every new clip starts gated, regardless of how old the post already is —
         // only attachVideoProof (once the 7-day gate actually clears) moves it into "pending".
-        status: "awaiting_analytics",
+        // A campaign that doesn't collect analytics has no gate: straight into the review queue.
+        status: campaign.requireAnalyticsProof ? "awaiting_analytics" : "pending",
         postedAt: meta.ok ? meta.data.postedAt : null,
+        // All-null for a proof-gated campaign (nothing earns until proof + %), so identical to the column
+        // defaults there; a no-analytics campaign is priced from views alone, immediately.
+        ...economicsColumns(
+          { views, manualViews: null, qualifyingAudiencePct: null, videoProofUrl: null, analyticsScreenshotPathname: null, baseRateOverride: null },
+          campaign,
+        ),
       })
       .returning();
     return { clip: row, statsAvailable: meta.ok };
@@ -209,13 +220,15 @@ export async function attachVideoProof(
   if (!clip) throw new Error("Post not found.");
   if (clip.paidStatus === "paid") throw new Error("This post has already been paid.");
 
+  const campaign = await loadCampaign(campaignId);
+  if (!campaign.requireAnalyticsProof) throw new Error(NO_ANALYTICS_MESSAGE);
+
   const wasAwaitingAnalytics = clip.status === "awaiting_analytics";
   if (wasAwaitingAnalytics) {
     const gate = analyticsGateState(clip);
     if (gate.locked) throw analyticsGateError(gate);
   }
 
-  const campaign = await loadCampaign(campaignId);
   const next = { ...clip, videoProofUrl: url, analyticsScreenshotPathname: null };
   const [row] = await db
     .update(clips)
@@ -393,6 +406,7 @@ export async function runAnalyticsGateSweep(now: Date = new Date()) {
         isNull(clips.analyticsScreenshotPathname),
         isNull(clips.analyticsUnlockNotifiedAt),
         eq(campaigns.status, "active"),
+        eq(campaigns.requireAnalyticsProof, true), // never tell a creator to submit proof the campaign doesn't use
       ),
     );
   for (const c of dueToNotify) {
@@ -458,9 +472,11 @@ export async function reviewClip(actorId: string, campaignId: string, clipId: st
     throw new Error("Access denied: only an Admin or Owner can approve a previously rejected post.");
   }
 
+  const campaign = await loadCampaign(campaignId);
   if (decision.action === "approve") {
-    if (!hasAnalyticsProof(clip)) throw new Error("Analytics proof is missing — attach it before Analytics Approving.");
-    const campaign = await loadCampaign(campaignId);
+    if (campaign.requireAnalyticsProof && !hasAnalyticsProof(clip)) {
+      throw new Error("Analytics proof is missing — attach it before Analytics Approving.");
+    }
     if (wouldExceedBudget(campaign.budgetSpent, clip.payout ?? 0, campaign.totalBudget)) {
       throw new Error("This post's payout would exceed the campaign's total budget.");
     }
@@ -486,7 +502,11 @@ export async function reviewClip(actorId: string, campaignId: string, clipId: st
       clipId,
       type: decision.action === "approve" ? "clip_approved" : "clip_rejected",
       message:
-        decision.action === "approve" ? "Your post's analytics were approved." : `Your post was rejected: ${decision.reason}`,
+        decision.action === "approve"
+          ? campaign.requireAnalyticsProof
+            ? "Your post's analytics were approved."
+            : "Your post was approved."
+          : `Your post was rejected: ${decision.reason}`,
     });
   });
 }
@@ -557,13 +577,15 @@ export async function setQualifyingAudiencePct(actorId: string, campaignId: stri
   const clip = await loadClip(campaignId, clipId);
   assertNotOwnPost(role, actorId, clip);
   if (clip.paidStatus === "paid") throw new Error("This post has already been paid.");
+  const campaign = await loadCampaign(campaignId);
+  // No analytics on this campaign = no per-post audience %: the fixed rate is applied automatically.
+  if (!campaign.requireAnalyticsProof) throw new Error(NO_ANALYTICS_MESSAGE);
   // CLAUDE.md verification flow: proof must exist before a % can be entered.
   if (!hasAnalyticsProof(clip)) throw new Error("Analytics proof is missing — the creator must attach it before a Qualifying Audience % can be entered.");
   if (!roleCanOverride(role, actorId, clip.qualifyingPctSetBy)) {
     throw new Error("Access denied: only an Admin or Owner can edit a % another reviewer entered.");
   }
 
-  const campaign = await loadCampaign(campaignId);
   const next = { ...clip, qualifyingAudiencePct: String(pct) };
   const [row] = await db
     .update(clips)
@@ -681,6 +703,53 @@ export async function unlockAnalyticsEarly(actorId: string, campaignId: string, 
     return updated;
   });
   return row;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Campaign setting: analytics proof
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Switch a campaign over to "no analytics": posts are paid on views alone at a fixed 100% audience
+ * (NO_ANALYTICS_QUALIFYING_PCT), with no proof to submit, no 7-day wait and no % to enter. Owner only
+ * (the platform Owner or this campaign's owner) — deliberately NOT Admin, since it changes what posts
+ * are paid. In one transaction it also (1) moves every post still stuck in "awaiting_analytics" into
+ * the normal review queue ("pending") and (2) re-prices every unpaid, non-rejected post from its
+ * current views. Paid posts are frozen and never touched, same as everywhere else.
+ *
+ * One-way on purpose: there is no matching "re-enable". Turning proof back on would null out the
+ * payout of any approved-but-unpaid post that never had proof (the next refresh recomputes it), and
+ * what to do about those is a business decision nobody has made. Not audited in clip_review_events:
+ * the status move isn't a review decision, and that table's action enum is reserved for those.
+ * Any Qualifying Audience % already entered on a post stays stored but is ignored from now on.
+ */
+export async function disableAnalyticsProof(actorId: string, campaignId: string) {
+  const role = await requireRole(actorId, campaignId, "admin");
+  if (role !== "owner") throw new Error("Access denied: only an Owner can change whether a campaign uses analytics proof.");
+
+  const campaign = await loadCampaign(campaignId);
+  if (!campaign.requireAnalyticsProof) return { alreadyOff: true as const, movedToPending: 0, repriced: 0 };
+  const updated = { ...campaign, requireAnalyticsProof: false };
+
+  return db.transaction(async (tx) => {
+    await tx.update(campaigns).set({ requireAnalyticsProof: false }).where(eq(campaigns.id, campaignId));
+
+    const open = await tx
+      .select()
+      .from(clips)
+      .where(and(eq(clips.campaignId, campaignId), eq(clips.paidStatus, "unpaid"), ne(clips.status, "rejected"), isNull(clips.deletedAt)));
+
+    let movedToPending = 0;
+    for (const c of open) {
+      const moved = c.status === "awaiting_analytics";
+      if (moved) movedToPending++;
+      await tx
+        .update(clips)
+        .set({ ...(moved ? { status: "pending" as const } : {}), ...economicsColumns(c, updated) })
+        .where(and(eq(clips.id, c.id), eq(clips.campaignId, campaignId)));
+    }
+    return { alreadyOff: false as const, movedToPending, repriced: open.length };
+  });
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -931,23 +1000,31 @@ export interface ClipHistoryFilters {
 }
 const CLIP_HISTORY_LIMIT = 500;
 
-function clipHistoryStatusCondition(status: ClipHistoryStatusFilter | undefined) {
+function clipHistoryStatusCondition(status: ClipHistoryStatusFilter | undefined, requireAnalyticsProof = true) {
   switch (status) {
     // Step 1 not done yet. A rejected clip is excluded: it's a dead end, not waiting on anything.
     case "waiting_post_approved":
       return and(eq(clips.clipApproved, false), ne(clips.status, "rejected"));
     // Step 1 done, step 2 (Analytics Approve/Reject) not. awaiting_analytics covers a clip whether
     // still gate-locked or unlocked-but-no-proof-yet; pending is proof-attached, awaiting review.
+    // A no-analytics campaign has a single approval: this tab is simply "not yet approved/rejected".
     case "waiting_analytics_approved":
-      return and(eq(clips.clipApproved, true), inArray(clips.status, ["awaiting_analytics", "pending"]));
+      return requireAnalyticsProof
+        ? and(eq(clips.clipApproved, true), inArray(clips.status, ["awaiting_analytics", "pending"]))
+        : inArray(clips.status, ["awaiting_analytics", "pending"]);
     // Steps 1 and 2 both done, but no Qualifying Audience % entered yet -- earnings can't be
     // calculated, so it can't be paid. Disjoint from waiting_payment below (which needs a %).
+    // Never applies without analytics: no % is ever entered, the fixed rate is applied instead.
     case "waiting_audience_pct":
-      return and(eq(clips.clipApproved, true), eq(clips.status, "approved"), isNull(clips.qualifyingAudiencePct));
+      return requireAnalyticsProof
+        ? and(eq(clips.clipApproved, true), eq(clips.status, "approved"), isNull(clips.qualifyingAudiencePct))
+        : sql`false`;
     // Analytics Approved with a % entered, not yet marked paid. Requiring the % keeps it from
     // overlapping waiting_audience_pct. (getReviewQueue's awaitingPayment list is looser: it has no % condition.)
     case "waiting_payment":
-      return and(eq(clips.status, "approved"), ne(clips.paidStatus, "paid"), isNotNull(clips.qualifyingAudiencePct));
+      return requireAnalyticsProof
+        ? and(eq(clips.status, "approved"), ne(clips.paidStatus, "paid"), isNotNull(clips.qualifyingAudiencePct))
+        : and(eq(clips.status, "approved"), ne(clips.paidStatus, "paid"));
     case "paid":
       return eq(clips.paidStatus, "paid");
     case "rejected":
@@ -992,7 +1069,8 @@ async function filteredClipHistory(scope: SQL, filters: ClipHistoryFilters, camp
     .from(clips)
     .where(dateScope);
 
-  const statusCondition = clipHistoryStatusCondition(filters.status);
+  const { requireAnalyticsProof } = await loadCampaign(campaignId);
+  const statusCondition = clipHistoryStatusCondition(filters.status, requireAnalyticsProof);
   const rows = await db
     .select({ clip: clips, creatorUsername: users.username })
     .from(clips)

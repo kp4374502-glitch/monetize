@@ -87,6 +87,9 @@ export const campaigns = pgTable("campaigns", {
     .default("0"),
   dailySubmissionLimit: integer("daily_submission_limit").notNull().default(100),
   eligiblePlatforms: platformEnum("eligible_platforms").array().notNull(),
+  // false = this campaign pays on views alone: no analytics proof, no 7-day wait, no Qualifying
+  // Audience % — every post is priced at a fixed 100% audience (see NO_ANALYTICS_QUALIFYING_PCT).
+  requireAnalyticsProof: boolean("require_analytics_proof").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   closedAt: timestamp("closed_at", { withTimezone: true }),
 });

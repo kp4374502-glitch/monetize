@@ -15,11 +15,14 @@ export function CreatorClips({
   clips,
   viewMinimum,
   campaignStatus,
+  requireAnalyticsProof = true,
 }: {
   campaignId: string;
   clips: (ClipRow & { postNumber: number })[];
   viewMinimum: number;
   campaignStatus: string;
+  /** false = this campaign pays on views alone: no proof to submit, no 7-day wait, nothing to attach. */
+  requireAnalyticsProof?: boolean;
 }) {
   const paused = campaignStatus === "paused";
   return (
@@ -27,7 +30,11 @@ export function CreatorClips({
       <Card>
         <SectionHeader
           title="Add a post"
-          description={`Posts earn once they pass ${viewMinimum.toLocaleString()} views and are approved with analytics proof.`}
+          description={
+            requireAnalyticsProof
+              ? `Posts earn once they pass ${viewMinimum.toLocaleString()} views and are approved with analytics proof.`
+              : `Posts earn once they pass ${viewMinimum.toLocaleString()} views and are approved. No analytics proof needed.`
+          }
         />
         <ActionForm action={submitClipAction.bind(null, campaignId)} className="flex flex-wrap items-start gap-2">
           <Input name="url" placeholder="Paste a TikTok, Instagram, YouTube or X link" required className="min-w-72 flex-1" />
@@ -61,7 +68,7 @@ export function CreatorClips({
                     )}
                     <div className="flex flex-wrap items-center gap-2">
                       <PostNumber n={c.postNumber} />
-                      <StatusBadge clip={c} />
+                      <StatusBadge clip={c} analytics={requireAnalyticsProof} />
                       <a href={c.url} target="_blank" rel="noreferrer" className="truncate text-sm text-text-secondary underline-offset-2 hover:text-gold-light hover:underline">
                         {c.url}
                       </a>
@@ -82,7 +89,7 @@ export function CreatorClips({
                       </Callout>
                     )}
 
-                    {hasAnalyticsProof(c) ? (
+                    {!requireAnalyticsProof ? null : hasAnalyticsProof(c) ? (
                       <div className="space-y-1.5">
                         <p className="flex items-center gap-1.5 text-xs text-green-400">
                           <CheckCircle2 className="h-3.5 w-3.5" /> Proof submitted{c.analyticsScreenshotPathname && " (screenshot)"}
@@ -149,7 +156,7 @@ export function CreatorClips({
                     )}
 
                     <div className="flex flex-wrap items-start gap-2 pt-1">
-                      {c.paidStatus === "unpaid" && !gate.locked && (
+                      {requireAnalyticsProof && c.paidStatus === "unpaid" && !gate.locked && (
                         <ActionForm action={attachProofAction.bind(null, campaignId, c.id)} className="flex min-w-64 flex-1 flex-wrap items-center gap-2">
                           <Input
                             name="proofUrl"

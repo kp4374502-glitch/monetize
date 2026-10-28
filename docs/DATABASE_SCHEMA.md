@@ -22,6 +22,7 @@ Every table holding campaign-specific data carries a `campaign_id` — this is t
 - `mod_mark_paid_threshold` — retired: always stored as 0 and not read anywhere (only Owner/Admin mark paid). Column kept so migrations stay additive.
 - `daily_submission_limit` (default 100)
 - `eligible_platforms` (array: tiktok, instagram, youtube, x)
+- `require_analytics_proof` (boolean, default true — false = paid on views alone at a fixed 100% audience; no proof, no 7-day wait, no Qualifying Audience %. See PRODUCT_SPEC → "Campaigns that don't use analytics")
 - `created_at`, `closed_at`
 
 ## platform\_admins

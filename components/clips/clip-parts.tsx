@@ -14,12 +14,19 @@ const STALE_AFTER_MS = 36 * 60 * 60 * 1000; // cron runs daily; anything older m
 export const money = (v: string | number | null) =>
   v === null ? "—" : `$${Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export function StatusBadge({ clip }: { clip: ClipRow }) {
+export function StatusBadge({ clip, analytics = true }: { clip: ClipRow; /** false for a campaign that doesn't use analytics proof: "approved" is just "Approved". */ analytics?: boolean }) {
   const label = clip.paidStatus === "paid" ? "paid" : clip.status;
   // "capitalize" only affects the first letter of the whole string, so the raw enum value would
   // render as "Awaiting_analytics" — spell it out instead. "approved" is the Analytics Approve step
   // specifically (Post Approved is its own, separate badge).
-  const text = label === "awaiting_analytics" ? "Awaiting analytics" : label === "approved" ? "Analytics Approved" : undefined;
+  const text =
+    label === "awaiting_analytics"
+      ? "Awaiting analytics"
+      : label === "approved"
+        ? analytics
+          ? "Analytics Approved"
+          : "Approved"
+        : undefined;
   return (
     <Badge status={label} data-testid="clip-status">
       {text}

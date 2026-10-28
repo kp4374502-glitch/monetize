@@ -73,10 +73,13 @@ export function ReviewQueue({
   canDelete = false,
   canClipApprove = false,
   canMarkPaid = false,
+  requireAnalyticsProof = true,
 }: {
   campaignId: string;
   pending: Row[];
   awaitingPayment: Row[];
+  /** false = this campaign pays on views alone: no proof line, no audience % box, plain "Approve". */
+  requireAnalyticsProof?: boolean;
   /** Owner/Admin only — the server re-checks this regardless of what's rendered. */
   canDelete?: boolean;
   /** Admin/Owner only — gates the Post Approve button. Mod keeps Analytics Approve and Reject, unchanged. */
@@ -84,6 +87,9 @@ export function ReviewQueue({
   /** Owner/Admin only. Server re-checks regardless. */
   canMarkPaid?: boolean;
 }) {
+  // A campaign without analytics has a single approval step: the plain "Approve" button. The separate
+  // Post Approve content check isn't offered there (it never gated payment, so nothing depends on it).
+  const showPostApprove = canClipApprove && requireAnalyticsProof;
   return (
     <>
       <section>
@@ -104,7 +110,7 @@ export function ReviewQueue({
                   <div className="min-w-0 flex-1 space-y-2.5">
                     <div className="flex flex-wrap items-center gap-2">
                       <PostNumber n={postNumber} />
-                      <StatusBadge clip={c} />
+                      <StatusBadge clip={c} analytics={requireAnalyticsProof} />
                       <ClipApprovedBadge clip={c} />
                       <span className="text-sm font-bold" data-testid="queue-creator">{creatorUsername}</span>
                       <CreatorPostNumber n={creatorPostNumber} />
@@ -119,14 +125,24 @@ export function ReviewQueue({
                         <span>{c.flaggedReason}</span>
                       </Callout>
                     )}
-                    <ProofLine clip={c} campaignId={campaignId} missingId="proof-missing" />
-                    <PctForm campaignId={campaignId} clip={c} />
+                    {requireAnalyticsProof ? (
+                      <>
+                        <ProofLine clip={c} campaignId={campaignId} missingId="proof-missing" />
+                        <PctForm campaignId={campaignId} clip={c} />
+                      </>
+                    ) : (
+                      <p className="text-sm text-text-secondary" data-testid="queue-payout">
+                        Payout: <span className="font-bold text-gold-light">{money(c.payout)}</span>
+                      </p>
+                    )}
                     {canSetManualViews(c) && <ManualViewsForm campaignId={campaignId} clip={c} />}
                     <div className="flex flex-wrap items-center gap-2 border-t border-subtle pt-3">
-                      {canClipApprove && <ClipApproveButton campaignId={campaignId} clip={c} />}
+                      {showPostApprove && <ClipApproveButton campaignId={campaignId} clip={c} />}
                       <ActionForm action={reviewAction.bind(null, campaignId, c.id)} className="flex flex-1 flex-wrap items-center gap-2">
                         <Input name="reason" placeholder="Reason (required to reject)" className="min-w-56 flex-1" />
-                        <Button type="submit" name="intent" value="approve" formNoValidate size="sm">Analytics Approve</Button>
+                        <Button type="submit" name="intent" value="approve" formNoValidate size="sm">
+                          {requireAnalyticsProof ? "Analytics Approve" : "Approve"}
+                        </Button>
                         <Button type="submit" name="intent" value="reject" variant="danger" formNoValidate size="sm">Reject</Button>
                       </ActionForm>
                       {canDelete && <DeleteClipButton campaignId={campaignId} clipId={c.id} />}
@@ -140,7 +156,7 @@ export function ReviewQueue({
       </section>
 
       <section>
-        <SectionHeader title="Analytics Approved — awaiting payment" count={awaitingPayment.length} />
+        <SectionHeader title={requireAnalyticsProof ? "Analytics Approved — awaiting payment" : "Approved — awaiting payment"} count={awaitingPayment.length} />
         {awaitingPayment.length === 0 && (
           <Card innerClassName="py-8 text-center text-sm text-text-secondary">No approved posts waiting to be paid.</Card>
         )}
@@ -151,7 +167,7 @@ export function ReviewQueue({
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                     <PostNumber n={postNumber} />
-                    <StatusBadge clip={c} />
+                    <StatusBadge clip={c} analytics={requireAnalyticsProof} />
                     <ClipApprovedBadge clip={c} />
                     <span className="font-bold">{creatorUsername}</span>
                     <CreatorPostNumber n={creatorPostNumber} />
@@ -162,7 +178,7 @@ export function ReviewQueue({
                     <span className="text-base font-medium tracking-[-0.03em] text-gold-light" data-testid="payment-amount">{money(c.payout)}</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    {canClipApprove && <ClipApproveButton campaignId={campaignId} clip={c} />}
+                    {showPostApprove && <ClipApproveButton campaignId={campaignId} clip={c} />}
                     {canMarkPaid && (
                       <ActionForm action={markPaidAction.bind(null, campaignId, c.id)}>
                         <Button type="submit" size="sm" disabled={c.payout === null}>Mark paid</Button>
@@ -173,8 +189,8 @@ export function ReviewQueue({
                   </div>
                 </div>
                 <div className="mt-3 space-y-2.5">
-                  <ProofLine clip={c} campaignId={campaignId} />
-                  <PctForm campaignId={campaignId} clip={c} />
+                  {requireAnalyticsProof && <ProofLine clip={c} campaignId={campaignId} />}
+                  {requireAnalyticsProof && <PctForm campaignId={campaignId} clip={c} />}
                   {canSetManualViews(c) && <ManualViewsForm campaignId={campaignId} clip={c} />}
                 </div>
               </Card>

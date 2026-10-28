@@ -18,7 +18,10 @@ export function ClipHistory({
   canDelete = false,
   canReverseRejection = false,
   canEditReason = false,
+  requireAnalyticsProof = true,
 }: {
+  /** false = this campaign pays on views alone, so the single approval is just "Approve". */
+  requireAnalyticsProof?: boolean;
   history: History;
   campaignId: string;
   /** Owner/Admin only — the server re-checks this regardless of what's rendered. */
@@ -88,7 +91,7 @@ export function ClipHistory({
                     <ActionForm action={reviewAction.bind(null, campaignId, c.id)} className="mt-1.5 flex flex-wrap items-center gap-2">
                       <input type="hidden" name="intent" value="approve" />
                       <Button type="submit" variant="outline" size="sm" data-testid="reverse-rejection">
-                        Analytics Approve
+                        {requireAnalyticsProof ? "Analytics Approve" : "Approve"}
                       </Button>
                       <span className="text-xs text-text-secondary">Reverses this rejection — Admin/Owner only.</span>
                     </ActionForm>

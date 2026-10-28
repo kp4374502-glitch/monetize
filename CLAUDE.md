@@ -54,6 +54,11 @@ Payout   = min(Earnings, Max Pay Per Post)
 worked example are in docs/PRODUCT_SPEC.md → "Payout formula".
 
 ## Verification flow
+**Exception:** a campaign with `campaigns.require_analytics_proof = false` (Efootball Diwali) skips all of this —
+no proof, no 7-day gate, no Qualifying Audience %; posts go straight to `pending`, are priced at a fixed 100%
+audience (= Base Rate per 1,000 views, since Base Rate is the CPM ceiling) and are approved in one step. Always
+read the flag off the campaign row; never special-case a campaign id. One-way switch: `disableAnalyticsProof`.
+
 A clip needs analytics proof — a video link (YouTube unlisted / Drive) — before an Admin/Mod can enter a
 Qualifying Audience %. Screenshot-upload proof was removed (Task 5 Part 2): a video link is the only way
 to submit NEW proof, but a clip with an already-accepted screenshot on file (Vercel Blob) keeps it and
