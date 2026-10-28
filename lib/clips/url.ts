@@ -1,4 +1,4 @@
-export type Platform = "tiktok" | "instagram" | "youtube";
+export type Platform = "tiktok" | "instagram" | "youtube" | "x";
 
 export interface ParsedClipUrl {
   platform: Platform;
@@ -8,9 +8,9 @@ export interface ParsedClipUrl {
   url: string;
 }
 
-const host = (h: string) => h.toLowerCase().replace(/^(www|m|vm|vt)\./, "");
+const host = (h: string) => h.toLowerCase().replace(/^(www|m|mobile|vm|vt)\./, "");
 
-/** Returns null for anything that isn't a recognisable TikTok/Instagram/YouTube post URL. */
+/** Returns null for anything that isn't a recognisable TikTok/Instagram/YouTube/X post URL. */
 export function parseClipUrl(raw: string): ParsedClipUrl | null {
   let u: URL;
   try {
@@ -29,6 +29,16 @@ export function parseClipUrl(raw: string): ParsedClipUrl | null {
     const s = path.match(/^\/(?:t\/)?([\w-]{6,})$/);
     if (s && (u.hostname.toLowerCase().startsWith("vm.") || u.hostname.toLowerCase().startsWith("vt.") || path.startsWith("/t/"))) {
       return { platform: "tiktok", postId: `short:${s[1]}`, url: `https://${u.hostname.toLowerCase()}${path}` };
+    }
+    return null;
+  }
+
+  if (h === "x.com" || h === "twitter.com") {
+    // /<handle>/status/<id>, optionally followed by /photo/1, /video/1, /analytics...; also the
+    // handle-less /i/status/<id> and /i/web/status/<id> forms. The numeric id is the stable key.
+    const m = path.match(/^\/(?:(\w{1,15})|i(?:\/web)?)\/status(?:es)?\/(\d{5,25})(?:\/.*)?$/);
+    if (m) {
+      return { platform: "x", postId: m[2], url: m[1] ? `https://x.com/${m[1].toLowerCase()}/status/${m[2]}` : `https://x.com/i/status/${m[2]}` };
     }
     return null;
   }

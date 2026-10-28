@@ -101,7 +101,7 @@ export async function submitClip(actorId: string, campaignId: string, rawUrl: st
   if (campaign.status !== "active") throw new Error("This campaign is not accepting submissions right now.");
 
   const parsed = parseClipUrl(rawUrl);
-  if (!parsed) throw new Error("That doesn't look like a TikTok, Instagram or YouTube post link.");
+  if (!parsed) throw new Error("That doesn't look like a TikTok, Instagram, YouTube or X post link.");
   if (!campaign.eligiblePlatforms.includes(parsed.platform)) {
     throw new Error(`${parsed.platform} posts are not eligible for this campaign.`);
   }

@@ -15,7 +15,8 @@ import { effectiveViews } from "@/lib/clips/rules";
 import { getCampaignChannels } from "@/lib/channels/service";
 import { ChannelsPanel } from "@/components/channels/channels-panel";
 import { generateInviteLinkAction, revokeInviteLinkAction, setLifecycleAction } from "../actions";
-import { addBrandViewerAction, addModAction, removeBrandViewerAction, removeModAction } from "../team-actions";
+import { addBrandViewerAction, addModAction, removeBrandViewerAction, removeModAction, setPlatformsAction } from "../team-actions";
+import { PlatformForm } from "@/components/campaigns/platform-form";
 import { AssignForm, RemoveForm } from "@/components/team/assign-form";
 import { refreshCampaignViewsAction } from "../clip-actions";
 import { ActionForm } from "@/components/action-form";
@@ -184,6 +185,15 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
                 </li>
               ))}
             </ul>
+          </Card>
+        </section>
+      )}
+
+      {isAdmin && (
+        <section data-testid="platforms-section">
+          <SectionHeader title="Eligible platforms" description="Where creators can post from on this campaign. Only affects new submissions; posts already submitted stay as they are." />
+          <Card>
+            <PlatformForm action={setPlatformsAction.bind(null, id)} current={campaign.eligiblePlatforms} />
           </Card>
         </section>
       )}

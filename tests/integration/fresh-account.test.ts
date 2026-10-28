@@ -137,6 +137,7 @@ describe("a brand-new account (users row with no roles) and one that never logge
       await denied(teamSvc.addPlatformAdmin(who, "creator"));
       await denied(teamSvc.removePlatformAdmin(who, "admin"));
       await denied(teamSvc.listPlatformAdmins(who));
+      await denied(campaignSvc.setEligiblePlatforms(who, camp, ["x"])); // platform list is Owner/Admin only
       // campaign channels: not a member, so neither readable nor writable
       await denied(channelSvc.getCampaignChannels(who, camp));
       await denied(channelSvc.markChannelRead(who, camp, "announcements"));
@@ -247,6 +248,7 @@ describe("campaign_brands (read-only Brand role)", () => {
     await denied(clipSvc.updateRejectionReason("brandviewer", camp, clipId, "new reason"));
     await denied(clipSvc.refreshViews("brandviewer", camp, clipId));
     await denied(clipSvc.getProofImage("brandviewer", camp, clipId));
+    await denied(campaignSvc.setEligiblePlatforms("brandviewer", camp, ["x"]));
     await denied(campaignSvc.addMod("brandviewer", camp, "creator")); // a Brand viewer can't assign roles
     await denied(teamSvc.addPlatformAdmin("brandviewer", "creator"));
     await denied(channelSvc.getCampaignChannels("brandviewer", camp)); // Brand never sees the channels

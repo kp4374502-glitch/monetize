@@ -17,7 +17,7 @@ import {
 } from "../../drizzle/schema";
 import { getRoleForCampaign, isPlatformAdmin, isPlatformOwner, requireRole } from "../auth/roles";
 import { isApprovedBrand } from "../brand/service";
-import { createCampaignSchema, updateCampaignSchema } from "./schemas";
+import { createCampaignSchema, eligiblePlatformsSchema, updateCampaignSchema } from "./schemas";
 
 /**
  * Tenant-scoped campaign operations. Every function takes the acting user explicitly and checks
@@ -144,6 +144,17 @@ export async function listInviteLinks(actorId: string, campaignId: string) {
 // link, and Owner/Admin only (same authority spec gives for adding a Mod). One campaign at a time,
 // enforced by campaign_brands' unique(user_id), same shape as campaign_mods.
 // ---------------------------------------------------------------------------------------------
+
+/**
+ * Owner/Admin: which platforms this campaign accepts posts from. Only affects NEW submissions; posts
+ * already submitted from a platform that is switched off stay exactly as they are.
+ */
+export async function setEligiblePlatforms(actorId: string, campaignId: string, platforms: unknown) {
+  await requireRole(actorId, campaignId, "admin");
+  const list = [...new Set(eligiblePlatformsSchema.parse(platforms))];
+  await db.update(campaigns).set({ eligiblePlatforms: list }).where(eq(campaigns.id, campaignId));
+  return list;
+}
 
 const isUniqueViolation = (e: unknown) =>
   String((e as { cause?: { code?: string }; code?: string })?.cause?.code ?? (e as { code?: string })?.code) === "23505";

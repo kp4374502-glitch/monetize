@@ -4,7 +4,7 @@
 
 ## Overview
 
-Monetize is a multi-tenant platform for running paid TikTok/Instagram/YouTube clipping campaigns: creators submit links to clips they've posted, a reviewer verifies view counts and audience quality, and the platform tracks what each creator has earned. The platform itself is free — no fee is taken from any campaign.
+Monetize is a multi-tenant platform for running paid TikTok/Instagram/YouTube/X clipping campaigns: creators submit links to clips they've posted, a reviewer verifies view counts and audience quality, and the platform tracks what each creator has earned. The platform itself is free — no fee is taken from any campaign.
 
 Each brand runs its own **campaign** with its own payout formula, review team, and creator roster. Payouts are calculated and tracked in-app, but the actual money changes hands manually on Discord — the app is a ledger and review tool, not a payment processor.
 
@@ -148,7 +148,7 @@ Unlike Admin, a Mod is **not** automatic across campaigns — they must be expli
 
 **Settings**
 
-- Beyond the payout parameters, the Owner also configures campaign name/branding and which social platforms (TikTok/Instagram/YouTube) are eligible for submission on that campaign.
+- Beyond the payout parameters, the Owner also configures campaign name/branding and which social platforms (TikTok/Instagram/YouTube/X) are eligible for submission on that campaign.
 - Can change the campaign's daily submission rate limit (default 100, adjustable per campaign).
 
 **Oversight**
@@ -214,7 +214,7 @@ Read-only, per-campaign viewer for the brand whose campaign it is — not the sa
 
 ## Clip data layer — ScrapeCreators
 
-Views, likes, captions, and thumbnails are pulled automatically via the [ScrapeCreators API](https://scrapecreators.com/), covering TikTok, Instagram, and YouTube.
+Views, likes, captions, and thumbnails are pulled automatically via the [ScrapeCreators API](https://scrapecreators.com/), covering TikTok, Instagram, YouTube and X (posts on X: `/v1/twitter/tweet`; views = `views.count`, which X only reports for newer posts, so an older post shows 0 views; likes = `legacy.favorite_count`; publish date = `legacy.created_at`).
 
 - **No creator OAuth required.** ScrapeCreators reads public data from a pasted link/handle — creators keep the existing "paste a link" flow, they never connect or authorize their social account.
 - Scope of use: **views, likes, and post metadata only.** It does not replace the audience-quality verification step (see next section).
@@ -396,6 +396,12 @@ New capability (the original Monetize build had none). **In-app only** — no em
 
 **Events that trigger a notification** (kept to the essentials): clip approved, clip rejected (with reason), payout marked paid, a reviewer reminder when a clip's proof is still missing 7 days after submission, and (Task 5 Part 3) a creator notification once their clip's 7-day analytics window clears and they haven't submitted proof yet — sent at most once per clip.
 
+## Eligible platforms
+
+Each campaign accepts posts from any combination of **TikTok, Instagram, YouTube and X**. The Owner picks them when creating the campaign, and Owner or Admin can change them later from the campaign page ("Eligible platforms"). At least one must stay on. Changing the list only affects **new** submissions; posts already submitted stay as they are.
+
+X links are accepted as `x.com` or `twitter.com` post links (`/<handle>/status/<id>`, with or without `/photo/1`, `/video/1`, tracking parameters, or the `/i/web/status/<id>` share form) and are stored as `https://x.com/<handle>/status/<id>`. The numeric post id is the duplicate key, so the same post in any spelling is one post. X reports views for every post type, so there is no manual view entry for X; a post with no view count from X shows 0.
+
 ## Role assignment
 
 Every campaign has the same cast: **Owner, Admin, Brand, Mod/CPE, Creator**. Creators sign up themselves; everyone else is *promoted from signed-up accounts* (the person must have signed in once, which creates their account here).
@@ -464,7 +470,7 @@ No public REST API is needed — this isn't consumed by external clients. Use **
 - **Sign-in codes & sessions:** handled natively by Clerk — no passwords are stored or handled, no custom crypto code needed.
 - **Devices (signed-in sessions):** the header's account menu → Manage account has a "Devices" tab (a Clerk custom profile page: `components/account-menu.tsx` + `devices-panel.tsx`). It lists every device signed in to the account (device, browser, location/IP, last active, "This device" marker) and lets the user sign any other one out, or all others at once, via Clerk's own `user.getSessions()`/`session.revoke()`. Clerk scopes both calls to the signed-in user, so it can only ever touch their own sessions. Shown to every signed-in user, not only admins; the current device has no button there (use the menu's Sign out).
 - **API-level rate limiting** (distinct from the business-level 100/day submission cap): throttle login attempts and invite-link redemption attempts, e.g. via Upstash Redis or Vercel Edge Middleware.
-- **Input validation:** `zod` on every Server Action; submitted clip URLs are validated against expected TikTok/Instagram/YouTube URL patterns before a ScrapeCreators call is made, rejecting anything malformed up front.
+- **Input validation:** `zod` on every Server Action; submitted clip URLs are validated against expected TikTok/Instagram/YouTube/X URL patterns before a ScrapeCreators call is made, rejecting anything malformed up front.
 
 ### Bootstrap process
 

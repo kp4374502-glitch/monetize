@@ -1,10 +1,10 @@
 import { createCampaignAction } from "@/app/campaigns/actions";
+import { PLATFORMS, PLATFORM_LABELS } from "@/lib/campaigns/schemas";
 import { Button } from "@/components/ui/button";
 import { Card, SectionHeader } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 
-const platforms = ["tiktok", "instagram", "youtube"];
 
 /** The new-campaign form (rendered by /campaigns/new after its Owner-only check). */
 export function NewCampaignForm({ brands = [] }: { brands?: { userId: string; brandName: string; username: string }[] }) {
@@ -55,13 +55,13 @@ export function NewCampaignForm({ brands = [] }: { brands?: { userId: string; br
           <fieldset className="mt-5">
             <legend className="mb-2 text-sm font-medium text-text-secondary">Eligible platforms</legend>
             <div className="flex flex-wrap gap-2">
-              {platforms.map((p) => (
+              {PLATFORMS.map((p) => (
                 <label
                   key={p}
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-subtle px-4 py-1.5 text-sm capitalize transition hover:border-gold-border/60 has-[:checked]:border-gold-border has-[:checked]:bg-gold-light/10 has-[:checked]:text-gold-light"
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-subtle px-4 py-1.5 text-sm transition hover:border-gold-border/60 has-[:checked]:border-gold-border has-[:checked]:bg-gold-light/10 has-[:checked]:text-gold-light"
                 >
                   <input type="checkbox" name="eligiblePlatforms" value={p} defaultChecked={p === "tiktok"} className="h-4 w-4 accent-[#ffb433]" />
-                  {p}
+                  {PLATFORM_LABELS[p]}
                 </label>
               ))}
             </div>

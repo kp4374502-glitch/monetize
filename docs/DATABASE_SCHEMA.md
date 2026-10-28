@@ -21,7 +21,7 @@ Every table holding campaign-specific data carries a `campaign_id` — this is t
 - `total_budget`, `budget_spent` (running total)
 - `mod_mark_paid_threshold` — retired: always stored as 0 and not read anywhere (only Owner/Admin mark paid). Column kept so migrations stay additive.
 - `daily_submission_limit` (default 100)
-- `eligible_platforms` (array: tiktok, instagram, youtube)
+- `eligible_platforms` (array: tiktok, instagram, youtube, x)
 - `created_at`, `closed_at`
 
 ## platform\_admins
@@ -70,7 +70,7 @@ Read-only per-campaign viewer role ("Brand" — unrelated to the `brand_requests
 - `id` (pk)
 - `campaign_id` (fk campaigns)
 - `creator_user_id` (fk users)
-- `platform` (tiktok | instagram | youtube)
+- `platform` (tiktok | instagram | youtube | x)
 - `url`, partial `unique(campaign_id, url) where deleted_at is null or paid_status = 'paid'` — blocks
   exact-duplicate submission by the same creator; frees up once the clip is soft-deleted, UNLESS it
   was ever paid, in which case the URL stays blocked forever (see below)

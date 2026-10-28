@@ -30,7 +30,7 @@ export function CreatorClips({
           description={`Posts earn once they pass ${viewMinimum.toLocaleString()} views and are approved with analytics proof.`}
         />
         <ActionForm action={submitClipAction.bind(null, campaignId)} className="flex flex-wrap items-start gap-2">
-          <Input name="url" placeholder="Paste a TikTok, Instagram or YouTube link" required className="min-w-72 flex-1" />
+          <Input name="url" placeholder="Paste a TikTok, Instagram, YouTube or X link" required className="min-w-72 flex-1" />
           <Button type="submit">Submit</Button>
         </ActionForm>
       </Card>

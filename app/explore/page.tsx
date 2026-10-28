@@ -4,12 +4,12 @@ import { ArrowRight } from "lucide-react";
 import { requireUserId } from "@/lib/auth/ensure-user";
 import { listActiveCampaigns } from "@/lib/campaigns/service";
 import { needsOnboarding } from "@/lib/creators/gate";
+import { PLATFORM_LABELS } from "@/lib/campaigns/schemas";
 import { joinCampaignAction } from "@/app/campaigns/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
-const PLATFORM_LABELS: Record<string, string> = { tiktok: "TikTok", instagram: "Instagram", youtube: "YouTube" };
 
 /** Every active campaign a creator can join with one click — where new creators land after onboarding. */
 export default async function ExplorePage() {
@@ -44,7 +44,7 @@ export default async function ExplorePage() {
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {c.eligiblePlatforms.map((p) => (
-                    <Badge key={p} status="platform">{PLATFORM_LABELS[p] ?? p}</Badge>
+                    <Badge key={p} status="platform">{PLATFORM_LABELS[p as keyof typeof PLATFORM_LABELS] ?? p}</Badge>
                   ))}
                 </div>
                 <div className="mt-auto">

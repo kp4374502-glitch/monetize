@@ -5,7 +5,7 @@ Full context lives in `/docs/PRODUCT_SPEC.md` and `/docs/DATABASE_SCHEMA.md` —
 touching any code that involves campaigns, roles, clips, or payouts.
 
 ## What this is
-A multi-tenant SaaS platform for running paid TikTok/Instagram/YouTube clipping campaigns.
+A multi-tenant SaaS platform for running paid TikTok/Instagram/YouTube/X clipping campaigns.
 Brands each get a campaign with their own payout formula; creators submit clip links; Admins/Mods
 review and verify; payouts are calculated in-app but paid out manually on Discord (this app never
 moves money).
@@ -17,7 +17,7 @@ moves money).
 - **Auth:** Clerk — sign in and sign up with an emailed 6-digit code (no passwords); username is kept
   as the display name
 - **External data:** ScrapeCreators API (https://scrapecreators.com/) for views/likes/post
-  metadata on TikTok/Instagram/YouTube — public-data lookups only, no OAuth, no creator
+  metadata on TikTok/Instagram/YouTube/X — public-data lookups only, no OAuth, no creator
   account-connect flow. See docs/PRODUCT_SPEC.md → "Clip data layer" for scope limits.
 - **File storage:** Vercel Blob (private) — serves already-accepted analytics-proof screenshots only;
   new screenshot upload was removed (Task 5 Part 2), so nothing writes to it anymore
@@ -106,7 +106,7 @@ Actions before merge.
   every input.
 - **Auth/security:** Clerk handles the emailed sign-in codes and sessions natively (no passwords). Add separate API-level
   rate limiting (login attempts, invite-link redemption) distinct from the business-level 100/day
-  submission cap. Validate clip URLs against TikTok/Instagram/YouTube patterns before any
+  submission cap. Validate clip URLs against TikTok/Instagram/YouTube/X patterns before any
   ScrapeCreators call.
 - **Bootstrap:** the single platform Owner is created by a one-time seed script at initial
   deploy (`is_platform_owner = true`) — never via a UI route.

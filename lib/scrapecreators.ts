@@ -16,7 +16,8 @@ export interface ClipMetadata {
   caption: string | null;
   /**
    * ScrapeCreators' own "is_video" flag — Instagram-specific. TikTok/YouTube posts our URL parser
-   * accepts are always video, so this is always `true` for them. For Instagram it's `false` for a
+   * accepts are always video, so this is always `true` for them. X posts are always `true` too: X
+   * reports a view count for every post type (text, photo, video), so there is no manual fallback. For Instagram it's `false` for a
    * confirmed photo/carousel (no view data exists for that post type at all) and `true` for a real
    * Reel; see lib/clips/rules.ts canSetManualViews, which this flag exists to drive.
    */
@@ -26,7 +27,8 @@ export interface ClipMetadata {
    * live per platform: TikTok aweme_detail.create_time (epoch seconds), Instagram
    * xdt_shortcode_media.taken_at_timestamp (epoch seconds, present even for a photo/carousel post),
    * YouTube's top-level publishDate (ISO string with a real timezone offset — never publishDateText,
-   * which is coarse/relative, and never anything under watchNextVideos, which is a different video).
+   * which is coarse/relative, and never anything under watchNextVideos, which is a different video),
+   * X's legacy.created_at ("Fri Oct 23 23:37:56 +0000 2026", with an explicit offset).
    * null if ScrapeCreators didn't return one — never guessed or defaulted; see setPostedAt.
    */
   postedAt: Date | null;
@@ -60,6 +62,12 @@ const dateFromEpochSeconds = (v: unknown): Date | null => {
   return typeof n === "number" && Number.isFinite(n) && n > 0 ? new Date(n * 1000) : null;
 };
 const dateFromIso = (v: unknown): Date | null => {
+  if (typeof v !== "string" || !v) return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+// X's own date format: "Fri Oct 23 23:37:56 +0000 2026" (parsed by the JS Date parser, offset included).
+const dateFromXDate = (v: unknown): Date | null => {
   if (typeof v !== "string" || !v) return null;
   const d = new Date(v);
   return Number.isNaN(d.getTime()) ? null : d;
@@ -99,6 +107,20 @@ export function parse(platform: Platform, j: any): ClipMetadata {
       postedAt: dateFromEpochSeconds(get(j, `${m}.taken_at_timestamp`)),
     };
   }
+  if (platform === "x") {
+    // Confirmed live against /v1/twitter/tweet. views.count is a string and only present while X
+    // reports it (state "EnabledWithCount"); older posts return views:{state:"Enabled"} with no
+    // count, which is 0 here rather than an error.
+    const m = get(j, "legacy.extended_entities.media.0.media_url_https") ?? get(j, "legacy.entities.media.0.media_url_https");
+    return {
+      views: num(get(j, "views.count")),
+      likes: num(get(j, "legacy.favorite_count")),
+      caption: str(get(j, "legacy.full_text")),
+      thumbnailUrl: str(m),
+      isVideo: true,
+      postedAt: dateFromXDate(get(j, "legacy.created_at")),
+    };
+  }
   return {
     views: num(j?.viewCountInt ?? j?.viewCountText),
     likes: num(j?.likeCountInt ?? j?.likeCountText),
@@ -115,6 +137,7 @@ const ENDPOINT: Record<Platform, string> = {
   tiktok: "/v2/tiktok/video",
   instagram: "/v1/instagram/post",
   youtube: "/v1/youtube/video",
+  x: "/v1/twitter/tweet",
 };
 
 export async function fetchClipMetadata(url: string, platform: Platform, opts: FetchOptions = {}): Promise<FetchResult> {

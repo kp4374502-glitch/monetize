@@ -1,6 +1,16 @@
 import { z } from "zod";
 
-export const PLATFORMS = ["tiktok", "instagram", "youtube"] as const;
+export const PLATFORMS = ["tiktok", "instagram", "youtube", "x"] as const;
+
+export const PLATFORM_LABELS: Record<(typeof PLATFORMS)[number], string> = {
+  tiktok: "TikTok",
+  instagram: "Instagram",
+  youtube: "YouTube",
+  x: "X",
+};
+
+/** The set of platforms a campaign accepts posts from. At least one. */
+export const eligiblePlatformsSchema = z.array(z.enum(PLATFORMS)).min(1, "Select at least one platform");
 
 const money = (label: string) =>
   z.coerce
@@ -18,7 +28,7 @@ export const campaignFieldsSchema = z.object({
   // Retired: only Owner/Admin mark paid now. The column stays (additive-only schema) and is always stored as 0.
   modMarkPaidThreshold: money("Mod mark-paid threshold").default(0),
   dailySubmissionLimit: z.coerce.number().int().positive("Daily limit must be at least 1").default(100),
-  eligiblePlatforms: z.array(z.enum(PLATFORMS)).min(1, "Select at least one platform"),
+  eligiblePlatforms: eligiblePlatformsSchema,
 });
 
 export const createCampaignSchema = campaignFieldsSchema;

@@ -25,7 +25,7 @@ export const campaignStatusEnum = pgEnum("campaign_status", [
   "archived",
 ]);
 
-export const platformEnum = pgEnum("platform", ["tiktok", "instagram", "youtube"]);
+export const platformEnum = pgEnum("platform", ["tiktok", "instagram", "youtube", "x"]);
 
 // "awaiting_analytics" (Task 5 Part 3): a pre-review gate, not a terminal status — a clip sits here
 // from submission until 7 days have passed since the POST's own publish date AND proof is attached;

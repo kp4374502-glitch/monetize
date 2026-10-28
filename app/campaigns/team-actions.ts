@@ -32,6 +32,10 @@ export const addBrandViewerAction = async (campaignId: string, _p: ActionState, 
 export const removeBrandViewerAction = async (campaignId: string, brandRowId: string, _p: ActionState, _fd: FormData) =>
   run([`/campaigns/${campaignId}`], (u) => campaigns.removeBrand(u, campaignId, brandRowId));
 
+// ---- campaign settings: eligible platforms (Owner/Admin) ----------------------------------------
+export const setPlatformsAction = async (campaignId: string, _p: ActionState, fd: FormData) =>
+  run([`/campaigns/${campaignId}`, "/explore"], (u) => campaigns.setEligiblePlatforms(u, campaignId, fd.getAll("eligiblePlatforms")), "Saved.");
+
 // ---- platform-wide Admin (platform Owner only) ----------------------------------------------------
 export const addAdminAction = async (_p: ActionState, fd: FormData) =>
   run(["/team"], (u) => team.addPlatformAdmin(u, username(fd)), "Added as Admin.");
