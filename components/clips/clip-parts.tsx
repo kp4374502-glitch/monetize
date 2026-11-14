@@ -4,7 +4,7 @@ import { ActionForm } from "@/components/action-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { editRejectionReasonAction, reviewAction, setPctAction } from "@/app/campaigns/clip-actions";
+import { editRejectionReasonAction, reviewAction, setManualViewsAction, setPctAction } from "@/app/campaigns/clip-actions";
 import { effectiveViews, hasAnalyticsProof } from "@/lib/clips/rules";
 
 export type ClipRow = typeof clips.$inferSelect;
@@ -152,6 +152,40 @@ export function PctForm({ campaignId, clip }: { campaignId: string; clip: ClipRo
         Payout: <span className="font-bold text-gold-light">{money(clip.payout)}</span>
       </span>
     </ActionForm>
+  );
+}
+
+/**
+ * Only shown for a clip ScrapeCreators has confirmed is an Instagram photo/carousel — that post
+ * type has no automatic view number at all, so a Mod/Admin/Owner enters one after checking the
+ * creator's analytics proof video themselves. Never offered for a real video (the auto-fetched
+ * number is trusted there); the service re-checks this regardless of what the UI shows. Shared by the
+ * dashboard review queue and the History rows.
+ */
+export function ManualViewsForm({ campaignId, clip }: { campaignId: string; clip: ClipRow }) {
+  return (
+    <div className="space-y-1 border-t border-subtle pt-2.5" data-testid="manual-views">
+      <p className="text-xs text-text-secondary">
+        ScrapeCreators has no view data for this post — it's a photo/carousel, not a video. After checking the
+        creator's proof video, you can enter the view count shown on their private analytics screen.
+      </p>
+      <ActionForm action={setManualViewsAction.bind(null, campaignId, clip.id)} className="flex flex-wrap items-center gap-2">
+        <Input
+          name="manualViews"
+          type="number"
+          step="1"
+          min="0"
+          placeholder="Manual view count"
+          defaultValue={clip.manualViews ?? ""}
+          className="w-44"
+          data-testid="manual-views-input"
+        />
+        <Button type="submit" variant="outline" size="sm">
+          {clip.manualViews !== null ? "Update views" : "Set views"}
+        </Button>
+        {clip.manualViews !== null && <span className="text-xs text-text-secondary">Leave blank and submit to clear it.</span>}
+      </ActionForm>
+    </div>
   );
 }
 

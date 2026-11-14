@@ -3,10 +3,10 @@ import { ActionForm } from "@/components/action-form";
 import { Button } from "@/components/ui/button";
 import { Callout, Card, SectionHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { clipApproveAction, markPaidAction, reviewAction, setManualViewsAction } from "@/app/campaigns/clip-actions";
+import { clipApproveAction, markPaidAction, reviewAction } from "@/app/campaigns/clip-actions";
 import { canRejectInline, canSetManualViews } from "@/lib/clips/rules";
 import { DeleteClipButton } from "./delete-clip-button";
-import { AnalyticsProof, ClipApprovedBadge, CreatorPostNumber, InlineRejectForm, PctForm, PostNumber, Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
+import { AnalyticsProof, ClipApprovedBadge, CreatorPostNumber, InlineRejectForm, ManualViewsForm, PctForm, PostNumber, Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
 
 function ClipApproveButton({ campaignId, clip }: { campaignId: string; clip: ClipRow }) {
   if (clip.clipApproved) return null;
@@ -30,39 +30,6 @@ function ProofLine({ clip, campaignId, missingId }: { clip: ClipRow; campaignId:
       <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
       <span>Analytics proof missing — earns $0 until the creator attaches it.</span>
     </Callout>
-  );
-}
-
-/**
- * Only shown for a clip ScrapeCreators has confirmed is an Instagram photo/carousel — that post
- * type has no automatic view number at all, so a Mod/Admin/Owner enters one after checking the
- * creator's analytics proof video themselves. Never offered for a real video (the auto-fetched
- * number is trusted there); the service re-checks this regardless of what the UI shows.
- */
-function ManualViewsForm({ campaignId, clip }: { campaignId: string; clip: ClipRow }) {
-  return (
-    <div className="space-y-1 border-t border-subtle pt-2.5" data-testid="manual-views">
-      <p className="text-xs text-text-secondary">
-        ScrapeCreators has no view data for this post — it's a photo/carousel, not a video. After checking the
-        creator's proof video, you can enter the view count shown on their private analytics screen.
-      </p>
-      <ActionForm action={setManualViewsAction.bind(null, campaignId, clip.id)} className="flex flex-wrap items-center gap-2">
-        <Input
-          name="manualViews"
-          type="number"
-          step="1"
-          min="0"
-          placeholder="Manual view count"
-          defaultValue={clip.manualViews ?? ""}
-          className="w-44"
-          data-testid="manual-views-input"
-        />
-        <Button type="submit" variant="outline" size="sm">
-          {clip.manualViews !== null ? "Update views" : "Set views"}
-        </Button>
-        {clip.manualViews !== null && <span className="text-xs text-text-secondary">Leave blank and submit to clear it.</span>}
-      </ActionForm>
-    </div>
   );
 }
 

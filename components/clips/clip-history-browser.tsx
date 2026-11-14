@@ -3,11 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Callout, Card, SectionHeader, StatCard } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/input";
 import { clipApproveAction, markPaidAction, reviewAction, setPostedAtAction } from "@/app/campaigns/clip-actions";
-import { analyticsGateState, canRejectInline } from "@/lib/clips/rules";
+import { analyticsGateState, canRejectInline, canSetManualViews } from "@/lib/clips/rules";
 import type { ClipHistoryStatusFilter } from "@/lib/clips/service";
 import { AutoSubmitSelect } from "./auto-submit-select";
 import { DeleteClipButton } from "./delete-clip-button";
-import { AnalyticsProof, ClipApprovedBadge, CreatorPostNumber, EditReasonForm, InlineRejectForm, PctForm, PostNumber, Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
+import { AnalyticsProof, ClipApprovedBadge, CreatorPostNumber, EditReasonForm, InlineRejectForm, ManualViewsForm, PctForm, PostNumber, Stats, StatusBadge, Thumb, money, type ClipRow } from "./clip-parts";
 
 type Row = { clip: ClipRow; creatorUsername: string; postNumber: number; creatorPostNumber: number | null };
 
@@ -228,6 +228,13 @@ export function ClipHistoryBrowser({
                     </div>
                   )}
                   <p className="mt-1 text-xs text-text-secondary">Submitted {submittedOn(c.submittedAt)}</p>
+                  {/* Instagram photo/carousel only (ScrapeCreators has no views for it). Hidden once paid
+                      or rejected, same as the server, which refuses a paid post. */}
+                  {canReview && canSetManualViews(c) && c.paidStatus !== "paid" && c.status !== "rejected" && (
+                    <div className="mt-2">
+                      <ManualViewsForm campaignId={campaignId} clip={c} />
+                    </div>
+                  )}
                   {c.status === "rejected" && c.rejectionReason && (
                     <p className="mt-1 text-xs text-red-300">Rejected: {c.rejectionReason}</p>
                   )}
