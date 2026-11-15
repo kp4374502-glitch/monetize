@@ -97,6 +97,27 @@ export function canRejectInline(clip: { status: string; paidStatus: string }): b
 }
 
 /**
+ * Whether a History row gets the Qualifying Audience % box. Two cases:
+ *  - an Analytics Approved clip that still has no % (the "waiting for Audience %" step), and
+ *  - an Instagram photo/carousel the reviewer is already working on from History (it has the manual
+ *    views box there), so views and % can both be entered on the one card instead of bouncing back to
+ *    the dashboard queue. That covers Pending and Approved, but not rejected or paid ones.
+ * UI-only convenience: setQualifyingAudiencePct enforces roles, proof, the override rule and the paid
+ * lock itself regardless. The box is rendered disabled until the clip has analytics proof.
+ */
+export function canEnterPctInline(clip: {
+  status: string;
+  paidStatus: string;
+  qualifyingAudiencePct: string | null;
+  platform: string;
+  isVideo: boolean | null;
+}): boolean {
+  if (clip.paidStatus === "paid") return false;
+  if (clip.status === "approved" && clip.qualifyingAudiencePct === null) return true;
+  return canSetManualViews(clip) && clip.status !== "rejected";
+}
+
+/**
  * Reversing a prior Analytics Reject back to Approved is a judgment call, not a routine
  * self-correction -- restricted to Admin/Owner even when roleCanOverride would otherwise let the
  * rejecting Mod undo their own call. The other direction (rejecting a previously-approved clip)

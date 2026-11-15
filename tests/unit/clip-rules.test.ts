@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   analyticsGateState,
+  canEnterPctInline,
   canRejectInline,
   canReverseRejection,
   canSetManualViews,
@@ -64,6 +65,38 @@ describe("canRejectInline (which rows get the inline Reject control)", () => {
   it("excludes already-rejected and paid clips", () => {
     expect(canRejectInline(row("rejected", "unpaid"))).toBe(false);
     expect(canRejectInline(row("approved", "paid"))).toBe(false);
+  });
+});
+
+describe("canEnterPctInline (which History rows get the Qualifying Audience % box)", () => {
+  const row = (o: Partial<{ status: string; paidStatus: string; qualifyingAudiencePct: string | null; platform: string; isVideo: boolean | null }>) => ({
+    status: "pending",
+    paidStatus: "unpaid",
+    qualifyingAudiencePct: null,
+    platform: "tiktok",
+    isVideo: true,
+    ...o,
+  });
+  const slideshow = { platform: "instagram", isVideo: false };
+
+  it("an Instagram photo/carousel gets it while Pending or Approved, so views and % are entered on one card", () => {
+    expect(canEnterPctInline(row({ ...slideshow, status: "pending" }))).toBe(true);
+    expect(canEnterPctInline(row({ ...slideshow, status: "approved", qualifyingAudiencePct: null }))).toBe(true);
+    expect(canEnterPctInline(row({ ...slideshow, status: "approved", qualifyingAudiencePct: "25.00" }))).toBe(true); // re-edit after changing views
+  });
+  it("an Approved clip with no % still gets it, whatever the platform (existing behaviour)", () => {
+    expect(canEnterPctInline(row({ status: "approved", qualifyingAudiencePct: null }))).toBe(true);
+    expect(canEnterPctInline(row({ status: "approved", qualifyingAudiencePct: "25.00" }))).toBe(false);
+  });
+  it("a Pending real video or an Instagram Reel does not get it on History (that's the dashboard queue)", () => {
+    expect(canEnterPctInline(row({ platform: "tiktok", status: "pending" }))).toBe(false);
+    expect(canEnterPctInline(row({ platform: "instagram", isVideo: true, status: "pending" }))).toBe(false);
+    expect(canEnterPctInline(row({ platform: "instagram", isVideo: null, status: "pending" }))).toBe(false);
+  });
+  it("never for rejected or paid clips, even a photo/carousel", () => {
+    expect(canEnterPctInline(row({ ...slideshow, status: "rejected" }))).toBe(false);
+    expect(canEnterPctInline(row({ ...slideshow, status: "approved", paidStatus: "paid" }))).toBe(false);
+    expect(canEnterPctInline(row({ status: "approved", paidStatus: "paid" }))).toBe(false);
   });
 });
 

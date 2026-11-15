@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Callout, Card, SectionHeader, StatCard } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/input";
 import { clipApproveAction, markPaidAction, reviewAction, setPostedAtAction } from "@/app/campaigns/clip-actions";
-import { analyticsGateState, canRejectInline, canSetManualViews } from "@/lib/clips/rules";
+import { analyticsGateState, canEnterPctInline, canRejectInline, canSetManualViews } from "@/lib/clips/rules";
 import type { ClipHistoryStatusFilter } from "@/lib/clips/service";
 import { AutoSubmitSelect } from "./auto-submit-select";
 import { DeleteClipButton } from "./delete-clip-button";
@@ -265,7 +265,7 @@ export function ClipHistoryBrowser({
                       </Button>
                     </ActionForm>
                   )}
-                  {requireAnalyticsProof && canReview && c.status === "approved" && c.qualifyingAudiencePct === null && (
+                  {requireAnalyticsProof && canReview && canEnterPctInline(c) && (
                     <div className="mt-1.5">
                       <PctForm campaignId={campaignId} clip={c} />
                     </div>
