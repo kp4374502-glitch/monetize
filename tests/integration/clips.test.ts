@@ -567,6 +567,21 @@ describe("setManualViews (Instagram photo/carousel posts)", () => {
     expect([set.views, set.manualViews, set.cpm, set.payout]).toEqual([0, 10000, "1.0000", "10.00"]);
   });
 
+  it("a Pending carousel with views and a % has a payout but isn't Owed until it's Analytics Approved", async () => {
+    const c = await igCampaign();
+    const clip = await igClip(c, false);
+    await svc.attachVideoProof("c1", c, clip.id, "https://youtu.be/aaaaaaaaaaa");
+    await svc.setQualifyingAudiencePct("admin", c, clip.id, 50);
+    await svc.setManualViews("admin", c, clip.id, "10000");
+
+    const pending = (await db.select().from(clips).where(eq(clips.id, clip.id)))[0];
+    expect([pending.status, pending.payout]).toEqual(["pending", "10.00"]);
+    expect((await svc.getClipHistory("admin", c)).totals.owed).toBe("0.00"); // priced, but nobody owes it yet
+
+    await svc.reviewClip("admin", c, clip.id, { action: "approve" }); // what the History card's Analytics Approve button calls
+    expect((await svc.getClipHistory("admin", c)).totals.owed).toBe("10.00");
+  });
+
   it("a blank submission clears the override and reverts to the automatic number", async () => {
     const c = await igCampaign();
     const clip = await igClip(c, false);

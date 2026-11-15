@@ -270,6 +270,16 @@ export function ClipHistoryBrowser({
                       <PctForm campaignId={campaignId} clip={c} />
                     </div>
                   )}
+                  {/* Same action as the dashboard review queue's Approve button (reviewClip re-checks roles,
+                      proof and the budget), so a Pending post can be finished here without going back. */}
+                  {canReview && c.status === "pending" && (
+                    <ActionForm action={reviewAction.bind(null, campaignId, c.id)} className="mt-1.5">
+                      <input type="hidden" name="intent" value="approve" />
+                      <Button type="submit" size="sm" data-testid="history-approve">
+                        {requireAnalyticsProof ? "Analytics Approve" : "Approve"}
+                      </Button>
+                    </ActionForm>
+                  )}
                   {canMarkPaid && c.status === "approved" && c.paidStatus !== "paid" && (
                     <ActionForm action={markPaidAction.bind(null, campaignId, c.id)} className="mt-1.5">
                       <Button type="submit" size="sm" disabled={c.payout === null} data-testid="history-mark-paid">
