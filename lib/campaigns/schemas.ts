@@ -31,6 +31,9 @@ export const campaignFieldsSchema = z.object({
   eligiblePlatforms: eligiblePlatformsSchema,
 });
 
+/** Just the descriptive details. Renaming never touches payout settings, platforms or status. */
+export const campaignDetailsSchema = campaignFieldsSchema.pick({ brandName: true, name: true });
+
 export const createCampaignSchema = campaignFieldsSchema;
 export const updateCampaignSchema = campaignFieldsSchema;
 

@@ -15,8 +15,9 @@ import { effectiveViews } from "@/lib/clips/rules";
 import { getCampaignChannels } from "@/lib/channels/service";
 import { ChannelsPanel } from "@/components/channels/channels-panel";
 import { generateInviteLinkAction, revokeInviteLinkAction, setLifecycleAction } from "../actions";
-import { addBrandViewerAction, addModAction, removeBrandViewerAction, removeModAction, setPlatformsAction } from "../team-actions";
+import { addBrandViewerAction, addModAction, removeBrandViewerAction, removeModAction, setPlatformsAction, updateDetailsAction } from "../team-actions";
 import { PlatformForm } from "@/components/campaigns/platform-form";
+import { DetailsForm } from "@/components/campaigns/details-form";
 import { AssignForm, RemoveForm } from "@/components/team/assign-form";
 import { refreshCampaignViewsAction } from "../clip-actions";
 import { ActionForm } from "@/components/action-form";
@@ -185,6 +186,15 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
                 </li>
               ))}
             </ul>
+          </Card>
+        </section>
+      )}
+
+      {isAdmin && (
+        <section data-testid="details-section">
+          <SectionHeader title="Campaign details" description="Rename the campaign or its brand. Shows everywhere the campaign appears, for everyone on it." />
+          <Card>
+            <DetailsForm action={updateDetailsAction.bind(null, id)} brandName={campaign.brandName} name={campaign.name} />
           </Card>
         </section>
       )}

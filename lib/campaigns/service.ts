@@ -17,7 +17,7 @@ import {
 } from "../../drizzle/schema";
 import { getRoleForCampaign, isPlatformAdmin, isPlatformOwner, requireRole } from "../auth/roles";
 import { isApprovedBrand } from "../brand/service";
-import { createCampaignSchema, eligiblePlatformsSchema, updateCampaignSchema } from "./schemas";
+import { campaignDetailsSchema, createCampaignSchema, eligiblePlatformsSchema, updateCampaignSchema } from "./schemas";
 
 /**
  * Tenant-scoped campaign operations. Every function takes the acting user explicitly and checks
@@ -65,6 +65,21 @@ export async function updateCampaignSettings(actorId: string, campaignId: string
   await requireRole(actorId, campaignId, "admin");
   const data = updateCampaignSchema.parse(input);
   const [row] = await db.update(campaigns).set(toDb(data)).where(eq(campaigns.id, campaignId)).returning();
+  return row;
+}
+
+/**
+ * Owner/Admin: rename the campaign and/or its brand. Only these two columns change; payout settings,
+ * platforms and status are untouched (they have their own controls).
+ */
+export async function updateCampaignDetails(actorId: string, campaignId: string, input: unknown) {
+  await requireRole(actorId, campaignId, "admin");
+  const { brandName, name } = campaignDetailsSchema.parse(input);
+  const [row] = await db
+    .update(campaigns)
+    .set({ brandName, name })
+    .where(eq(campaigns.id, campaignId))
+    .returning({ id: campaigns.id, brandName: campaigns.brandName, name: campaigns.name });
   return row;
 }
 
