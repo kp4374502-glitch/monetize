@@ -43,6 +43,24 @@ export const updateDetailsAction = async (campaignId: string, _p: ActionState, f
     "Saved.",
   );
 
+// ---- campaign settings: pay terms and limits (Owner/Admin) --------------------------------------
+const PAYOUT_FIELDS = ["baseRate", "divisor", "maxPayPerPost", "viewMinimum", "totalBudget", "dailySubmissionLimit"] as const;
+
+export async function updatePayoutSettingsAction(campaignId: string, _p: ActionState, fd: FormData): Promise<ActionState> {
+  let pinnedPosts = 0;
+  const result = await run([`/campaigns/${campaignId}`, `/campaigns/${campaignId}/history`], async (u) => {
+    const input = Object.fromEntries(PAYOUT_FIELDS.map((k) => [k, fd.get(k)]));
+    ({ pinnedPosts } = await campaigns.updatePayoutSettings(u, campaignId, input));
+  });
+  if (result.error) return result;
+  return {
+    ok: true,
+    message: pinnedPosts
+      ? `Saved. The ${pinnedPosts.toLocaleString("en-US")} post${pinnedPosts === 1 ? "" : "s"} already submitted keep their previous pay terms; new posts use these.`
+      : "Saved.",
+  };
+}
+
 // ---- campaign settings: eligible platforms (Owner/Admin) ----------------------------------------
 export const setPlatformsAction = async (campaignId: string, _p: ActionState, fd: FormData) =>
   run([`/campaigns/${campaignId}`, "/explore"], (u) => campaigns.setEligiblePlatforms(u, campaignId, fd.getAll("eligiblePlatforms")), "Saved.");

@@ -273,6 +273,12 @@ export const clips = pgTable(
     // current rate (the normal case). Used to pin posts to the rate they were submitted under when
     // a campaign's rate later changes, so a rate change applies going forward only (see PRODUCT_SPEC).
     baseRateOverride: numeric("base_rate_override", { precision: 10, scale: 4 }),
+    // Same idea for the other pay terms: null = follow the campaign; set = the value this post was
+    // submitted under. Written by updatePayoutSettings when a campaign's term changes, only on posts
+    // that don't already have their own pin, so an edit never re-prices posts already submitted.
+    divisorOverride: numeric("divisor_override", { precision: 10, scale: 4 }),
+    maxPayPerPostOverride: numeric("max_pay_per_post_override", { precision: 10, scale: 2 }),
+    viewMinimumOverride: integer("view_minimum_override"),
     // Two-step approval: a pure content/eligibility check (guidelines, brand integration, CTA) —
     // independent of `status`, the 7-day analytics gate, and payout math. Settable any time,
     // including while still `awaiting_analytics` and before any proof exists. Never reset by a

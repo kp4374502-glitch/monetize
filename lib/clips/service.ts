@@ -65,7 +65,18 @@ function assertNotOwnPost(role: string | null, actorId: string, clip: Pick<Clip,
 
 /** cpm/earnings/payout columns for a clip's current state; nulls when not (yet) earning. */
 function economicsColumns(
-  clip: Pick<Clip, "views" | "manualViews" | "qualifyingAudiencePct" | "videoProofUrl" | "analyticsScreenshotPathname" | "baseRateOverride">,
+  clip: Pick<
+    Clip,
+    | "views"
+    | "manualViews"
+    | "qualifyingAudiencePct"
+    | "videoProofUrl"
+    | "analyticsScreenshotPathname"
+    | "baseRateOverride"
+    | "divisorOverride"
+    | "maxPayPerPostOverride"
+    | "viewMinimumOverride"
+  >,
   campaign: Campaign,
 ) {
   const e = computeEconomics({
@@ -74,11 +85,11 @@ function economicsColumns(
     videoProofUrl: clip.videoProofUrl,
     analyticsScreenshotPathname: clip.analyticsScreenshotPathname,
     campaign: {
-      // The post's own pinned rate, if it has one, else the campaign's current rate.
+      // Each term: the post's own pinned value, if it has one, else the campaign's current value.
       baseRate: Number(clip.baseRateOverride ?? campaign.baseRate),
-      divisor: Number(campaign.divisor),
-      maxPayPerPost: Number(campaign.maxPayPerPost),
-      viewMinimum: campaign.viewMinimum,
+      divisor: Number(clip.divisorOverride ?? campaign.divisor),
+      maxPayPerPost: Number(clip.maxPayPerPostOverride ?? campaign.maxPayPerPost),
+      viewMinimum: clip.viewMinimumOverride ?? campaign.viewMinimum,
       requireAnalyticsProof: campaign.requireAnalyticsProof,
     },
   });
@@ -165,7 +176,17 @@ export async function submitClip(actorId: string, campaignId: string, rawUrl: st
         // All-null for a proof-gated campaign (nothing earns until proof + %), so identical to the column
         // defaults there; a no-analytics campaign is priced from views alone, immediately.
         ...economicsColumns(
-          { views, manualViews: null, qualifyingAudiencePct: null, videoProofUrl: null, analyticsScreenshotPathname: null, baseRateOverride: null },
+          {
+            views,
+            manualViews: null,
+            qualifyingAudiencePct: null,
+            videoProofUrl: null,
+            analyticsScreenshotPathname: null,
+            baseRateOverride: null,
+            divisorOverride: null,
+            maxPayPerPostOverride: null,
+            viewMinimumOverride: null,
+          },
           campaign,
         ),
       })

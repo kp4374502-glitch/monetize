@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, notInArray } from "drizzle-orm";
+import { and, asc, eq, inArray, notInArray, sql } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 import { db } from "../db/client";
 import {
@@ -17,7 +17,7 @@ import {
 } from "../../drizzle/schema";
 import { getRoleForCampaign, isPlatformAdmin, isPlatformOwner, requireRole } from "../auth/roles";
 import { isApprovedBrand } from "../brand/service";
-import { campaignDetailsSchema, createCampaignSchema, eligiblePlatformsSchema, updateCampaignSchema } from "./schemas";
+import { campaignDetailsSchema, createCampaignSchema, eligiblePlatformsSchema, payoutSettingsSchema, updateCampaignSchema } from "./schemas";
 
 /**
  * Tenant-scoped campaign operations. Every function takes the acting user explicitly and checks
@@ -81,6 +81,63 @@ export async function updateCampaignDetails(actorId: string, campaignId: string,
     .where(eq(campaigns.id, campaignId))
     .returning({ id: campaigns.id, brandName: campaigns.brandName, name: campaigns.name });
   return row;
+}
+
+export type PayTerm = "baseRate" | "divisor" | "maxPayPerPost" | "viewMinimum";
+
+/**
+ * Owner/Admin: edit a live campaign's pay terms and limits. Pay terms (base rate, divisor, max pay per
+ * post, view minimum) apply going forward only: every post already in the campaign is first pinned to
+ * the value it was submitted under (its clips.*_override), unless it already has its own pin (e.g. the
+ * Hair u rate change), so nothing already submitted re-prices. Total budget and the daily submission
+ * limit apply immediately; the budget may be set to any non-negative amount, even below what's been
+ * paid. Name, brand, platforms and status are untouched (they have their own controls).
+ */
+export async function updatePayoutSettings(actorId: string, campaignId: string, input: unknown) {
+  await requireRole(actorId, campaignId, "admin");
+  const data = payoutSettingsSchema.parse(input);
+
+  return db.transaction(async (tx) => {
+    // Locked so two concurrent edits can't each pin against a value the other is replacing.
+    const [c] = await tx.select().from(campaigns).where(eq(campaigns.id, campaignId)).for("update");
+    if (!c) throw new Error("Campaign not found.");
+
+    // Compare as stored: the columns round (base rate/divisor to 4 decimals, money to 2).
+    const changed: PayTerm[] = [];
+    if (Number(c.baseRate) !== Number(data.baseRate.toFixed(4))) changed.push("baseRate");
+    if (Number(c.divisor) !== Number(data.divisor.toFixed(4))) changed.push("divisor");
+    if (Number(c.maxPayPerPost) !== Number(data.maxPayPerPost.toFixed(2))) changed.push("maxPayPerPost");
+    if (c.viewMinimum !== data.viewMinimum) changed.push("viewMinimum");
+
+    let pinnedPosts = 0;
+    if (changed.length) {
+      const pins = {
+        ...(changed.includes("baseRate") && { baseRateOverride: sql`coalesce(${clips.baseRateOverride}, ${c.baseRate})` }),
+        ...(changed.includes("divisor") && { divisorOverride: sql`coalesce(${clips.divisorOverride}, ${c.divisor})` }),
+        ...(changed.includes("maxPayPerPost") && {
+          maxPayPerPostOverride: sql`coalesce(${clips.maxPayPerPostOverride}, ${c.maxPayPerPost})`,
+        }),
+        ...(changed.includes("viewMinimum") && { viewMinimumOverride: sql`coalesce(${clips.viewMinimumOverride}, ${c.viewMinimum})` }),
+      };
+      // Every post already in THIS campaign, paid or deleted included, so the rule holds if one is ever restored or un-paid.
+      const pinned = await tx.update(clips).set(pins).where(eq(clips.campaignId, campaignId)).returning({ id: clips.id });
+      pinnedPosts = pinned.length;
+    }
+
+    const [row] = await tx
+      .update(campaigns)
+      .set({
+        baseRate: String(data.baseRate),
+        divisor: String(data.divisor),
+        maxPayPerPost: String(data.maxPayPerPost),
+        viewMinimum: data.viewMinimum,
+        totalBudget: String(data.totalBudget),
+        dailySubmissionLimit: data.dailySubmissionLimit,
+      })
+      .where(eq(campaigns.id, campaignId))
+      .returning();
+    return { campaign: row, changedPayTerms: changed, pinnedPosts };
+  });
 }
 
 async function setStatus(
