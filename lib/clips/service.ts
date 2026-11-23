@@ -898,6 +898,8 @@ function withReviewerNumbers<T extends { clip: Clip }>(rows: T[], nums: PostNumb
  * other creators have submitted.
  */
 export async function getCreatorClips(actorId: string, campaignId: string) {
+  // No role on this campaign (never joined, or it is archived, which hides it from creators) -> nothing, not an error.
+  if (!(await getRoleForCampaign(actorId, campaignId))) return [];
   const mine = await db
     .select()
     .from(clips)

@@ -91,6 +91,25 @@ function Landing() {
   );
 }
 
+function CampaignRow({ c }: { c: Awaited<ReturnType<typeof getCampaignsForUser>>[number] }) {
+  return (
+    <li>
+      <Link href={`/campaigns/${c.id}`} className="block transition hover:-translate-y-0.5">
+        <Card innerClassName="flex items-center justify-between gap-3">
+          <span className="min-w-0">
+            <span className="block truncate font-bold">{c.name}</span>
+            <span className="block truncate text-sm text-text-secondary">{c.brandName}</span>
+          </span>
+          <span className="flex shrink-0 items-center gap-1.5">
+            {c.status !== "active" && <Badge status={c.status} />}
+            <Badge status={c.role ?? "creator"} />
+          </span>
+        </Card>
+      </Link>
+    </li>
+  );
+}
+
 export default async function Home() {
   const { userId } = await auth();
   if (!userId) return <Landing />;
@@ -141,24 +160,20 @@ export default async function Home() {
           )}
         </Card>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
-          {list.map((c) => (
-            <li key={c.id}>
-              <Link href={`/campaigns/${c.id}`} className="block transition hover:-translate-y-0.5">
-                <Card innerClassName="flex items-center justify-between gap-3">
-                  <span className="min-w-0">
-                    <span className="block truncate font-bold">{c.name}</span>
-                    <span className="block truncate text-sm text-text-secondary">{c.brandName}</span>
-                  </span>
-                  <span className="flex shrink-0 items-center gap-1.5">
-                    {c.status !== "active" && <Badge status={c.status} />}
-                    <Badge status={c.role ?? "creator"} />
-                  </span>
-                </Card>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="grid gap-3 sm:grid-cols-2" data-testid="campaign-list">
+            {list.filter((c) => c.status !== "archived").map((c) => <CampaignRow key={c.id} c={c} />)}
+          </ul>
+          {/* Archived campaigns only ever reach the Owner, Admins, Mods and Brand viewers (never creators). */}
+          {list.some((c) => c.status === "archived") && (
+            <section className="space-y-3 pt-2" data-testid="archived-campaigns">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-text-secondary">Archived</h2>
+              <ul className="grid gap-3 opacity-80 sm:grid-cols-2">
+                {list.filter((c) => c.status === "archived").map((c) => <CampaignRow key={c.id} c={c} />)}
+              </ul>
+            </section>
+          )}
+        </>
       )}
     </main>
   );

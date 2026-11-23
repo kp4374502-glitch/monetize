@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, ne } from "drizzle-orm";
 import { db } from "../db/client";
 import { campaigns, campaignBrands, campaignCreators, campaignMods, platformAdmins, users } from "../../drizzle/schema";
 
@@ -47,7 +47,7 @@ export async function isPlatformAdmin(userId: string): Promise<boolean> {
 export async function getRoleForCampaign(userId: string, campaignId: string): Promise<Role> {
   if (!isUuid(campaignId)) return null;
   const [campaign] = await db
-    .select({ ownerUserId: campaigns.ownerUserId })
+    .select({ ownerUserId: campaigns.ownerUserId, status: campaigns.status })
     .from(campaigns)
     .where(eq(campaigns.id, campaignId))
     .limit(1);
@@ -70,6 +70,11 @@ export async function getRoleForCampaign(userId: string, campaignId: string): Pr
     .where(and(eq(campaignBrands.campaignId, campaignId), eq(campaignBrands.userId, userId)))
     .limit(1);
   if (brandRow) return "brand";
+
+  // An ARCHIVED campaign is visible to the Owner, Admins, Mods and Brand viewers only: a Creator has no
+  // access to it at all (it looks exactly like a campaign they never joined). Their membership row is kept,
+  // so unarchiving brings the campaign straight back with all their posts.
+  if (campaign.status === "archived") return null;
 
   const [creatorRow] = await db
     .select()
@@ -129,8 +134,9 @@ export async function getCampaignForUser(userId: string, campaignId: string) {
 /**
  * Every campaign the user holds a role on, with that role — powers the campaign switcher.
  * Platform Owner and platform Admins see all campaigns (roles apply implicitly everywhere); a Mod
- * sees the campaign they are assigned to; a Creator sees campaigns they have joined. A user can
- * hold different roles in different campaigns (e.g. Mod on one, Creator on another).
+ * sees the campaign they are assigned to; a Creator sees campaigns they have joined, except ARCHIVED
+ * ones (archived campaigns are for Owner/Admin/Mod/Brand only). A user can hold different roles in
+ * different campaigns (e.g. Mod on one, Creator on another).
  */
 export async function getCampaignsForUser(userId: string) {
   const cols = { id: campaigns.id, name: campaigns.name, brandName: campaigns.brandName, status: campaigns.status };
@@ -164,7 +170,7 @@ export async function getCampaignsForUser(userId: string) {
     .select(cols)
     .from(campaignCreators)
     .innerJoin(campaigns, eq(campaigns.id, campaignCreators.campaignId))
-    .where(eq(campaignCreators.userId, userId));
+    .where(and(eq(campaignCreators.userId, userId), ne(campaigns.status, "archived"))); // archived: not visible to creators
   for (const c of joined) if (!found.has(c.id)) found.set(c.id, { ...c, role: "creator" });
 
   return [...found.values()].sort((a, b) => a.name.localeCompare(b.name));

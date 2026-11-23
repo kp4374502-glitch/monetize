@@ -127,6 +127,7 @@ Unlike Admin, a Mod is **not** automatic across campaigns — they must be expli
 - Campaign ownership can be transferred to someone else, though this is an occasional action rather than a routine one.
 - Can delete, pause, or close a campaign at will.
 - A closed/archived campaign can be reopened by the Owner.
+- **Archive / Unarchive** (button on every campaign page, Owner and Admin; archiving asks to confirm): an ARCHIVED campaign is visible to the Owner, Admins, Mods and Brand viewers only. Creators lose all access to it: it disappears from their campaign list and switcher, its page is a 404, they can't submit, it isn't on `/explore`, and its invite link stops working (no join, no campaign name shown). Their membership and posts are kept, so **Unarchive** (back to `active`) restores everything. Archived campaigns sort under an "Archived" heading on the home list. No creator announcement notifications are sent while archived. Enforced centrally in `getRoleForCampaign`/`getCampaignsForUser` (`lib/auth/roles.ts`), plus `lookupInvite` and `getCreatorClips`.
 
 **People**
 

@@ -156,6 +156,10 @@ async function setStatus(
 
 export const pauseCampaign = (actor: string, id: string) => setStatus(actor, id, "paused");
 export const closeCampaign = (actor: string, id: string) => setStatus(actor, id, "closed");
+/**
+ * Owner/Admin. Hides the campaign from creators (they lose all access; their membership and posts are kept)
+ * while the Owner, Admins, Mods and Brand viewers still see it. Reversible: reopenCampaign ("Unarchive").
+ */
 export const archiveCampaign = (actor: string, id: string) => setStatus(actor, id, "archived");
 export const reopenCampaign = (actor: string, id: string) => setStatus(actor, id, "active");
 
@@ -348,20 +352,22 @@ export async function listBrands(actorId: string, campaignId: string) {
 }
 
 export type InviteLookup =
-  | { ok: true; link: typeof inviteLinks.$inferSelect; campaign: { id: string; name: string; brandName: string } }
+  | { ok: true; link: typeof inviteLinks.$inferSelect; campaign: { id: string; name: string; brandName: string; status: string } }
   | { ok: false; reason: "not_found" | "revoked" };
 
 export async function lookupInvite(code: string): Promise<InviteLookup> {
   const [row] = await db
     .select({
       link: inviteLinks,
-      campaign: { id: campaigns.id, name: campaigns.name, brandName: campaigns.brandName },
+      campaign: { id: campaigns.id, name: campaigns.name, brandName: campaigns.brandName, status: campaigns.status },
     })
     .from(inviteLinks)
     .innerJoin(campaigns, eq(campaigns.id, inviteLinks.campaignId))
     .where(eq(inviteLinks.code, code))
     .limit(1);
-  if (!row) return { ok: false, reason: "not_found" };
+  // An archived campaign is hidden from everyone but its team, so its invite link behaves as if it didn't exist
+  // (no joining, and the campaign's name is not revealed to the person holding the link).
+  if (!row || row.campaign.status === "archived") return { ok: false, reason: "not_found" };
   if (row.link.revoked) return { ok: false, reason: "revoked" };
   return { ok: true, ...row };
 }

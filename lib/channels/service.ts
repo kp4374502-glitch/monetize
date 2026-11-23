@@ -62,7 +62,7 @@ export async function getCampaignChannels(userId: string, campaignId: string) {
 export async function createChannelPost(actorId: string, campaignId: string, input: unknown) {
   await requireRole(actorId, campaignId, "admin");
   const data = channelPostSchema.parse(input);
-  const [campaign] = await db.select({ name: campaigns.name }).from(campaigns).where(eq(campaigns.id, campaignId)).limit(1);
+  const [campaign] = await db.select({ name: campaigns.name, status: campaigns.status }).from(campaigns).where(eq(campaigns.id, campaignId)).limit(1);
   if (!campaign) throw new Error("Campaign not found.");
 
   return db.transaction(async (tx) => {
@@ -71,7 +71,8 @@ export async function createChannelPost(actorId: string, campaignId: string, inp
       .values({ campaignId, channel: data.channel, title: data.title, body: data.body, links: data.links, authorUserId: actorId })
       .returning();
 
-    if (data.channel === ANNOUNCEMENTS_CHANNEL) {
+    // Creators can't see an archived campaign, so don't ping them about it.
+    if (data.channel === ANNOUNCEMENTS_CHANNEL && campaign.status !== "archived") {
       const members = await tx
         .select({ userId: campaignCreators.userId })
         .from(campaignCreators)

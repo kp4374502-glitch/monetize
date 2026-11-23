@@ -17,7 +17,8 @@ export async function CampaignSwitcher() {
 
   let list: Awaited<ReturnType<typeof getCampaignsForUser>> = [];
   try {
-    list = await getCampaignsForUser(userId);
+    // Archived campaigns (only ever returned for Owner/Admin/Mod/Brand) sink to the bottom of the menu.
+    list = (await getCampaignsForUser(userId)).sort((a, b) => Number(a.status === "archived") - Number(b.status === "archived"));
   } catch {
     return null; // e.g. database not configured yet — don't take the whole shell down
   }

@@ -16,6 +16,7 @@ import { getCampaignChannels } from "@/lib/channels/service";
 import { ChannelsPanel } from "@/components/channels/channels-panel";
 import { generateInviteLinkAction, revokeInviteLinkAction, setLifecycleAction } from "../actions";
 import { addBrandViewerAction, addModAction, removeBrandViewerAction, removeModAction, setPlatformsAction, updateDetailsAction, updatePayoutSettingsAction } from "../team-actions";
+import { ArchiveCampaignButton } from "@/components/campaigns/archive-campaign-button";
 import { PlatformForm } from "@/components/campaigns/platform-form";
 import { DetailsForm } from "@/components/campaigns/details-form";
 import { PayoutSettingsForm } from "@/components/campaigns/payout-settings-form";
@@ -75,12 +76,16 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
           <Link href={`/campaigns/${id}/history`} className={buttonVariants({ variant: "outline", size: "sm" })}>
             Dashboard
           </Link>
+          {isAdmin && campaign.status === "archived" && (
+            <ArchiveCampaignButton action={setLifecycleAction.bind(null, id, "reopen")} archived />
+          )}
           {isAdmin &&
+            campaign.status !== "archived" &&
             (["pause", "reopen"] as const).map((a) => {
-              // Close, Archive, and Delete are intentionally not exposed anywhere in the UI — too
-              // risky to be one click away on a live campaign. The service-layer functions
-              // (closeCampaign/archiveCampaign/deleteCampaign) still exist for a deliberate,
-              // manual, direct action if ever genuinely needed.
+              // Close and Delete are intentionally not exposed anywhere in the UI — too risky to be one
+              // click away on a live campaign. The service-layer functions (closeCampaign/deleteCampaign)
+              // still exist for a deliberate, manual, direct action if ever genuinely needed. Archive is
+              // exposed (below) behind a confirm and is fully reversible.
               const resultStatus = { pause: "paused", reopen: "active" }[a];
               const isCurrent = campaign.status === resultStatus;
               return (
@@ -97,6 +102,9 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
                 </form>
               );
             })}
+          {isAdmin && campaign.status !== "archived" && (
+            <ArchiveCampaignButton action={setLifecycleAction.bind(null, id, "archive")} archived={false} />
+          )}
         </div>
       </header>
 
