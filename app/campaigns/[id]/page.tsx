@@ -242,7 +242,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
           <div>
             <SectionHeader
               title="Mod / CPE"
-              description="Reviews posts on this campaign only. Can't mark paid, delete, Post Approve or change settings. One campaign at a time."
+              description="Reviews posts on this campaign. Can't mark paid, delete, Post Approve or change settings. Can be a Mod/CPE on several campaigns."
               action={<AssignForm action={addModAction.bind(null, id)} usernames={assignable} listId="assignable-mods" submitLabel="Add Mod / CPE" />}
             />
             <Card>

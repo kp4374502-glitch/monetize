@@ -61,13 +61,18 @@ describe("who can assign a Mod/CPE", () => {
     await denied(campaignSvc.removeMod("cpe1", A, row.id)); // a Mod can't remove Mods either
   });
 
-  it("works on one campaign at a time and never reaches across campaigns", async () => {
-    await expect(campaignSvc.addMod("owner", B, "cpe1")).rejects.toThrow(/one campaign at a time/);
+  it("can work on several campaigns (once each) and never reaches across campaigns", async () => {
+    const cpe1OnB = await campaignSvc.addMod("owner", B, "cpe1"); // already a Mod on A: allowed
+    await expect(campaignSvc.addMod("owner", A, "cpe1")).rejects.toThrow(/already a Mod\/CPE on this campaign/);
     const mine = await campaignSvc.addMod("owner", B, "cpe2");
     const [aRow] = await modRows(A);
     await campaignSvc.removeMod("owner", B, aRow.id); // A's row addressed through B: nothing happens
     expect((await modRows(A)).map((r) => r.userId)).toEqual(["cpe1"]);
+    expect((await modRows(B)).map((r) => r.userId).sort()).toEqual(["cpe1", "cpe2"]);
+    // Removing cpe1 from B leaves their A assignment alone.
+    await campaignSvc.removeMod("owner", B, cpe1OnB.id);
     expect((await modRows(B)).map((r) => r.id)).toEqual([mine.id]);
+    expect((await modRows(A)).map((r) => r.userId)).toEqual(["cpe1"]);
   });
 
   it("refuses unknown usernames, Admins and the Owner, with a clear message", async () => {

@@ -79,7 +79,7 @@ A platform-wide **Admin is a strict superset of Mod** — anything a Mod can do,
 
 ### Mod permissions (detailed)
 
-Unlike Admin, a Mod is **not** automatic across campaigns — they must be explicitly added to each one, and a single Mod account works on only **one campaign at a time** (no multi-campaign Mod assignment). There's no cap on how many Mods a single campaign can have. Despite being scoped to one campaign for review duties, a Mod **can still view** clips/creators in campaigns they aren't assigned to — that read visibility isn't restricted the way review authority is.
+Unlike Admin, a Mod is **not** automatic across campaigns — they must be explicitly added to each one, and a single Mod account can be assigned to **any number of campaigns** (once per campaign). There's no cap on how many Mods a single campaign can have. Despite being scoped to one campaign for review duties, a Mod **can still view** clips/creators in campaigns they aren't assigned to — that read visibility isn't restricted the way review authority is.
 
 **People**
 
@@ -198,7 +198,7 @@ Unlike Admin, a Mod is **not** automatic across campaigns — they must be expli
 
 ### Brand permissions (detailed)
 
-Read-only, per-campaign viewer for the brand whose campaign it is — not the same thing as the "approved brand" platform-onboarding concept elsewhere in this doc (see the naming note above). Added directly by username by the campaign's Owner or Admin, exactly like a Mod (no invite link) — and, like a Mod, a single Brand account works on only **one campaign at a time**.
+Read-only, per-campaign viewer for the brand whose campaign it is — not the same thing as the "approved brand" platform-onboarding concept elsewhere in this doc (see the naming note above). Added directly by username by the campaign's Owner or Admin, exactly like a Mod (no invite link) — but, unlike a Mod, a single Brand account works on only **one campaign at a time**.
 
 **Can**
 
@@ -421,11 +421,11 @@ Every campaign has the same cast: **Owner, Admin, Brand, Mod/CPE, Creator**. Cre
 | Role | Scope | Who assigns | Where |
 | --- | --- | --- | --- |
 | Admin | Platform-wide, every campaign | **Platform Owner only** | Header "Team" page (`/team`) |
-| Mod / CPE | One campaign at a time | Owner or Admin | That campaign's page, "Mod / CPE" |
+| Mod / CPE | Any number of campaigns, assigned one by one | Owner or Admin | That campaign's page, "Mod / CPE" |
 | Brand viewer | One campaign at a time, read-only | Owner or Admin | That campaign's page, "Brand viewers" |
 
 - Each form is a username box with a dropdown of eligible signed-up accounts (the Owner, Admins, and people already holding that role on this campaign are left out).
-- **Mod/CPE** reviews posts on their one campaign. They can Analytics Approve, reject, enter the audience %, generate invite links and refresh views. They **cannot** mark paid, delete, Post Approve, change settings, or assign roles. "CPE" is an internal label; in the app it is the Mod role.
+- **Mod/CPE** reviews posts on each campaign they're assigned to. They can Analytics Approve, reject, enter the audience %, generate invite links and refresh views. They **cannot** mark paid, delete, Post Approve, change settings, or assign roles. "CPE" is an internal label; in the app it is the Mod role.
 - **Only Owner and Admin mark paid.**
 - A creator can also be made a Mod/CPE on a campaign they joined: both memberships are kept and the Mod role wins. A Mod/CPE can never review, price or otherwise act on their **own** posts (another Mod, an Admin or the Owner has to).
 - A person can't be both Mod/CPE and Brand viewer on the same campaign, and an Owner/Admin can't be given a campaign-scoped role (they already see every campaign).

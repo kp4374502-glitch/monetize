@@ -149,6 +149,20 @@ export function startOfUtcDay(now: Date): Date {
 }
 
 /**
+ * Submission window: a post's link must reach Monetize within 30 minutes of the post going live on its
+ * platform (clips.posted_at, from ScrapeCreators -- never the submission time). A post submitted later is
+ * refused outright, nothing saved. An unknown posted_at is NOT treated as late: the clip is accepted and
+ * shows "post time unknown" so a reviewer can check it by hand (an API hiccup must not block creators).
+ * Exactly 30:00 still counts as on time.
+ */
+export const SUBMISSION_WINDOW_MINUTES = 30;
+
+export function isSubmittedTooLate(postedAt: Date | null, now: Date = new Date()): boolean {
+  if (postedAt === null) return false;
+  return now.getTime() - postedAt.getTime() > SUBMISSION_WINDOW_MINUTES * 60 * 1000;
+}
+
+/**
  * A clip has analytics proof if it carries a video link OR an accepted screenshot.
  *
  * Task 5 Part 2: new screenshot submission has been removed — a video link is now the only proof

@@ -277,8 +277,8 @@ export async function addBrand(actorId: string, campaignId: string, username: st
 }
 
 /**
- * Mod/CPE: reviews posts on this one campaign (one campaign at a time) but can never mark paid, delete,
- * Post Approve or change settings. Owner/Admin assign.
+ * Mod/CPE: reviews posts on the campaigns they're assigned to (any number of them, once each) but can
+ * never mark paid, delete, Post Approve or change settings. Owner/Admin assign.
  */
 export async function addMod(actorId: string, campaignId: string, username: string) {
   await requireRole(actorId, campaignId, "admin");
@@ -294,7 +294,7 @@ export async function addMod(actorId: string, campaignId: string, username: stri
     return row;
   } catch (e) {
     if (isUniqueViolation(e)) {
-      throw new Error("That user is already a Mod/CPE on a campaign (one campaign at a time).");
+      throw new Error("That user is already a Mod/CPE on this campaign.");
     }
     throw e;
   }
@@ -318,7 +318,8 @@ export async function listMods(actorId: string, campaignId: string) {
 /**
  * Usernames the Owner/Admin can pick from when assigning a Mod/CPE or Brand viewer on this campaign:
  * everyone who has signed up, minus the Owner, Admins, and people already holding one of those two
- * roles here. (A person already on another campaign is still listed; the one-campaign rule explains itself on add.)
+ * roles here. (A person already on another campaign is still listed: a Mod can work many campaigns, and a
+ * Brand viewer's one-campaign rule explains itself on add.)
  */
 export async function listAssignableUsernames(actorId: string, campaignId: string, limit = 1000) {
   await requireRole(actorId, campaignId, "admin");

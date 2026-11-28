@@ -104,7 +104,8 @@ export const platformAdmins = pgTable("platform_admins", {
 });
 
 // ---------------------------------------------------------------------------
-// campaign_mods — unique(userId): a Mod works one campaign at a time
+// campaign_mods — unique(campaignId, userId): a Mod/CPE can be assigned to any number of campaigns,
+// but only once per campaign
 // ---------------------------------------------------------------------------
 export const campaignMods = pgTable(
   "campaign_mods",
@@ -122,7 +123,7 @@ export const campaignMods = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
-    oneCampaignPerMod: unique("campaign_mods_user_id_unique").on(t.userId),
+    oneRowPerModPerCampaign: unique("campaign_mods_campaign_id_user_id_unique").on(t.campaignId, t.userId),
     campaignIdx: index("campaign_mods_campaign_id_idx").on(t.campaignId),
   }),
 );

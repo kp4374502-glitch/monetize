@@ -8,14 +8,36 @@ import {
   computeEconomics,
   duplicateFlag,
   effectiveViews,
+  isSubmittedTooLate,
   roleCanMarkPaid,
   roleCanOverride,
   startOfUtcDay,
+  SUBMISSION_WINDOW_MINUTES,
   wouldExceedBudget,
 } from "@/lib/clips/rules";
 import { isValidProofUrl, parseClipUrl } from "@/lib/clips/url";
 
 const campaign = { baseRate: 1, divisor: 50, maxPayPerPost: 500, viewMinimum: 1000 };
+
+describe("30-minute submission window", () => {
+  const posted = new Date("2026-11-24T17:00:00Z");
+  const at = (min: number, sec = 0) => new Date(posted.getTime() + min * 60_000 + sec * 1000);
+  it("is on time up to and including exactly 30:00 after posting", () => {
+    expect(isSubmittedTooLate(posted, at(0))).toBe(false);
+    expect(isSubmittedTooLate(posted, at(29, 59))).toBe(false);
+    expect(isSubmittedTooLate(posted, at(30))).toBe(false);
+  });
+  it("is late from 30:01 on", () => {
+    expect(isSubmittedTooLate(posted, at(30, 1))).toBe(true);
+    expect(isSubmittedTooLate(posted, at(60 * 24 * 11))).toBe(true);
+  });
+  it("never treats an unknown post time as late", () => {
+    expect(isSubmittedTooLate(null, at(9999))).toBe(false);
+  });
+  it("uses a 30-minute window", () => {
+    expect(SUBMISSION_WINDOW_MINUTES).toBe(30);
+  });
+});
 
 describe("budget cap", () => {
   it("allows a payout that lands exactly on the cap", () => {

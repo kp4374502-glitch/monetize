@@ -31,7 +31,8 @@ const body = (views: number) => ({
 });
 const okFetch = (views: number) => (async () => ({ ok: true, status: 200, json: async () => body(views) })) as unknown as typeof fetch;
 const sleep = async () => {};
-const opts = (views = 100_000) => ({ fetchImpl: okFetch(views), sleep });
+// The post is 30 days old on purpose, so the 30-minute submission window is switched off here.
+const opts = (views = 100_000) => ({ fetchImpl: okFetch(views), sleep, enforceSubmissionWindow: false });
 
 async function submit(creator: string, campaignId: string, views = 100_000) {
   return (await svc.submitClip(creator, campaignId, tiktok(), opts(views))).clip;

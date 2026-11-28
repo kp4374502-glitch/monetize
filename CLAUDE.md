@@ -37,7 +37,7 @@ Quick summary:
   authority, no restrictions.
 - **Admin** — platform-wide, automatically active on every campaign, strict superset of Mod. Made by
   the platform Owner only (header "Team" page).
-- **Mod / CPE** — assigned per campaign by Owner/Admin, one campaign at a time. Reviews posts but can
+- **Mod / CPE** — assigned per campaign by Owner/Admin, on any number of campaigns (once each). Reviews posts but can
   never mark paid, delete or Post Approve. **Only Owner and Admin mark paid.**
 - **Brand** — read-only viewer, assigned per campaign by Owner/Admin, one campaign at a time.
 - **Creator** — self-serve sign-up + onboarding (/sign-up -> /onboarding -> /explore), then joins active campaigns in one click or via reusable invite links, fully isolated from other creators'
@@ -52,6 +52,12 @@ Payout   = min(Earnings, Max Pay Per Post)
 `Base Rate`, `Divisor`, `Max Pay Per Post`, `View Minimum` and `Total Budget` all live on the
 `campaigns` row — never hardcode them. (`mod_mark_paid_threshold` is retired and unused.) Full detail and a
 worked example are in docs/PRODUCT_SPEC.md → "Payout formula".
+
+## Submission window
+A post link must be submitted within **30 minutes** of the post going live on its platform
+(`clips.posted_at` from ScrapeCreators, never the submission time) — later submissions are refused and
+nothing is saved. If ScrapeCreators can't return the post time, the clip is accepted and shown to
+reviewers as "post time unknown" for a manual check. See `isSubmittedTooLate` in lib/clips/rules.ts.
 
 ## Verification flow
 **Exception:** a campaign with `campaigns.require_analytics_proof = false` (Efootball Diwali) skips all of this —

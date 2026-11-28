@@ -228,6 +228,13 @@ export function ClipHistoryBrowser({
                     </div>
                   )}
                   <p className="mt-1 text-xs text-text-secondary">Submitted {submittedOn(c.submittedAt)}</p>
+                  {/* 30-minute window: an unknown post time was let through, so a reviewer checks it by hand.
+                      (Proof-gated clips already say "Post date unknown" below; don't say it twice.) */}
+                  {c.postedAt === null && !(gate.locked && gate.reason === "unknown_posted_at") && (
+                    <p className="mt-1 text-xs text-amber-300" data-testid="posted-at-unknown">
+                      Post time unknown — couldn&apos;t check the 30-minute submission window. Check it by hand.
+                    </p>
+                  )}
                   {/* Instagram photo/carousel only (ScrapeCreators has no views for it). Hidden once paid
                       or rejected, same as the server, which refuses a paid post. */}
                   {canReview && canSetManualViews(c) && c.paidStatus !== "paid" && c.status !== "rejected" && (

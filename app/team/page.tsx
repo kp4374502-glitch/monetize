@@ -51,7 +51,7 @@ export default async function TeamPage() {
         <ul className="mt-2 grid gap-1.5">
           <li><strong className="text-text-primary">Owner</strong>: everything, including making Admins.</li>
           <li><strong className="text-text-primary">Admin</strong>: every campaign; reviews, Post Approves, marks paid, deletes, and adds Mods/CPEs and Brand viewers.</li>
-          <li><strong className="text-text-primary">Mod / CPE</strong>: one campaign; reviews posts, never marks paid or deletes. Added from that campaign&apos;s page.</li>
+          <li><strong className="text-text-primary">Mod / CPE</strong>: any number of campaigns; reviews posts, never marks paid or deletes. Added from that campaign&apos;s page.</li>
           <li><strong className="text-text-primary">Brand</strong>: one campaign; read-only. Added from that campaign&apos;s page.</li>
           <li><strong className="text-text-primary">Creator</strong>: submits posts and sees only their own.</li>
         </ul>

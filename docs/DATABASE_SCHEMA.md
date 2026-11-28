@@ -34,7 +34,7 @@ Every table holding campaign-specific data carries a `campaign_id` — this is t
 - `id` (pk)
 - `campaign_id` (fk campaigns)
 - `user_id` (fk users)
-- `unique(user_id)` — enforces "one Mod account works on only one campaign as Mod at a time"
+- `unique(campaign_id, user_id)` — a Mod/CPE can work on any number of campaigns, but is listed once per campaign
 - `added_by` (fk users), `created_at`
 
 ## campaign\_brands
@@ -178,7 +178,7 @@ When each person last opened each channel; drives the per-viewer "N new" badges.
 ## Relationships summary
 
 - One `platform_owner` (flag on `users`, not a separate table)
-- `users` —< `campaign_mods` >— `campaigns` (join table; unique(user\_id) keeps a Mod on exactly one campaign)
+- `users` —< `campaign_mods` >— `campaigns` (join table; unique(campaign\_id, user\_id) — a Mod can be on many campaigns, once each)
 - `users` —< `campaign_brands` >— `campaigns` (join table; unique(user\_id) keeps a Brand viewer on exactly one campaign, same as Mod)
 - `users` —< `campaign_creators` >— `campaigns` (join table; unlimited campaigns per creator)
 - `campaigns` 1—1 `owner_user_id`

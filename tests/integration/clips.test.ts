@@ -50,7 +50,13 @@ const okFetch = (views: number, postedDaysAgo: number | null = 30) =>
   (async () => ({ ok: true, status: 200, json: async () => tiktokBody(views, postedDaysAgo) })) as unknown as typeof fetch;
 const failFetch = (async () => ({ ok: false, status: 500, json: async () => ({}) })) as unknown as typeof fetch;
 const sleep = async () => {};
-const opts = (views = 5000, postedDaysAgo: number | null = 30) => ({ fetchImpl: okFetch(views, postedDaysAgo), sleep });
+// These posts are deliberately days old (see above), so the 30-minute submission window is switched off
+// for them; the window itself is covered by its own describe block below.
+const opts = (views = 5000, postedDaysAgo: number | null = 30) => ({
+  fetchImpl: okFetch(views, postedDaysAgo),
+  sleep,
+  enforceSubmissionWindow: false,
+});
 
 // Real Instagram shape: a photo/carousel has is_video: false and NO video_play_count/video_view_count at
 // all — that's the confirmation manual view entry relies on, not the views number itself being 0.
@@ -66,7 +72,7 @@ const igBody = (isVideo: boolean, views: number, likes = 40, postedDaysAgo: numb
 });
 const igFetch = (isVideo: boolean, views: number, likes = 40, postedDaysAgo: number | null = 30) =>
   (async () => ({ ok: true, status: 200, json: async () => igBody(isVideo, views, likes, postedDaysAgo) })) as unknown as typeof fetch;
-const igOpts = (isVideo: boolean, views = 0, likes = 40) => ({ fetchImpl: igFetch(isVideo, views, likes), sleep });
+const igOpts = (isVideo: boolean, views = 0, likes = 40) => ({ fetchImpl: igFetch(isVideo, views, likes), sleep, enforceSubmissionWindow: false });
 
 async function makeClip(creator: string, campaignId = camp, views = 5000) {
   const { clip } = await svc.submitClip(creator, campaignId, tiktok(), opts(views));
@@ -238,6 +244,33 @@ describe("submitClip", () => {
     const { clip, statsAvailable } = await svc.submitClip("c1", camp, tiktok(), { fetchImpl: failFetch, sleep });
     expect(statsAvailable).toBe(false);
     expect(clip).toMatchObject({ views: 0, lastRefreshedAt: null });
+  });
+});
+
+describe("30-minute submission window", () => {
+  // The real rule, switched on (the default) -- unlike opts() above.
+  const postedMinutesAgo = (min: number) => ({ fetchImpl: okFetch(5000, min / 1440), sleep });
+
+  it("accepts a post submitted 10 minutes after it went live", async () => {
+    const { clip } = await svc.submitClip("c1", camp, tiktok(), postedMinutesAgo(10));
+    expect(clip.postedAt).not.toBeNull();
+  });
+
+  it("refuses a post submitted 31 minutes after it went live, and saves nothing", async () => {
+    const url = tiktok();
+    await expect(svc.submitClip("c1", camp, url, postedMinutesAgo(31))).rejects.toThrow(
+      /more than 30 minutes ago\. Links must be submitted within 30 minutes of posting/,
+    );
+    expect(await db.select().from(clips).where(eq(clips.url, url))).toHaveLength(0);
+  });
+
+  it("refuses a post that went live days ago", async () => {
+    await expect(svc.submitClip("c1", camp, tiktok(), { fetchImpl: okFetch(5000, 2), sleep })).rejects.toThrow(/30 minutes/);
+  });
+
+  it("accepts a post whose time ScrapeCreators couldn't return, with posted_at left unknown", async () => {
+    const { clip } = await svc.submitClip("c1", camp, tiktok(), { fetchImpl: okFetch(5000, null), sleep });
+    expect(clip.postedAt).toBeNull();
   });
 });
 

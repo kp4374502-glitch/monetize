@@ -54,10 +54,10 @@ beforeAll(async () => {
 
 describe("turning X on for a campaign", () => {
   it("is refused until the campaign allows X, then works", async () => {
-    await expect(clipSvc.submitClip("c1", A, `https://x.com/nasa/status/${POST_ID}`, { fetchImpl: xFetch(), sleep })).rejects.toThrow(/x posts are not eligible/i);
+    await expect(clipSvc.submitClip("c1", A, `https://x.com/nasa/status/${POST_ID}`, { fetchImpl: xFetch(), sleep, enforceSubmissionWindow: false })).rejects.toThrow(/x posts are not eligible/i);
 
     expect(await campaignSvc.setEligiblePlatforms("owner", A, ["tiktok", "x"])).toEqual(["tiktok", "x"]);
-    const { clip, statsAvailable } = await clipSvc.submitClip("c1", A, `https://twitter.com/NASA/status/${POST_ID}?s=20`, { fetchImpl: xFetch(), sleep });
+    const { clip, statsAvailable } = await clipSvc.submitClip("c1", A, `https://twitter.com/NASA/status/${POST_ID}?s=20`, { fetchImpl: xFetch(), sleep, enforceSubmissionWindow: false });
     expect(statsAvailable).toBe(true);
     expect(clip).toMatchObject({ platform: "x", url: `https://x.com/nasa/status/${POST_ID}`, views: 1350083, likes: 7850, status: "awaiting_analytics", isVideo: true });
     expect(clip.postedAt?.toISOString()).toBe("2026-10-23T23:37:56.000Z");
@@ -65,14 +65,14 @@ describe("turning X on for a campaign", () => {
   });
 
   it("sees the same post as a duplicate whatever the URL spelling", async () => {
-    await expect(clipSvc.submitClip("c1", A, `https://x.com/NASA/status/${POST_ID}/photo/1`, { fetchImpl: xFetch(), sleep })).rejects.toThrow();
-    await expect(clipSvc.submitClip("c2", A, `https://x.com/i/web/status/${POST_ID}`, { fetchImpl: xFetch(), sleep })).resolves.toBeTruthy(); // another creator: flagged, not blocked
+    await expect(clipSvc.submitClip("c1", A, `https://x.com/NASA/status/${POST_ID}/photo/1`, { fetchImpl: xFetch(), sleep, enforceSubmissionWindow: false })).rejects.toThrow();
+    await expect(clipSvc.submitClip("c2", A, `https://x.com/i/web/status/${POST_ID}`, { fetchImpl: xFetch(), sleep, enforceSubmissionWindow: false })).resolves.toBeTruthy(); // another creator: flagged, not blocked
     const flagged = await db.select().from(clips).where(eq(clips.creatorUserId, "c2"));
     expect(flagged[0].flaggedDuplicate).toBe(true);
   });
 
   it("stores 0 views, not a failure, for a post X reports no count for", async () => {
-    const { clip, statsAvailable } = await clipSvc.submitClip("c2", A, "https://x.com/someone/status/1519480761749016577", { fetchImpl: xFetch(null), sleep });
+    const { clip, statsAvailable } = await clipSvc.submitClip("c2", A, "https://x.com/someone/status/1519480761749016577", { fetchImpl: xFetch(null), sleep, enforceSubmissionWindow: false });
     expect(statsAvailable).toBe(true);
     expect(clip.views).toBe(0);
   });
@@ -90,13 +90,13 @@ describe("turning X on for a campaign", () => {
   it("only changes the campaign it is addressed to", async () => {
     const [b] = await db.select().from(campaigns).where(eq(campaigns.id, B));
     expect(b.eligiblePlatforms).toEqual(["tiktok"]);
-    await expect(clipSvc.submitClip("c1", B, "https://x.com/nasa/status/2114801524358406570", { fetchImpl: xFetch(), sleep })).rejects.toThrow(/not eligible/);
+    await expect(clipSvc.submitClip("c1", B, "https://x.com/nasa/status/2114801524358406570", { fetchImpl: xFetch(), sleep, enforceSubmissionWindow: false })).rejects.toThrow(/not eligible/);
   });
 
   it("switching X back off leaves posts already submitted exactly as they are", async () => {
     const before = (await db.select().from(clips).where(eq(clips.platform, "x"))).length;
     await campaignSvc.setEligiblePlatforms("owner", A, ["tiktok"]);
     expect((await db.select().from(clips).where(eq(clips.platform, "x"))).length).toBe(before);
-    await expect(clipSvc.submitClip("c1", A, "https://x.com/nasa/status/2114801524358406570", { fetchImpl: xFetch(), sleep })).rejects.toThrow(/not eligible/);
+    await expect(clipSvc.submitClip("c1", A, "https://x.com/nasa/status/2114801524358406570", { fetchImpl: xFetch(), sleep, enforceSubmissionWindow: false })).rejects.toThrow(/not eligible/);
   });
 });

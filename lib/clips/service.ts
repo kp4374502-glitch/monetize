@@ -17,6 +17,8 @@ import {
   hasAnalyticsProof,
   computeEconomics,
   duplicateFlag,
+  isSubmittedTooLate,
+  SUBMISSION_WINDOW_MINUTES,
   roleCanMarkPaid,
   roleCanOverride,
   startOfUtcDay,
@@ -102,7 +104,16 @@ function economicsColumns(
 // Creator actions
 // ---------------------------------------------------------------------------------------------
 
-export async function submitClip(actorId: string, campaignId: string, rawUrl: string, fetchOpts?: FetchOptions) {
+/**
+ * `enforceSubmissionWindow: false` exists only for tests that need to create a clip for a post that is
+ * already days old (e.g. the 7-day analytics gate). The app's own call sites never pass it.
+ */
+export async function submitClip(
+  actorId: string,
+  campaignId: string,
+  rawUrl: string,
+  fetchOpts?: FetchOptions & { enforceSubmissionWindow?: boolean },
+) {
   const [membership] = await db
     .select()
     .from(campaignCreators)
@@ -150,6 +161,14 @@ export async function submitClip(actorId: string, campaignId: string, rawUrl: st
 
   const meta = await fetchClipMetadata(parsed.url, parsed.platform, fetchOpts);
   const views = meta.ok ? meta.data.views : 0;
+
+  // 30-minute submission window, measured from the post's own publish time. Unknown time = accepted
+  // (shown to reviewers as "post time unknown"), never guessed -- see isSubmittedTooLate.
+  if (fetchOpts?.enforceSubmissionWindow !== false && isSubmittedTooLate(meta.ok ? meta.data.postedAt : null, new Date())) {
+    throw new Error(
+      `This post went live more than ${SUBMISSION_WINDOW_MINUTES} minutes ago. Links must be submitted within ${SUBMISSION_WINDOW_MINUTES} minutes of posting.`,
+    );
+  }
 
   try {
     const [row] = await db
